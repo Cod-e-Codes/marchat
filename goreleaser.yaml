@@ -1,4 +1,4 @@
-version: '2'
+version: 2
 # goreleaser.yaml for marchat 🧃
 # Builds client & server, cross-compiles, archives, publishes GitHub releases
 
