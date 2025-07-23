@@ -2,6 +2,7 @@
 # Builds client & server, cross-compiles, archives, publishes GitHub releases
 
 project_name: marchat
+
 builds:
   - id: server
     main: ./cmd/server/main.go
@@ -51,9 +52,6 @@ archives:
 
 checksum:
   name_template: "checksums.txt"
-
-checksum:
-  name_template: "checksums.txt"
   algorithm: sha256
 
 snapshot:
@@ -63,14 +61,12 @@ changelog:
   use: git
 
 release:
-  # Publish on GitHub releases
   github:
     owner: Cod-e-Codes
     name: marchat
     draft: false
     prerelease: false
 
-# Optional: to clean dist folder each run
 before:
   hooks:
     - rm -rf dist
