@@ -1,0 +1,76 @@
+# goreleaser.yaml for marchat 🧃
+# Builds client & server, cross-compiles, archives, publishes GitHub releases
+
+project_name: marchat
+builds:
+  - id: server
+    main: ./cmd/server/main.go
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+    binary: marchat-server
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    goflags:
+      - -mod=readonly
+
+  - id: client
+    main: ./client/main.go
+    goos:
+      - linux
+      - windows
+      - darwin
+    goarch:
+      - amd64
+    binary: marchat-client
+    env:
+      - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+    goflags:
+      - -mod=readonly
+
+archives:
+  - id: archive
+    builds:
+      - server
+      - client
+    format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+      - config.json
+    replacements:
+      darwin: macOS
+
+checksum:
+  name_template: "checksums.txt"
+
+checksum:
+  name_template: "checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  name_template: "{{ .Tag }}-snapshot"
+
+changelog:
+  use: git
+
+release:
+  # Publish on GitHub releases
+  github:
+    owner: Cod-e-Codes
+    name: marchat
+    draft: false
+    prerelease: false
+
+# Optional: to clean dist folder each run
+before:
+  hooks:
+    - rm -rf dist
