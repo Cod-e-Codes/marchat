@@ -41,16 +41,11 @@ archives:
       - server
       - client
     format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ if eq .Os \"darwin\" }}macOS{{ else }}{{ .Os }}{{ end }}_{{ .Arch }}"
     files:
       - LICENSE
       - README.md
       - config.json
-    format_overrides:
-      - goos: darwin
-        format: tar.gz
-        replacements:
-          darwin: macOS
 
 checksum:
   name_template: "checksums.txt"
@@ -63,11 +58,11 @@ changelog:
   use: git
 
 release:
+  draft: false
+  prerelease: false
   github:
     owner: Cod-e-Codes
     name: marchat
-    draft: false
-    prerelease: false
 
 before:
   hooks:
