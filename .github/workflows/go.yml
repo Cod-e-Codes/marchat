@@ -3,7 +3,8 @@ name: Go CI and Release
 on:
   push:
     branches: [ main ]
-    # You can also trigger release on tags if desired
+    tags:
+      - 'v*'  # Runs on version tags like v0.1.0 or v0.1.0-beta.1
   pull_request:
     branches: [ main ]
 
