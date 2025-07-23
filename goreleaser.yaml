@@ -1,6 +1,4 @@
 version: 2
-# goreleaser.yaml for marchat 🧃
-# Builds client & server, cross-compiles, archives, publishes GitHub releases
 
 project_name: marchat
 
@@ -18,7 +16,7 @@ builds:
       - CGO_ENABLED=0
     ldflags:
       - -s -w
-    goflags:
+    flags:
       - -mod=readonly
 
   - id: client
@@ -34,7 +32,7 @@ builds:
       - CGO_ENABLED=0
     ldflags:
       - -s -w
-    goflags:
+    flags:
       - -mod=readonly
 
 archives:
@@ -48,8 +46,11 @@ archives:
       - LICENSE
       - README.md
       - config.json
-    replacements:
-      darwin: macOS
+    format_overrides:
+      - goos: darwin
+        format: tar.gz
+        replacements:
+          darwin: macOS
 
 checksum:
   name_template: "checksums.txt"
