@@ -9,7 +9,7 @@ require (
 	github.com/alecthomas/chroma v0.10.0
 	github.com/atotto/clipboard v0.1.4
 	github.com/charmbracelet/bubbles v0.21.0
-	github.com/charmbracelet/bubbletea v1.3.8
+	github.com/charmbracelet/bubbletea v1.3.10
 	github.com/charmbracelet/lipgloss v1.1.1-0.20250404203927-76690c660834
 	github.com/charmbracelet/x/term v0.2.1
 	github.com/gorilla/websocket v1.5.3
