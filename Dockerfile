@@ -14,7 +14,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build \
     -o marchat-server ./cmd/server
 
 # === Runtime Stage ===
-FROM alpine:3.21
+FROM alpine:3.3.5-r0
 
 # Update the package index and upgrade all installed packages
 RUN apk update && apk upgrade --no-cache
