@@ -38,6 +38,18 @@ var configPath = flag.String("config", "", "Path to server config file (JSON, de
 var configDir = flag.String("config-dir", "", "Configuration directory (default: ./config in dev, $XDG_CONFIG_HOME/marchat in prod)")
 var enableAdminPanel = flag.Bool("admin-panel", false, "Enable the built-in admin panel TUI")
 var enableWebPanel = flag.Bool("web-panel", false, "Enable the built-in web admin panel (served at /admin)")
+var nonInteractiveFlag = flag.Bool("non-interactive", false, "Disable interactive setup; exit if required config is missing (or set MARCHAT_NON_INTERACTIVE=1)")
+
+// getEnvBool returns true if the specified env var is set to a truthy value
+func getEnvBool(name string) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(name)))
+	switch v {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
+	}
+}
 
 func printBanner(addr string, admins []string, scheme string, tlsEnabled bool) {
 	fmt.Println(`
@@ -142,7 +154,22 @@ func main() {
 		}
 	}
 
+	// Determine if we should skip interactive setup
+	isTTY := term.IsTerminal(os.Stdin.Fd())
+	nonInteractive := *nonInteractiveFlag || getEnvBool("MARCHAT_NON_INTERACTIVE") || !isTTY
+
 	if needsInteractiveConfig {
+		if nonInteractive {
+			// Print clear non-interactive error and exit
+			fmt.Fprintln(os.Stderr, "Missing required configuration and interactive setup is disabled.")
+			if missingRequired {
+				fmt.Fprintln(os.Stderr, "Set MARCHAT_ADMIN_KEY and MARCHAT_USERS (comma-separated) to proceed.")
+			} else if missingE2E {
+				fmt.Fprintln(os.Stderr, "Set MARCHAT_GLOBAL_E2E_KEY or allow the server to generate one on first run in interactive mode.")
+			}
+			fmt.Fprintln(os.Stderr, "Tip: Remove --non-interactive, unset MARCHAT_NON_INTERACTIVE, or run in a TTY to use guided setup.")
+			os.Exit(2)
+		}
 		fmt.Println("🚀 Welcome to marchat server setup!")
 		if missingRequired {
 			fmt.Println("Some required configuration is missing. Let's set it up interactively.")

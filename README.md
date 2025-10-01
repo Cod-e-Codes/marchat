@@ -26,6 +26,7 @@ A lightweight terminal chat with separate server and client binaries, real-time 
   - [Source Installation](#source-installation)
 - [Quick Start](#quick-start)  
 - [Configuration](#configuration)
+  - [Non-Interactive Mode](#non-interactive-mode)
 - [Admin Panel](#admin-panel)
 - [TLS Support](#tls-support)
 - [Plugin System](#plugin-system)
@@ -246,6 +247,7 @@ docker run -it -p 8080:8080 codecodesxyz/marchat:v0.8.0-beta.2
 # Or run with environment variables (for non-interactive/background use)
 docker run -d \
   -p 8080:8080 \
+  -e MARCHAT_NON_INTERACTIVE=1 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
   codecodesxyz/marchat:v0.8.0-beta.2
@@ -324,6 +326,32 @@ export MARCHAT_USERS="admin1,admin2"
 | `MARCHAT_GLOBAL_E2E_KEY` | No | - | Base64-encoded 32-byte global encryption key for public channels |
 | `MARCHAT_MAX_FILE_BYTES` | No | `1048576` | Maximum file size in bytes for file messages (takes precedence) |
 | `MARCHAT_MAX_FILE_MB` | No | - | Maximum file size in megabytes (used if bytes unset) |
+| `MARCHAT_NON_INTERACTIVE` | No | `auto` | Set to `1`/`true` to disable interactive setup and exit if required config is missing. Auto-disabled when stdin is not a TTY (e.g., Docker, Unraid, systemd). |
+
+### Non-Interactive Mode
+
+Some environments (Docker, Unraid, systemd services, CI) do not provide an interactive TTY for the server’s guided setup. In these cases you can explicitly disable the setup prompt:
+
+```bash
+# Disable interactive setup and exit if required config is missing
+./marchat-server --non-interactive
+
+# Or via environment variable
+export MARCHAT_NON_INTERACTIVE=1
+./marchat-server
+
+# Docker/Compose example
+docker run -d \
+  -p 8080:8080 \
+  -e MARCHAT_NON_INTERACTIVE=1 \
+  -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
+  -e MARCHAT_USERS=admin1,admin2 \
+  codecodesxyz/marchat:v0.8.0-beta.2
+```
+
+Notes:
+- When non-interactive mode is active and required settings are missing, the server exits with a clear error. Set `MARCHAT_ADMIN_KEY` and `MARCHAT_USERS` to start successfully.
+- If stdin is not a terminal (no TTY), the server automatically disables the interactive prompt even without the flag or environment variable.
 
 ### Configuration File
 
