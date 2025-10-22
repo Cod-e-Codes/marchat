@@ -135,11 +135,11 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.9.0-beta.2
+docker pull codecodesxyz/marchat:v0.9.0-beta.3
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.9.0-beta.2
+  codecodesxyz/marchat:v0.9.0-beta.3
 ```
 
 **From Source:**

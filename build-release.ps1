@@ -1,9 +1,9 @@
-# Build script for marchat v0.9.0-beta.2
+# Build script for marchat v0.9.0-beta.3
 # This script builds all platform targets and creates release zips
 
 $ErrorActionPreference = "Stop"
 
-$VERSION = "v0.9.0-beta.2"
+$VERSION = "v0.9.0-beta.3"
 $BUILD_DIR = "build"
 $RELEASE_DIR = "release"
 
