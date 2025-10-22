@@ -17,6 +17,7 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **Client Improvements**: Added vim-style :q quit command for safer application exit
 - **Theme System Fixes**: Case-insensitive theme lookup, theme persistence across logins, improved UI redraw
 - **ESC Key Behavior**: ESC now only closes menus/dialogs, preventing accidental quits
+- **Database Backup**: Improved WAL mode backup with VACUUM INTO and WAL checkpoint
 - **Documentation**: Updated with :q command documentation and corrected ESC behavior
 
 ### Recent Releases
