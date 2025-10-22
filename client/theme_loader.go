@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
@@ -129,6 +130,32 @@ func IsCustomTheme(themeName string) bool {
 func GetCustomTheme(themeName string) (ThemeDefinition, bool) {
 	theme, exists := customThemes[themeName]
 	return theme, exists
+}
+
+// GetCustomThemeByName performs case-insensitive lookup of custom themes by display name
+func GetCustomThemeByName(displayName string) (string, ThemeDefinition, bool) {
+	displayNameLower := strings.ToLower(displayName)
+
+	// First try exact key match
+	if theme, exists := customThemes[displayNameLower]; exists {
+		return displayNameLower, theme, true
+	}
+
+	// Then try case-insensitive key match
+	for key, theme := range customThemes {
+		if strings.ToLower(key) == displayNameLower {
+			return key, theme, true
+		}
+	}
+
+	// Finally try case-insensitive display name match
+	for key, theme := range customThemes {
+		if strings.ToLower(theme.Name) == displayNameLower {
+			return key, theme, true
+		}
+	}
+
+	return "", ThemeDefinition{}, false
 }
 
 // ListAllThemes returns all available themes (built-in + custom)

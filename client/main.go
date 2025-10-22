@@ -52,19 +52,20 @@ var urlRegex *regexp.Regexp
 
 // keyMap defines all keybindings for the help system
 type keyMap struct {
-	Send       key.Binding
-	ScrollUp   key.Binding
-	ScrollDown key.Binding
-	PageUp     key.Binding
-	PageDown   key.Binding
-	Copy       key.Binding
-	Paste      key.Binding
-	Cut        key.Binding
-	SelectAll  key.Binding
-	Help       key.Binding
-	Quit       key.Binding
-	TimeFormat key.Binding
-	Clear      key.Binding
+	Send        key.Binding
+	ScrollUp    key.Binding
+	ScrollDown  key.Binding
+	PageUp      key.Binding
+	PageDown    key.Binding
+	Copy        key.Binding
+	Paste       key.Binding
+	Cut         key.Binding
+	SelectAll   key.Binding
+	Help        key.Binding
+	Quit        key.Binding
+	TimeFormat  key.Binding
+	Clear       key.Binding
+	QuitCommand key.Binding
 	// Commands with both text commands and hotkey alternatives
 	SendFile    key.Binding
 	SaveFile    key.Binding
@@ -176,7 +177,7 @@ func newKeyMap() keyMap {
 		),
 		Quit: key.NewBinding(
 			key.WithKeys("esc"),
-			key.WithHelp("esc", "quit"),
+			key.WithHelp("esc", "close menus"),
 		),
 		TimeFormat: key.NewBinding(
 			key.WithKeys(":time"),
@@ -185,6 +186,10 @@ func newKeyMap() keyMap {
 		Clear: key.NewBinding(
 			key.WithKeys(":clear"),
 			key.WithHelp(":clear", "clear chat history"),
+		),
+		QuitCommand: key.NewBinding(
+			key.WithKeys(":q"),
+			key.WithHelp(":q", "quit client"),
 		),
 		SendFile: key.NewBinding(
 			key.WithKeys(":sendfile"),
@@ -572,9 +577,62 @@ func debugWebSocketWrite(ws *websocket.Conn, msg interface{}) error {
 	return ws.WriteJSON(msg)
 }
 
+// getCurrentProfileName finds the profile name that matches the current config
+func getCurrentProfileName(cfg *config.Config) string {
+	loader, err := config.NewInteractiveConfigLoader()
+	if err != nil {
+		return "" // Can't determine profile name
+	}
+
+	profiles, err := loader.LoadProfiles()
+	if err != nil {
+		return "" // Can't load profiles
+	}
+
+	// Find matching profile
+	for _, profile := range profiles.Profiles {
+		if profile.Username == cfg.Username &&
+			profile.ServerURL == cfg.ServerURL &&
+			profile.IsAdmin == cfg.IsAdmin &&
+			profile.UseE2E == cfg.UseE2E {
+			return profile.Name
+		}
+	}
+
+	return "" // No matching profile found
+}
+
+// updateProfileTheme updates the theme in the corresponding profile in profiles.json
+func (m *model) updateProfileTheme(newTheme string) error {
+	if m.profileName == "" {
+		return nil // No profile to update
+	}
+
+	loader, err := config.NewInteractiveConfigLoader()
+	if err != nil {
+		return err
+	}
+
+	profiles, err := loader.LoadProfiles()
+	if err != nil {
+		return err
+	}
+
+	// Find and update the matching profile
+	for i, profile := range profiles.Profiles {
+		if profile.Name == m.profileName {
+			profiles.Profiles[i].Theme = newTheme
+			return loader.SaveProfiles(profiles)
+		}
+	}
+
+	return nil // Profile not found, nothing to update
+}
+
 type model struct {
 	cfg            config.Config
 	configFilePath string // Store the config file path for saving
+	profileName    string // Store the current profile name for updating profiles.json
 	textarea       textarea.Model
 	viewport       viewport.Model
 	messages       []shared.Message
@@ -1439,8 +1497,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.selectedUser = ""
 				return m, nil
 			}
-			m.closeWebSocket()
-			return m, tea.Quit
+			// ESC no longer quits - use :q command instead
+			return m, nil
 		case key.Matches(v, m.keys.DatabaseMenu):
 			// Only show database menu if admin and no other menus are open
 			if *isAdmin && !m.showHelp {
@@ -1515,13 +1573,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			nextIndex := (currentIndex + 1) % len(themes)
-			m.cfg.Theme = themes[nextIndex]
+			newTheme := themes[nextIndex]
+			m.cfg.Theme = newTheme
 			m.styles = getThemeStyles(m.cfg.Theme)
 			_ = config.SaveConfig(m.configFilePath, m.cfg)
+
+			// Update profile with new theme
+			_ = m.updateProfileTheme(newTheme)
 
 			// Show theme info in banner
 			themeInfo := GetThemeInfo(m.cfg.Theme)
 			m.banner = fmt.Sprintf("Theme: %s", themeInfo)
+
+			// Redraw viewport and user list with new theme
+			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+			m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
 			return m, nil
 		case key.Matches(v, m.keys.TimeFormatHotkey):
 			// Toggle time format
@@ -1926,23 +1992,43 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(parts) == 2 && strings.TrimSpace(parts[1]) != "" {
 					themeName := strings.TrimSpace(parts[1])
 
-					// Check if theme exists
+					// Check if theme exists using case-insensitive lookup
 					allThemes := ListAllThemes()
 					themeExists := false
+					actualThemeName := themeName
+
+					// First try exact match
 					for _, t := range allThemes {
 						if t == themeName {
 							themeExists = true
+							actualThemeName = t
 							break
+						}
+					}
+
+					// If not found, try case-insensitive match for custom themes
+					if !themeExists {
+						if key, _, found := GetCustomThemeByName(themeName); found {
+							themeExists = true
+							actualThemeName = key
 						}
 					}
 
 					if !themeExists {
 						m.banner = fmt.Sprintf("Theme '%s' not found. Use :themes to list available themes.", themeName)
 					} else {
-						m.cfg.Theme = themeName
+						m.cfg.Theme = actualThemeName
 						m.styles = getThemeStyles(m.cfg.Theme)
 						_ = config.SaveConfig(m.configFilePath, m.cfg)
-						m.banner = fmt.Sprintf("Theme changed to: %s", GetThemeInfo(themeName))
+
+						// Update profile with new theme
+						_ = m.updateProfileTheme(actualThemeName)
+
+						m.banner = fmt.Sprintf("Theme changed to: %s", GetThemeInfo(actualThemeName))
+
+						// Redraw viewport and user list with new theme
+						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+						m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
 					}
 				} else {
 					m.banner = "Please provide a theme name. Use :themes to list available themes."
@@ -1956,6 +2042,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.banner = "Chat cleared."
 				m.textarea.SetValue("")
 				return m, nil
+			}
+			if text == ":q" {
+				m.closeWebSocket()
+				m.textarea.SetValue("")
+				return m, tea.Quit
 			}
 			// Individual E2E encryption commands removed - only global E2E encryption supported
 			if text == ":time" {
@@ -2183,7 +2274,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.conn != nil {
 					// Check if this is a server-side command (admin/plugin) that should bypass encryption
 					// Client-side commands are handled above and never reach this point
-					clientOnlyCommands := []string{":theme", ":time", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile"}
+					clientOnlyCommands := []string{":theme", ":time", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q"}
 					isClientCommand := false
 					for _, cmd := range clientOnlyCommands {
 						// Check if text is exactly the command or starts with "command "
@@ -3346,6 +3437,7 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	m := &model{
 		cfg:               *cfg,
 		configFilePath:    configFilePath,
+		profileName:       getCurrentProfileName(cfg),
 		textarea:          ta,
 		viewport:          vp,
 		styles:            getThemeStyles(cfg.Theme),

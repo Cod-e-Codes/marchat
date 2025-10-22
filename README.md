@@ -45,7 +45,6 @@ Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/relea
 
 - **Terminal UI** - Beautiful TUI built with Bubble Tea
 - **Real-time Chat** - Fast WebSocket messaging with SQLite backend (PostgreSQL/MySQL planned)
-- **Database Performance** - SQLite WAL mode for improved concurrency and performance (creates additional `.db-wal` and `.db-shm` files)
 - **Plugin System** - Remote registry with text commands and Alt+key hotkeys
 - **E2E Encryption** - X25519/ChaCha20-Poly1305 with global encryption
 - **File Sharing** - Send files up to 1MB (configurable) with interactive picker
@@ -111,22 +110,6 @@ export MARCHAT_USERS="admin1,admin2"
 ./marchat-client
 ```
 
-## Try the Demo
-
-Want to test marchat without setting up your own server? Try our public demo:
-
-```bash
-# Connect to the demo server (unencrypted, not for production)
-./marchat-client --username your-username --server wss://marchat.Cod-e-Codes.com/ws
-```
-
-**Demo Server Details:**
-- **URL**: `wss://marchat.Cod-e-Codes.com/ws`
-- **Status**: Public demo (not for production use)
-- **Encryption**: Disabled (unencrypted)
-- **Data**: Will be wiped periodically
-- **Purpose**: Testing and demonstration only
-
 ## Database Schema
 
 Key tables for message tracking and moderation:
@@ -139,12 +122,12 @@ Key tables for message tracking and moderation:
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.1/marchat-v0.9.0-beta.1-linux-amd64.zip
-unzip marchat-v0.9.0-beta.1-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.2/marchat-v0.9.0-beta.2-linux-amd64.zip
+unzip marchat-v0.9.0-beta.2-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.1/marchat-v0.9.0-beta.1-darwin-amd64.zip
-unzip marchat-v0.9.0-beta.1-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.2/marchat-v0.9.0-beta.2-darwin-amd64.zip
+unzip marchat-v0.9.0-beta.2-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -152,11 +135,11 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.9.0-beta.1
+docker pull codecodesxyz/marchat:v0.9.0-beta.2
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.9.0-beta.1
+  codecodesxyz/marchat:v0.9.0-beta.2
 ```
 
 **From Source:**
@@ -219,6 +202,7 @@ go build -o marchat-client ./client
 | `:themes` | List all available themes | - |
 | `:time` | Toggle 12/24-hour format | `Alt+T` |
 | `:clear` | Clear chat buffer | `Ctrl+L` |
+| `:q` | Quit client | - |
 | `:sendfile [path]` | Send file (or open picker without path) | `Alt+F` |
 | `:savefile <name>` | Save received file | - |
 | `:code` | Open code composer with syntax highlighting | `Alt+C` |
@@ -270,7 +254,7 @@ Navigate with arrow keys, Enter to select/open folders, ".. (Parent Directory)" 
 |-----|--------|
 | `Ctrl+H` | Toggle help overlay |
 | `Enter` | Send message |
-| `Esc` | Quit / Close menus |
+| `Esc` | Close menus |
 | `↑/↓` | Scroll chat |
 | `PgUp/PgDn` | Page through chat |
 | `Ctrl+C/V/X/A` | Copy/Paste/Cut/Select all |
