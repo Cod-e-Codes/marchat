@@ -13,15 +13,14 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ## Latest Updates
 
-### v0.9.0-beta.2 (Current)
-- **Database Performance**: Enabled SQLite WAL mode for improved concurrency and performance
-- **Documentation**: Enhanced architecture docs, improved data flow diagrams, added Alternative Frontends section
-- **Dependencies**: Updated golang.org/x/crypto to v0.43.0 and modernc.org/sqlite to v1.39.1
-- **Plugin System**: Fixed non-admin users running plugin commands with AdminOnly=false
-- **Configuration**: Corrected ban history gaps environment variable name in env.example
-- **Code Quality**: Applied go fmt formatting across codebase
+### v0.9.0-beta.3 (Current)
+- **Client Improvements**: Added vim-style :q quit command for safer application exit
+- **Theme System Fixes**: Case-insensitive theme lookup, theme persistence across logins, improved UI redraw
+- **ESC Key Behavior**: ESC now only closes menus/dialogs, preventing accidental quits
+- **Documentation**: Updated with :q command documentation and corrected ESC behavior
 
 ### Recent Releases
+- **v0.9.0-beta.2**: Database performance improvements, documentation enhancements, dependency updates
 - **v0.9.0-beta.1**: Enhanced notifications, custom themes, plugin ecosystem, test coverage improvements
 - **v0.8.0-beta.11**: Encryption UI, hotkey alternatives, command encryption fix, username validation
 - **v0.8.0-beta.10**: Plugin persistence, state management, auto-discovery, deadlock fixes
