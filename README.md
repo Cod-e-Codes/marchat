@@ -122,12 +122,12 @@ Key tables for message tracking and moderation:
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.2/marchat-v0.9.0-beta.2-linux-amd64.zip
-unzip marchat-v0.9.0-beta.2-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.3/marchat-v0.9.0-beta.3-linux-amd64.zip
+unzip marchat-v0.9.0-beta.3-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.2/marchat-v0.9.0-beta.2-darwin-amd64.zip
-unzip marchat-v0.9.0-beta.2-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.3/marchat-v0.9.0-beta.3-darwin-amd64.zip
+unzip marchat-v0.9.0-beta.3-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -202,7 +202,7 @@ go build -o marchat-client ./client
 | `:themes` | List all available themes | - |
 | `:time` | Toggle 12/24-hour format | `Alt+T` |
 | `:clear` | Clear chat buffer | `Ctrl+L` |
-| `:q` | Quit client | - |
+| `:q` | Quit application (vim-style) | - |
 | `:sendfile [path]` | Send file (or open picker without path) | `Alt+F` |
 | `:savefile <name>` | Save received file | - |
 | `:code` | Open code composer with syntax highlighting | `Alt+C` |
@@ -254,7 +254,8 @@ Navigate with arrow keys, Enter to select/open folders, ".. (Parent Directory)" 
 |-----|--------|
 | `Ctrl+H` | Toggle help overlay |
 | `Enter` | Send message |
-| `Esc` | Close menus |
+| `Esc` | Close menus / dialogs |
+| `:q` | Quit application (vim-style) |
 | `↑/↓` | Scroll chat |
 | `PgUp/PgDn` | Page through chat |
 | `Ctrl+C/V/X/A` | Copy/Paste/Cut/Select all |
