@@ -19,6 +19,11 @@ import (
 	"github.com/Cod-e-Codes/marchat/shared"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/x/term"
+	
+	// Database drivers
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/lib/pq"
+	_ "modernc.org/sqlite"
 )
 
 // Multi-admin support
