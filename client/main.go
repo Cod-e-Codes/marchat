@@ -2286,10 +2286,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					// If it starts with : and is NOT a client command, it's a server command
 					// This includes both built-in admin commands and dynamic plugin commands
-					isServerCommand := *isAdmin && strings.HasPrefix(text, ":") && !isClientCommand
+					// All users can send server commands unencrypted; server will check permissions
+					isServerCommand := strings.HasPrefix(text, ":") && !isClientCommand
 
 					if isServerCommand {
 						// Send as admin command type to bypass encryption
+						// Server will check permissions for plugin commands and built-in admin commands
 						msg := shared.Message{
 							Sender:  m.cfg.Username,
 							Content: text,
@@ -2297,7 +2299,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						err := m.conn.WriteJSON(msg)
 						if err != nil {
-							m.banner = "❌ Failed to send admin command (connection lost)"
+							m.banner = "❌ Failed to send command (connection lost)"
 							m.sending = false
 							return m, m.listenWebSocket()
 						}
