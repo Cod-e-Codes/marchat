@@ -326,6 +326,7 @@ type webMetricsData struct {
 	PeakMemory        uint64            `json:"peak_memory"`
 	TotalConnections  int               `json:"total_connections"`
 	TotalDisconnects  int               `json:"total_disconnects"`
+	TotalMessages     int               `json:"total_messages"`
 	AverageResponse   string            `json:"average_response"`
 }
 
@@ -1171,6 +1172,9 @@ func (w *WebAdminServer) updateMetrics() {
 	w.metrics.TotalConnections = w.hub.GetTotalConnections()
 	w.metrics.TotalDisconnects = w.hub.GetTotalDisconnects()
 
+	// Update total messages count
+	w.metrics.TotalMessages = messageCount
+
 	w.metrics.LastUpdated = currentTime
 }
 
@@ -1184,6 +1188,7 @@ func (w *WebAdminServer) resetMetrics() {
 		PeakMemory:        0,
 		TotalConnections:  0,
 		TotalDisconnects:  0,
+		TotalMessages:     0,
 		AverageResponse:   "0ms",
 	}
 }
