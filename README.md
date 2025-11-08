@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![GitHub tag (latest SemVer)](https://img.shields.io/github/v/tag/Cod-e-Codes/marchat?label=version&logo=github)](https://github.com/Cod-e-Codes/marchat/releases/latest)
+[![Version](https://img.shields.io/badge/version-v0.9.0--beta.4-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.9.0-beta.4)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
