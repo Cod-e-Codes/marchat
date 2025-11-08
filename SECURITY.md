@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-`marchat` is currently at **v0.9.0-beta.3**.  
+`marchat` is currently at **v0.9.0-beta.4**.  
 All security updates and fixes are applied to the `main` branch.
 
 | Version            | Supported |
