@@ -25,16 +25,6 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **v0.9.0-beta.1**: Enhanced notifications, custom themes, plugin ecosystem, test coverage improvements
 - **v0.8.0-beta.11**: Encryption UI, hotkey alternatives, command encryption fix, username validation
 - **v0.8.0-beta.10**: Plugin persistence, state management, auto-discovery, deadlock fixes
-- **v0.8.0-beta.9**: Critical security fixes for path traversal and command injection
-- **v0.8.0-beta.8**: Debug log management, log rotation, full plugin management, plugin hotkeys
-- **v0.8.0-beta.7**: Real-time log capture, OS-specific log export, metrics tracking
-- **v0.8.0-beta.6**: Profile selection bug fix, object-based returns
-- **v0.8.0-beta.5**: Database backup fix, improved admin commands
-- **v0.8.0-beta.4**: Interactive server setup, simplified configuration
-- **v0.8.0-beta.3**: Environment variables only setup, container-friendly configuration
-- **v0.8.0-beta.2**: Interactive server configuration, profile management
-- **v0.8.0-beta.1**: Comprehensive test suite, cross-platform testing
-- **v0.7.0-beta.7**: Advanced security hardening, session management
 
 Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
