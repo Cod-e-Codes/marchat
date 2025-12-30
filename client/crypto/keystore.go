@@ -15,6 +15,8 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/pbkdf2"
+
 	"github.com/Cod-e-Codes/marchat/shared"
 )
 
@@ -175,7 +177,7 @@ func (ks *KeyStore) save() error {
 	}
 
 	// Derive encryption key from passphrase
-	key := deriveKeyFromPassphrase(ks.passphrase)
+	key := deriveKeyFromPassphrase(ks.passphrase, ks.keystorePath)
 
 	// Encrypt the data
 	encryptedData, err := encryptData(key, data)
@@ -206,7 +208,7 @@ func (ks *KeyStore) load() error {
 	}
 
 	// Derive decryption key from passphrase
-	key := deriveKeyFromPassphrase(ks.passphrase)
+	key := deriveKeyFromPassphrase(ks.passphrase, ks.keystorePath)
 
 	// Decrypt the data
 	data, err := decryptData(key, encryptedData)
@@ -235,10 +237,21 @@ func (ks *KeyStore) load() error {
 	return nil
 }
 
-// deriveKeyFromPassphrase derives a 32-byte key from a passphrase
-func deriveKeyFromPassphrase(passphrase []byte) []byte {
-	hash := sha256.Sum256(passphrase)
-	return hash[:]
+// deriveKeyFromPassphrase derives a 32-byte key from a passphrase using PBKDF2.
+// This provides secure key derivation that is resistant to brute-force attacks.
+// The keystorePath is used as a salt to ensure different keystores produce different keys
+// even with the same passphrase.
+func deriveKeyFromPassphrase(passphrase []byte, keystorePath string) []byte {
+	// Use the keystore path as salt for deterministic but unique key derivation
+	// This ensures different keystore files produce different keys even with same passphrase
+	salt := []byte(keystorePath)
+
+	// PBKDF2 with SHA256, 100,000 iterations, 32-byte key length
+	// 100k iterations provides good security while remaining reasonably fast
+	const iterations = 100000
+	const keyLen = 32
+
+	return pbkdf2.Key(passphrase, salt, iterations, keyLen, sha256.New)
 }
 
 // encryptData encrypts data using AES-GCM

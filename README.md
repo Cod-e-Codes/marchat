@@ -397,8 +397,10 @@ export MARCHAT_GLOBAL_E2E_KEY="your-generated-key"
 ### Security Features
 - **Forward Secrecy**: Unique session keys per conversation
 - **Server Privacy**: Server cannot read encrypted messages
-- **Local Keystore**: Encrypted with passphrase protection
+- **Local Keystore**: Encrypted with passphrase protection using PBKDF2
 - **Validation**: Automatic encryption/decryption testing on startup
+
+**Note**: Keystore encryption was upgraded from SHA256 to PBKDF2 for enhanced security. Existing keystores encrypted with the old method will need to be re-initialized.
 
 ## Plugin System
 

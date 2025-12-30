@@ -281,22 +281,29 @@ func TestKeyStoreDecryptMessageNoSessionKey(t *testing.T) {
 
 func TestDeriveKeyFromPassphrase(t *testing.T) {
 	passphrase := "test-passphrase"
-	key := deriveKeyFromPassphrase([]byte(passphrase))
+	keystorePath := "/tmp/test-keystore.dat"
+	key := deriveKeyFromPassphrase([]byte(passphrase), keystorePath)
 
 	if len(key) != 32 {
 		t.Errorf("Expected key length 32, got %d", len(key))
 	}
 
-	// Same passphrase should produce same key
-	key2 := deriveKeyFromPassphrase([]byte(passphrase))
+	// Same passphrase and path should produce same key
+	key2 := deriveKeyFromPassphrase([]byte(passphrase), keystorePath)
 	if string(key) != string(key2) {
-		t.Error("Same passphrase should produce same key")
+		t.Error("Same passphrase and path should produce same key")
 	}
 
 	// Different passphrase should produce different key
-	differentKey := deriveKeyFromPassphrase([]byte("different-passphrase"))
+	differentKey := deriveKeyFromPassphrase([]byte("different-passphrase"), keystorePath)
 	if string(key) == string(differentKey) {
 		t.Error("Different passphrase should produce different key")
+	}
+
+	// Different path should produce different key (even with same passphrase)
+	differentPathKey := deriveKeyFromPassphrase([]byte(passphrase), "/tmp/different-path.dat")
+	if string(key) == string(differentPathKey) {
+		t.Error("Different keystore path should produce different key")
 	}
 }
 
