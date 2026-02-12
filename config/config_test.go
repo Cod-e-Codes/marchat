@@ -21,7 +21,7 @@ func TestLoadConfig(t *testing.T) {
 			os.Unsetenv("MARCHAT_USERS")
 		}()
 
-		cfg, err := LoadConfig("")
+		cfg, err := LoadConfig(t.TempDir())
 		if err != nil {
 			t.Fatalf("LoadConfig failed: %v", err)
 		}
@@ -47,7 +47,7 @@ func TestLoadConfig(t *testing.T) {
 		os.Unsetenv("MARCHAT_ADMIN_KEY")
 		os.Unsetenv("MARCHAT_USERS")
 
-		_, err := LoadConfig("")
+		_, err := LoadConfig(t.TempDir())
 		if err == nil {
 			t.Error("Expected error when required environment variables are missing")
 		}
@@ -63,7 +63,7 @@ func TestLoadConfig(t *testing.T) {
 			os.Unsetenv("MARCHAT_USERS")
 		}()
 
-		_, err := LoadConfig("")
+		_, err := LoadConfig(t.TempDir())
 		if err == nil {
 			t.Error("Expected error for invalid port")
 		}
