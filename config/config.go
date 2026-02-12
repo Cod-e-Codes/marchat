@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -138,7 +140,11 @@ func (c *Config) loadFromEnv() error {
 	if jwtSecret := os.Getenv("MARCHAT_JWT_SECRET"); jwtSecret != "" {
 		c.JWTSecret = jwtSecret
 	} else {
-		c.JWTSecret = "marchat-default-secret-change-in-production"
+		jwtSecret, err := generateJWTSecret()
+		if err != nil {
+			return fmt.Errorf("when generating JWT secret: %w", err)
+		}
+		c.JWTSecret = jwtSecret
 	}
 
 	// TLS configuration
@@ -301,4 +307,13 @@ func (c *Config) GetWebSocketScheme() string {
 		return "wss"
 	}
 	return "ws"
+}
+
+func generateJWTSecret() (string, error) {
+	jwtSecret := make([]byte, 32)
+	_, err := rand.Read(jwtSecret)
+	if err != nil {
+		return "", fmt.Errorf("when reading random bytes: %w", err)
+	}
+	return hex.EncodeToString(jwtSecret), nil
 }
