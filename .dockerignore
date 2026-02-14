@@ -1,0 +1,77 @@
+# Version control
+.git/
+.github/
+.gitignore
+.gitattributes
+
+# Documentation (not needed in build)
+*.md
+!README.md
+ARCHITECTURE.md
+CONTRIBUTORS.md
+ROADMAP.md
+SECURITY.md
+TESTING.md
+PROTOCOL.md
+PLUGIN_ECOSYSTEM.md
+
+# IDE and editor files
+.vscode/
+.idea/
+.cursor/
+.cursorrules
+*.swp
+*~
+
+# Test artifacts
+*.test
+coverage.*
+coverage
+*.out
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment and config files
+.env
+.env.*
+env.example
+config.json
+server_config.json
+
+# Database files
+*.db
+*.db-wal
+*.db-shm
+
+# Keystore files
+keystore.dat
+*.keystore
+
+# Logs
+*.log
+
+# Release binaries and archives
+marchat-*
+*.zip
+*.exe
+build-release.ps1
+build-release.sh
+
+# Install scripts (not needed in container)
+install.sh
+install.ps1
+
+# Plugin binaries
+plugin/examples/*/echo
+plugin/examples/*/*.zip
+plugin/examples/*/*.exe
+plugin/examples/*/*.so
+plugin/examples/*/*.dylib
+
+# Docker files (avoid recursive context)
+docker-bake.hcl
+
+# Assets (images not needed for server build)
+assets/

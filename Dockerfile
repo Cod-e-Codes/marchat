@@ -7,8 +7,14 @@ ARG BUILD_TIME
 ARG VERSION
 
 WORKDIR /marchat
+
+# Copy dependency files first for better layer caching
+COPY go.mod go.sum ./
+COPY plugin/sdk/go.mod ./plugin/sdk/
+RUN go mod download
+
+# Copy source code (changes here won't invalidate the dependency cache)
 COPY . .
-RUN go mod tidy
 RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=${VERSION} -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=${VERSION} -X github.com/Cod-e-Codes/marchat/shared.BuildTime='${BUILD_TIME}' -X github.com/Cod-e-Codes/marchat/shared.GitCommit=${GIT_COMMIT}" \
     -o marchat-server ./cmd/server
