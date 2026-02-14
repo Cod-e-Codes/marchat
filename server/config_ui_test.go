@@ -31,7 +31,14 @@ func TestServerConfigUISavesEnv(t *testing.T) {
 	// Basic content checks
 	b, _ := os.ReadFile(envPath)
 	content := string(b)
-	if !strings.Contains(content, "MARCHAT_PORT=8123") || !strings.Contains(content, "MARCHAT_ADMIN_KEY=adminkey123") || !strings.Contains(content, "MARCHAT_USERS=alice,bob") {
-		t.Fatalf("unexpected .env content: %s", content)
+	for _, needle := range []string{
+		"MARCHAT_PORT=8123",
+		"MARCHAT_ADMIN_KEY=adminkey123",
+		"MARCHAT_USERS=alice,bob",
+		"MARCHAT_JWT_SECRET=", // The value is random, so we only check for the presence of the env var
+	} {
+		if !strings.Contains(content, needle) {
+			t.Fatalf("missing .env content: %s", needle)
+		}
 	}
 }

@@ -140,7 +140,7 @@ func (c *Config) loadFromEnv() error {
 	if jwtSecret := os.Getenv("MARCHAT_JWT_SECRET"); jwtSecret != "" {
 		c.JWTSecret = jwtSecret
 	} else {
-		jwtSecret, err := generateJWTSecret()
+		jwtSecret, err := GenerateJWTSecret()
 		if err != nil {
 			return fmt.Errorf("when generating JWT secret: %w", err)
 		}
@@ -309,7 +309,7 @@ func (c *Config) GetWebSocketScheme() string {
 	return "ws"
 }
 
-func generateJWTSecret() (string, error) {
+func GenerateJWTSecret() (string, error) {
 	jwtSecret := make([]byte, 32)
 	_, err := rand.Read(jwtSecret)
 	if err != nil {
