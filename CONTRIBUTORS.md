@@ -7,3 +7,4 @@ Thanks to everyone who has helped improve marchat in any way!
 - [BasToTheMax](https://github.com/BasToTheMax) – Suggested roadmap and admin key security improvements
 - [cmckerley](https://github.com/cmckerley) – Collaborated on Docker, testing, reverse proxy, and DevOps; suggested the :q quit command for safer application exit
 - [lmarsengill](https://github.com/lmarsengill) – Found a bug in query logic affecting message order
+- [aleksen](https://github.com/aleksen) – Added auto-generated JWT secret with persistence via interactive setup, fixed test isolation with `t.TempDir()`
