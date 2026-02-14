@@ -431,7 +431,7 @@ func TestConfigurationValidation(t *testing.T) {
 			}()
 
 			// Test configuration loading
-			_, err := config.LoadConfig("")
+			_, err := config.LoadConfig(t.TempDir())
 			if tt.shouldError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -548,7 +548,7 @@ func TestTLSConfiguration(t *testing.T) {
 			}()
 
 			// Load configuration
-			cfg, err := config.LoadConfig("")
+			cfg, err := config.LoadConfig(t.TempDir())
 			if err != nil {
 				t.Fatalf("Failed to load config: %v", err)
 			}
@@ -662,7 +662,7 @@ func TestMainFunctionIntegration(t *testing.T) {
 		}()
 
 		// Test that configuration loads successfully
-		cfg, err := config.LoadConfig("")
+		cfg, err := config.LoadConfig(t.TempDir())
 		if err != nil {
 			t.Fatalf("Configuration should load successfully: %v", err)
 		}

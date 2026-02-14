@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -21,7 +22,7 @@ func TestLoadConfig(t *testing.T) {
 			os.Unsetenv("MARCHAT_USERS")
 		}()
 
-		cfg, err := LoadConfig("")
+		cfg, err := LoadConfig(t.TempDir())
 		if err != nil {
 			t.Fatalf("LoadConfig failed: %v", err)
 		}
@@ -47,7 +48,7 @@ func TestLoadConfig(t *testing.T) {
 		os.Unsetenv("MARCHAT_ADMIN_KEY")
 		os.Unsetenv("MARCHAT_USERS")
 
-		_, err := LoadConfig("")
+		_, err := LoadConfig(t.TempDir())
 		if err == nil {
 			t.Error("Expected error when required environment variables are missing")
 		}
@@ -63,7 +64,7 @@ func TestLoadConfig(t *testing.T) {
 			os.Unsetenv("MARCHAT_USERS")
 		}()
 
-		_, err := LoadConfig("")
+		_, err := LoadConfig(t.TempDir())
 		if err == nil {
 			t.Error("Expected error for invalid port")
 		}
@@ -346,4 +347,36 @@ func TestGetEnvIntWithDefault(t *testing.T) {
 	if result != 789 {
 		t.Errorf("Expected 789 (default), got %d", result)
 	}
+}
+
+// TestJWTSecretGeneratedRandomly checks that JWTSecret is a 64 char long generated hex when not provided
+func TestJWTSecretGeneratedRandomly(t *testing.T) {
+	os.Setenv("MARCHAT_PORT", "8080")
+	os.Setenv("MARCHAT_ADMIN_KEY", "test-key")
+	os.Setenv("MARCHAT_USERS", "user1,user2")
+	os.Unsetenv("MARCHAT_JWT_SECRET")
+	defer func() {
+		os.Unsetenv("MARCHAT_PORT")
+		os.Unsetenv("MARCHAT_ADMIN_KEY")
+		os.Unsetenv("MARCHAT_USERS")
+	}()
+
+	cfg, err := LoadConfig(t.TempDir())
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if len(cfg.JWTSecret) != 64 {
+		t.Fatalf("invalid JWTSecret length: %s (%d)", cfg.JWTSecret, len(cfg.JWTSecret))
+	}
+
+	dest := make([]byte, 32)
+	n, err := hex.Decode(dest, []byte(cfg.JWTSecret))
+	if err != nil {
+		t.Fatalf("JWT Secret is not made of hex: %s", err.Error())
+	}
+	if n != 32 {
+		t.Errorf("unexpected number of bytes decoded: %d", n)
+	}
+
 }
