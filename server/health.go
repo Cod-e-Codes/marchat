@@ -161,7 +161,9 @@ func (hc *HealthChecker) checkWebSocketHealth() *ComponentHealth {
 	}
 
 	// Check if hub is responsive
+	hc.hub.clientsMutex.RLock()
 	clientCount := len(hc.hub.clients)
+	hc.hub.clientsMutex.RUnlock()
 	if clientCount >= 1000 { // Arbitrary limit
 		health.Status = HealthStatusDegraded
 		health.Message = fmt.Sprintf("High client count: %d", clientCount)
@@ -231,7 +233,9 @@ func (hc *HealthChecker) getSystemMetrics() SystemMetrics {
 
 	activeUsers := 0
 	if hc.hub != nil {
+		hc.hub.clientsMutex.RLock()
 		activeUsers = len(hc.hub.clients)
+		hc.hub.clientsMutex.RUnlock()
 	}
 
 	totalMessages := 0

@@ -38,7 +38,9 @@ func TestIntegrationMessageFlow(t *testing.T) {
 
 	// Insert messages
 	for _, msg := range testMessages {
-		InsertMessage(db, msg)
+		if err := InsertMessage(db, msg); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
 	}
 
 	// Retrieve messages
@@ -153,7 +155,9 @@ func TestIntegrationDatabaseStats(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		InsertMessage(db, msg)
+		if err := InsertMessage(db, msg); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
 	}
 
 	// Get database stats
@@ -199,7 +203,9 @@ func TestIntegrationEncryptedMessageFlow(t *testing.T) {
 	}
 
 	// Insert encrypted message
-	InsertEncryptedMessage(db, encryptedMsg)
+	if err := InsertEncryptedMessage(db, encryptedMsg); err != nil {
+		t.Fatalf("InsertEncryptedMessage failed: %v", err)
+	}
 
 	// Retrieve messages (this would need to be modified to handle encrypted messages properly)
 	recentMessages := GetRecentMessages(db)
@@ -235,7 +241,9 @@ func TestIntegrationMessageCap(t *testing.T) {
 			CreatedAt: time.Now().Add(time.Duration(i) * time.Minute),
 			Encrypted: false,
 		}
-		InsertMessage(db, msg)
+		if err := InsertMessage(db, msg); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
 	}
 
 	// Retrieve recent messages
@@ -339,7 +347,9 @@ func TestIntegrationConcurrentOperations(t *testing.T) {
 			}
 			// Synchronize database access
 			dbMutex.Lock()
-			InsertMessage(db, msg)
+			if err := InsertMessage(db, msg); err != nil {
+				t.Errorf("InsertMessage failed: %v", err)
+			}
 			dbMutex.Unlock()
 		}(i)
 	}

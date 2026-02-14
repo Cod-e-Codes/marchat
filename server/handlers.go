@@ -21,7 +21,30 @@ import (
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin:     func(r *http.Request) bool { return true },
+	CheckOrigin: func(r *http.Request) bool {
+		// Allow non-browser clients (terminal clients don't send Origin)
+		origin := r.Header.Get("Origin")
+		if origin == "" {
+			return true
+		}
+		// Allow same-host connections (browser-based clients)
+		host := r.Host
+		if host == "" {
+			host = r.Header.Get("Host")
+		}
+		// Accept if origin matches the server host
+		if strings.Contains(origin, host) {
+			return true
+		}
+		// Allow localhost/loopback origins for local development
+		for _, local := range []string{"localhost", "127.0.0.1", "[::1]"} {
+			if strings.Contains(origin, local) {
+				return true
+			}
+		}
+		log.Printf("WebSocket origin rejected: %s (host: %s)", origin, host)
+		return false
+	},
 }
 
 type WSMessage struct {
@@ -147,12 +170,12 @@ func CreateSchema(db *sql.DB) {
 	}
 }
 
-func InsertMessage(db *sql.DB, msg shared.Message) {
+func InsertMessage(db *sql.DB, msg shared.Message) error {
 	result, err := db.Exec(`INSERT INTO messages (sender, content, created_at, is_encrypted) VALUES (?, ?, ?, ?)`,
 		msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted)
 	if err != nil {
 		log.Println("Insert error:", err)
-		return
+		return fmt.Errorf("insert message: %w", err)
 	}
 
 	// Get the inserted ID and update message_id
@@ -171,16 +194,17 @@ func InsertMessage(db *sql.DB, msg shared.Message) {
 	if err != nil {
 		log.Println("Error enforcing message cap:", err)
 	}
+	return nil
 }
 
 // InsertEncryptedMessage stores an encrypted message in the database
-func InsertEncryptedMessage(db *sql.DB, encryptedMsg *shared.EncryptedMessage) {
+func InsertEncryptedMessage(db *sql.DB, encryptedMsg *shared.EncryptedMessage) error {
 	result, err := db.Exec(`INSERT INTO messages (sender, content, created_at, is_encrypted, encrypted_data, nonce, recipient) VALUES (?, ?, ?, ?, ?, ?, ?)`,
 		encryptedMsg.Sender, encryptedMsg.Content, encryptedMsg.CreatedAt,
 		encryptedMsg.IsEncrypted, encryptedMsg.Encrypted, encryptedMsg.Nonce, encryptedMsg.Recipient)
 	if err != nil {
 		log.Println("Insert encrypted message error:", err)
-		return
+		return fmt.Errorf("insert encrypted message: %w", err)
 	}
 
 	// Get the inserted ID and update message_id
@@ -199,6 +223,7 @@ func InsertEncryptedMessage(db *sql.DB, encryptedMsg *shared.EncryptedMessage) {
 	if err != nil {
 		log.Println("Error enforcing message cap:", err)
 	}
+	return nil
 }
 
 func GetRecentMessages(db *sql.DB) []shared.Message {
@@ -535,6 +560,7 @@ func GetDatabaseStats(db *sql.DB) (string, error) {
 }
 
 func (h *Hub) broadcastUserList() {
+	h.clientsMutex.RLock()
 	usernames := []string{}
 	for client := range h.clients {
 		if client.username != "" {
@@ -548,6 +574,7 @@ func (h *Hub) broadcastUserList() {
 	for client := range h.clients {
 		client.send <- msg
 	}
+	h.clientsMutex.RUnlock()
 }
 
 type adminAuth struct {
@@ -574,7 +601,7 @@ func validateUsernameHandler(username string) error {
 	}
 	// Prevent usernames that could be confused with system messages or commands
 	if strings.HasPrefix(username, ":") || strings.HasPrefix(username, ".") {
-		return fmt.Errorf("username cannot start with : or")
+		return fmt.Errorf("username cannot start with ':' or '.'")
 	}
 	// Prevent path traversal attempts
 	if strings.Contains(username, "..") {
@@ -683,15 +710,22 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		ipAddr := getClientIP(r)
 
 		// Check for duplicate username
+		hub.clientsMutex.RLock()
+		isDuplicate := false
 		for client := range hub.clients {
 			if strings.EqualFold(client.username, username) {
 				log.Printf("Duplicate username attempt: '%s' (IP: %s) - username already in use by IP: %s", username, ipAddr, client.ipAddr)
-				if err := conn.WriteMessage(websocket.CloseMessage, []byte("Username already taken - please choose a different username")); err != nil {
-					log.Printf("WriteMessage error: %v", err)
-				}
-				conn.Close()
-				return
+				isDuplicate = true
+				break
 			}
+		}
+		hub.clientsMutex.RUnlock()
+		if isDuplicate {
+			if err := conn.WriteMessage(websocket.CloseMessage, []byte("Username already taken - please choose a different username")); err != nil {
+				log.Printf("WriteMessage error: %v", err)
+			}
+			conn.Close()
+			return
 		}
 
 		// Check if user is banned

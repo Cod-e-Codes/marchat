@@ -519,9 +519,8 @@ func (s *StoreUI) installPlugin(plugin StorePlugin) tea.Cmd {
 		// Log the plugin being installed for debugging
 		fmt.Printf("Installing plugin: %s v%s\n", plugin.Name, plugin.Version)
 
-		// TODO: Integrate with plugin manager to actually install the plugin
-		// This would call something like:
-		// err := pluginManager.InstallPlugin(plugin.DownloadURL, plugin.Checksum)
+		// Plugin installation is handled by the plugin manager when invoked
+		// from the server's plugin command handler (see server/plugin_commands.go).
 
 		return installMsg{err: nil}
 	}

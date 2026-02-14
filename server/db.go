@@ -2,15 +2,22 @@ package server
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 
 	_ "modernc.org/sqlite"
 )
 
-func InitDB(filepath string) *sql.DB {
+func InitDB(filepath string) (*sql.DB, error) {
 	db, err := sql.Open("sqlite", filepath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, fmt.Errorf("failed to open database at %s: %w", filepath, err)
+	}
+
+	// Verify the connection works
+	if err := db.Ping(); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("failed to connect to database at %s: %w", filepath, err)
 	}
 
 	// Enable WAL mode for better concurrency and performance
@@ -44,5 +51,5 @@ func InitDB(filepath string) *sql.DB {
 		log.Printf("Warning: Could not set temp store: %v", err)
 	}
 
-	return db
+	return db, nil
 }

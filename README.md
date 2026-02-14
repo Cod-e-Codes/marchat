@@ -459,7 +459,7 @@ See [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md) for development guide.
 - Ideal for persistent troublemakers
 
 **Ban History Gaps:**
-Prevents banned users from seeing messages sent during ban periods. Enable with `MARCHAT_BAN_HISTORY_GAPS=true` (default).
+Prevents banned users from seeing messages sent during ban periods. Enable with `MARCHAT_BAN_HISTORY_GAPS=true` (disabled by default).
 
 ## Client Configuration
 
@@ -556,7 +556,7 @@ Profiles stored in platform-appropriate locations:
 | Port in use | Change port: `export MARCHAT_PORT=8081` |
 | Database migration fails | Check file permissions, backup before source build |
 | Message history missing | Expected after updates - user states reset for ban/unban improvements |
-| Ban history gaps not working | Ensure `MARCHAT_BAN_HISTORY_GAPS=true` (default) and `ban_history` table exists |
+| Ban history gaps not working | Ensure `MARCHAT_BAN_HISTORY_GAPS=true` (disabled by default) and `ban_history` table exists |
 | TLS certificate errors | Use `--skip-tls-verify` for dev with self-signed certs |
 | Plugin installation fails | Verify `MARCHAT_PLUGIN_REGISTRY_URL` is accessible and valid JSON |
 | E2E encryption errors | Ensure `--e2e` flag and keystore passphrase provided, check debug logs |

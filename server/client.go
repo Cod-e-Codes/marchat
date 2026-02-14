@@ -91,7 +91,9 @@ func (c *Client) readPump() {
 		}
 		msg.CreatedAt = time.Now()
 		if msg.Type == "" || msg.Type == shared.TextMessage {
-			InsertMessage(c.db, msg)
+			if err := InsertMessage(c.db, msg); err != nil {
+				log.Printf("Failed to persist message from %s: %v", c.username, err)
+			}
 		}
 		c.hub.broadcast <- msg
 	}
@@ -117,7 +119,7 @@ func validateUsername(username string) error {
 	}
 	// Prevent usernames that could be confused with system messages or commands
 	if strings.HasPrefix(username, ":") || strings.HasPrefix(username, ".") {
-		return fmt.Errorf("username cannot start with : or")
+		return fmt.Errorf("username cannot start with ':' or '.'")
 	}
 	// Prevent path traversal attempts
 	if strings.Contains(username, "..") {

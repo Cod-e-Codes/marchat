@@ -494,12 +494,14 @@ func (ap *AdminPanel) loadUsers() {
 	}
 
 	// Get connected users from hub
+	ap.hub.clientsMutex.RLock()
 	connectedUsers := make(map[string]*Client)
 	for client := range ap.hub.clients {
 		if client.username != "" {
 			connectedUsers[client.username] = client
 		}
 	}
+	ap.hub.clientsMutex.RUnlock()
 
 	// Create user list combining database and live data
 	userMap := make(map[string]*userInfo)
@@ -661,7 +663,9 @@ func (ap *AdminPanel) updateSystemStats() {
 
 	ap.systemInfo.MessagesSent = messageCount
 	ap.systemInfo.TotalUsers = userCount
+	ap.hub.clientsMutex.RLock()
 	ap.systemInfo.ActiveUsers = len(ap.hub.clients)
+	ap.hub.clientsMutex.RUnlock()
 	ap.systemInfo.PluginsActive = activePlugins
 	ap.systemInfo.Uptime = time.Since(ap.startTime)
 	ap.systemInfo.ServerStatus = "Running"
@@ -1522,9 +1526,17 @@ func (ap *AdminPanel) showDatabaseStats() tea.Cmd {
 	}
 }
 
+// adminUsername returns the admin username to attribute actions to in the TUI panel.
+func (ap *AdminPanel) adminUsername() string {
+	if ap.config != nil && len(ap.config.Admins) > 0 {
+		return ap.config.Admins[0]
+	}
+	return "admin-panel"
+}
+
 func (ap *AdminPanel) banUser(username string) tea.Cmd {
 	return func() tea.Msg {
-		ap.hub.BanUser(username, "admin")
+		ap.hub.BanUser(username, ap.adminUsername())
 		return actionMsg{
 			success: true,
 			message: fmt.Sprintf("🚫 User '%s' has been banned", username),
@@ -1534,7 +1546,7 @@ func (ap *AdminPanel) banUser(username string) tea.Cmd {
 
 func (ap *AdminPanel) unbanUser(username string) tea.Cmd {
 	return func() tea.Msg {
-		success := ap.hub.UnbanUser(username, "admin")
+		success := ap.hub.UnbanUser(username, ap.adminUsername())
 		if success {
 			return actionMsg{
 				success: true,
@@ -1550,7 +1562,7 @@ func (ap *AdminPanel) unbanUser(username string) tea.Cmd {
 
 func (ap *AdminPanel) kickUser(username string) tea.Cmd {
 	return func() tea.Msg {
-		ap.hub.KickUser(username, "admin")
+		ap.hub.KickUser(username, ap.adminUsername())
 		return actionMsg{
 			success: true,
 			message: fmt.Sprintf("👢 User '%s' has been kicked (24h)", username),
@@ -1560,7 +1572,7 @@ func (ap *AdminPanel) kickUser(username string) tea.Cmd {
 
 func (ap *AdminPanel) allowUser(username string) tea.Cmd {
 	return func() tea.Msg {
-		success := ap.hub.AllowUser(username, "admin")
+		success := ap.hub.AllowUser(username, ap.adminUsername())
 		if success {
 			return actionMsg{
 				success: true,

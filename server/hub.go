@@ -13,10 +13,11 @@ import (
 )
 
 type Hub struct {
-	clients    map[*Client]bool
-	broadcast  chan interface{}
-	register   chan *Client
-	unregister chan *Client
+	clients      map[*Client]bool
+	clientsMutex sync.RWMutex
+	broadcast    chan interface{}
+	register     chan *Client
+	unregister   chan *Client
 
 	// Ban management
 	bans      map[string]time.Time // username -> expiry time (permanent bans use far future time)
@@ -152,25 +153,34 @@ func (h *Hub) IsUserBanned(username string) bool {
 
 // kickUser forcibly disconnects a user by username
 func (h *Hub) kickUser(username string, reason string) {
+	h.clientsMutex.RLock()
+	var target *Client
 	for client := range h.clients {
 		if strings.EqualFold(client.username, username) {
-			log.Printf("[ADMIN] Kicking user '%s' (IP: %s) - Reason: %s", username, client.ipAddr, reason)
-
-			// Send kick message to the user
-			kickMsg := shared.Message{
-				Sender:    "System",
-				Content:   "You have been kicked by an administrator: " + reason,
-				CreatedAt: time.Now(),
-				Type:      shared.TextMessage,
-			}
-			client.send <- kickMsg
-
-			// Close the connection
-			client.conn.Close()
-			return
+			target = client
+			break
 		}
 	}
-	log.Printf("[ADMIN] Kick attempt for '%s' - user not found", username)
+	h.clientsMutex.RUnlock()
+
+	if target == nil {
+		log.Printf("[ADMIN] Kick attempt for '%s' - user not found", username)
+		return
+	}
+
+	log.Printf("[ADMIN] Kicking user '%s' (IP: %s) - Reason: %s", username, target.ipAddr, reason)
+
+	// Send kick message to the user
+	kickMsg := shared.Message{
+		Sender:    "System",
+		Content:   "You have been kicked by an administrator: " + reason,
+		CreatedAt: time.Now(),
+		Type:      shared.TextMessage,
+	}
+	target.send <- kickMsg
+
+	// Close the connection
+	target.conn.Close()
 }
 
 // KickUser temporarily bans a user for 24 hours
@@ -268,6 +278,7 @@ func (h *Hub) CleanupExpiredBans() {
 
 // CleanupStaleConnections removes clients with broken connections
 func (h *Hub) CleanupStaleConnections() {
+	h.clientsMutex.RLock()
 	var staleClients []*Client
 
 	// Check all clients for broken connections
@@ -278,40 +289,56 @@ func (h *Hub) CleanupStaleConnections() {
 			staleClients = append(staleClients, client)
 		}
 	}
+	h.clientsMutex.RUnlock()
+
+	if len(staleClients) == 0 {
+		return
+	}
 
 	// Remove stale clients
+	h.clientsMutex.Lock()
 	for _, client := range staleClients {
-		log.Printf("[CLEANUP] Removing stale connection for user '%s' (IP: %s)", client.username, client.ipAddr)
-		delete(h.clients, client)
-		close(client.send)
-		client.conn.Close()
+		if _, exists := h.clients[client]; exists {
+			log.Printf("[CLEANUP] Removing stale connection for user '%s' (IP: %s)", client.username, client.ipAddr)
+			delete(h.clients, client)
+			close(client.send)
+			client.conn.Close()
+		}
 	}
+	h.clientsMutex.Unlock()
 
-	if len(staleClients) > 0 {
-		log.Printf("[CLEANUP] Removed %d stale connections", len(staleClients))
-		h.broadcastUserList()
-	}
+	log.Printf("[CLEANUP] Removed %d stale connections", len(staleClients))
+	h.broadcastUserList()
 }
 
 // ForceDisconnectUser forcibly removes a user from the clients map (admin command for stale connections)
 func (h *Hub) ForceDisconnectUser(username string, adminUsername string) bool {
+	h.clientsMutex.Lock()
+	var target *Client
 	for client := range h.clients {
 		if strings.EqualFold(client.username, username) {
-			log.Printf("[ADMIN] Force disconnecting user '%s' (IP: %s) by admin '%s'", username, client.ipAddr, adminUsername)
-
-			// Try to close gracefully first
-			client.conn.Close()
-
-			// Remove from clients map
-			delete(h.clients, client)
-			close(client.send)
-
-			h.broadcastUserList()
-			return true
+			target = client
+			break
 		}
 	}
-	log.Printf("[ADMIN] Force disconnect attempt for '%s' by '%s' - user not found", username, adminUsername)
-	return false
+	if target == nil {
+		h.clientsMutex.Unlock()
+		log.Printf("[ADMIN] Force disconnect attempt for '%s' by '%s' - user not found", username, adminUsername)
+		return false
+	}
+
+	log.Printf("[ADMIN] Force disconnecting user '%s' (IP: %s) by admin '%s'", username, target.ipAddr, adminUsername)
+
+	// Remove from clients map
+	delete(h.clients, target)
+	close(target.send)
+	h.clientsMutex.Unlock()
+
+	// Close connection outside the lock
+	target.conn.Close()
+
+	h.broadcastUserList()
+	return true
 }
 
 func (h *Hub) Run() {
@@ -340,31 +367,23 @@ func (h *Hub) Run() {
 	// Start plugin message handler goroutine
 	go func() {
 		for msg := range h.pluginManager.GetMessageChannel() {
-			// Convert plugin message to shared message
+			// Route plugin messages through the broadcast channel for safe access
 			sharedMsg := shared.Message{
 				Sender:    msg.Sender,
 				Content:   msg.Content,
 				CreatedAt: msg.CreatedAt,
 				Type:      shared.TextMessage,
 			}
-
-			// Broadcast plugin message to all clients
-			for client := range h.clients {
-				select {
-				case client.send <- sharedMsg:
-				default:
-					log.Printf("Dropping client %s due to full send channel\n", client.username)
-					close(client.send)
-					delete(h.clients, client)
-				}
-			}
+			h.broadcast <- sharedMsg
 		}
 	}()
 
 	for {
 		select {
 		case client := <-h.register:
+			h.clientsMutex.Lock()
 			h.clients[client] = true
+			h.clientsMutex.Unlock()
 			HubLogger.Info("Client registered", map[string]interface{}{
 				"username": client.username,
 				"ip":       client.ipAddr,
@@ -377,6 +396,7 @@ func (h *Hub) Run() {
 
 			h.broadcastUserList() // Broadcast after register
 		case client := <-h.unregister:
+			h.clientsMutex.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
 				close(client.send)
@@ -390,8 +410,10 @@ func (h *Hub) Run() {
 				h.totalDisconnects++
 				h.metricsMutex.Unlock()
 			}
+			h.clientsMutex.Unlock()
 			h.broadcastUserList()
 		case message := <-h.broadcast:
+			h.clientsMutex.Lock()
 			for client := range h.clients {
 				select {
 				case client.send <- message:
@@ -401,6 +423,7 @@ func (h *Hub) Run() {
 					delete(h.clients, client)
 				}
 			}
+			h.clientsMutex.Unlock()
 		}
 	}
 }

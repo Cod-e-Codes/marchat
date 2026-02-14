@@ -11,7 +11,10 @@ func setupPanelEnv(t *testing.T) (*AdminPanel, func()) {
 	t.Helper()
 	tdir := t.TempDir()
 	dbPath := filepath.Join(tdir, "test.db")
-	db := InitDB(dbPath)
+	db, err := InitDB(dbPath)
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
 	CreateSchema(db)
 	pluginDir := filepath.Join(tdir, "plugins")
 	dataDir := filepath.Join(tdir, "data")

@@ -8,7 +8,10 @@ import (
 func TestInitDBAndSchema(t *testing.T) {
 	tdir := t.TempDir()
 	dbPath := filepath.Join(tdir, "test.db")
-	db := InitDB(dbPath)
+	db, err := InitDB(dbPath)
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
 	defer db.Close()
 
 	if db == nil {

@@ -19,7 +19,10 @@ func setupTestServerEnv(t *testing.T) (*sql.DB, *Hub, *appcfg.Config, func()) {
 	t.Helper()
 	tdir := t.TempDir()
 	dbPath := filepath.Join(tdir, "test.db")
-	db := InitDB(dbPath)
+	db, err := InitDB(dbPath)
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
 	db.SetMaxOpenConns(1)
 	CreateSchema(db)
 

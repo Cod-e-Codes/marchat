@@ -95,7 +95,9 @@ func TestInsertMessage(t *testing.T) {
 	}
 
 	// Insert message
-	InsertMessage(db, msg)
+	if err := InsertMessage(db, msg); err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
 
 	// Verify message was inserted
 	recentMessages := GetRecentMessages(db)
@@ -138,7 +140,9 @@ func TestInsertEncryptedMessage(t *testing.T) {
 	}
 
 	// Insert encrypted message
-	InsertEncryptedMessage(db, encryptedMsg)
+	if err := InsertEncryptedMessage(db, encryptedMsg); err != nil {
+		t.Fatalf("InsertEncryptedMessage failed: %v", err)
+	}
 
 	// Verify message was inserted
 	recentMessages := GetRecentMessages(db)
@@ -175,7 +179,9 @@ func TestGetRecentMessages(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		InsertMessage(db, msg)
+		if err := InsertMessage(db, msg); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
 	}
 
 	// Get recent messages
@@ -220,7 +226,9 @@ func TestGetMessagesAfter(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		InsertMessage(db, msg)
+		if err := InsertMessage(db, msg); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
 	}
 
 	// Get messages after the first one (message_id = 1)
@@ -307,7 +315,9 @@ func TestClearMessages(t *testing.T) {
 		CreatedAt: time.Now(),
 		Encrypted: false,
 	}
-	InsertMessage(db, msg)
+	if err := InsertMessage(db, msg); err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
 
 	// Verify message exists
 	recentMessages := GetRecentMessages(db)
@@ -348,7 +358,9 @@ func TestBackupDatabase(t *testing.T) {
 		CreatedAt: time.Now(),
 		Encrypted: false,
 	}
-	InsertMessage(db, msg)
+	if err := InsertMessage(db, msg); err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
 
 	// Close the database before backup
 	db.Close()
@@ -393,7 +405,9 @@ func TestGetDatabaseStats(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		InsertMessage(db, msg)
+		if err := InsertMessage(db, msg); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
 	}
 
 	// Get database stats

@@ -200,28 +200,8 @@ func (w *WebAdminServer) cleanupRateLimiting() {
 	}
 }
 
-func (w *WebAdminServer) cleanupExpiredSessions() {
-	ticker := time.NewTicker(10 * time.Minute)
-	defer ticker.Stop()
-
-	for range ticker.C {
-		// Since we use stateless HMAC-signed sessions, we don't need to clean up
-		// session storage. However, we can log session validation statistics
-		// and monitor for potential issues.
-
-		// Log session cleanup activity (useful for monitoring)
-		log.Printf("Session cleanup: Checking for expired sessions (stateless validation)")
-
-		// In a future implementation, if we add session storage, we would:
-		// 1. Iterate through stored sessions
-		// 2. Validate each session token
-		// 3. Remove expired or invalid sessions
-		// 4. Log cleanup statistics
-
-		// For now, the session validation happens on-demand in validateSession()
-		// which is more efficient for stateless sessions
-	}
-}
+// Note: Sessions are stateless (HMAC-signed), so no cleanup is needed.
+// Validation happens on-demand in validateSession().
 
 func (w *WebAdminServer) getCSRFTokenFromSession(sessionToken string) (string, error) {
 	parts := strings.Split(sessionToken, ".")
@@ -382,9 +362,8 @@ func NewWebAdminServer(hub *Hub, db *sql.DB, cfg *config.Config) *WebAdminServer
 		log.Printf("Warning: Failed to generate session secret: %v", err)
 	}
 
-	// Start cleanup goroutines
+	// Start cleanup goroutine for rate limiting
 	go server.cleanupRateLimiting()
-	go server.cleanupExpiredSessions()
 
 	return server
 }
@@ -933,10 +912,14 @@ func (w *WebAdminServer) getSystemStats() webSystemStats {
 
 	uptime := time.Since(w.startTime)
 
+	w.hub.clientsMutex.RLock()
+	activeUsers := len(w.hub.clients)
+	w.hub.clientsMutex.RUnlock()
+
 	return webSystemStats{
 		Uptime:         w.formatDuration(uptime),
 		MemoryUsage:    float64(m.Alloc) / 1024 / 1024,
-		ActiveUsers:    len(w.hub.clients),
+		ActiveUsers:    activeUsers,
 		TotalUsers:     userCount,
 		MessagesSent:   messageCount,
 		PluginsActive:  activePlugins,
@@ -973,12 +956,14 @@ func (w *WebAdminServer) getUsersData() []webUserInfo {
 	}
 
 	// Get connected users from hub
+	w.hub.clientsMutex.RLock()
 	connectedUsers := make(map[string]*Client)
 	for client := range w.hub.clients {
 		if client.username != "" {
 			connectedUsers[client.username] = client
 		}
 	}
+	w.hub.clientsMutex.RUnlock()
 
 	// Create user list combining database and live data
 	userMap := make(map[string]*webUserInfo)
@@ -1121,9 +1106,12 @@ func (w *WebAdminServer) updateMetrics() {
 	currentTime := time.Now()
 
 	// Add connection point
+	w.hub.clientsMutex.RLock()
+	clientCount := len(w.hub.clients)
+	w.hub.clientsMutex.RUnlock()
 	w.metrics.ConnectionHistory = append(w.metrics.ConnectionHistory, connectionPoint{
 		Time:  currentTime,
-		Count: len(w.hub.clients),
+		Count: clientCount,
 	})
 
 	// Get current message count
@@ -1161,8 +1149,8 @@ func (w *WebAdminServer) updateMetrics() {
 	}
 
 	// Update peak values
-	if len(w.hub.clients) > w.metrics.PeakUsers {
-		w.metrics.PeakUsers = len(w.hub.clients)
+	if clientCount > w.metrics.PeakUsers {
+		w.metrics.PeakUsers = clientCount
 	}
 	if m.Alloc > w.metrics.PeakMemory {
 		w.metrics.PeakMemory = m.Alloc

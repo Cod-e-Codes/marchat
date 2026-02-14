@@ -775,10 +775,8 @@ func (m *model) shouldNotify(msg shared.Message) (bool, NotificationLevel) {
 		level = NotificationLevelMention
 	}
 
-	// TODO: Add DM detection logic when DM support is added
-	// if msg.IsDM {
-	//     level = NotificationLevelDM
-	// }
+	// DM detection will be added when DM support is implemented.
+	// When available, DM messages should use NotificationLevelDM.
 
 	return true, level
 }
