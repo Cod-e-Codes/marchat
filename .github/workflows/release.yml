@@ -12,7 +12,6 @@ on:
 
 jobs:
   build:
-    if: ${{ github.event.release.prerelease == false }}
     name: Build Release Binaries
     runs-on: ubuntu-latest
     strategy:
@@ -47,12 +46,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version: '1.24'
 
@@ -100,22 +99,16 @@ jobs:
       - name: Create release archive
         run: |
           cd build
-          if [ "${{ matrix.goos }}" = "windows" ]; then
-            zip "../marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip" \
-              "marchat-client-${{ matrix.platform }}${{ matrix.ext }}" \
-              "marchat-server-${{ matrix.platform }}${{ matrix.ext }}"
-          else
-            tar -czf "../marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.tar.gz" \
-              "marchat-client-${{ matrix.platform }}${{ matrix.ext }}" \
-              "marchat-server-${{ matrix.platform }}${{ matrix.ext }}"
-          fi
+          zip "../marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip" \
+            "marchat-client-${{ matrix.platform }}${{ matrix.ext }}" \
+            "marchat-server-${{ matrix.platform }}${{ matrix.ext }}"
 
       - name: Upload release artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: marchat-${{ matrix.platform }}
           path: |
-            marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.*
+            marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip
 
   upload-assets:
     name: Upload GitHub Release Assets
@@ -127,58 +120,55 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           path: release-artifacts
 
       - name: Add Artifacts to GitHub Release
         if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           append_body: true
           files: |
             release-artifacts/**/*
-          body: |
-            ## Docker Image
-            The Docker image is available on Docker Hub:
-            ```
-            docker pull codecodesxyz/marchat:${{ needs.build.outputs.VERSION }}
-            ```
-            You can also use the `latest` tag to always get the most recent release:
-            ```
-            docker pull codecodesxyz/marchat:latest
-            ```
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-        # Cleanup artifacts after upload instead of relying on retention period
       - name: Delete Uploaded Artifacts
         if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: geekyeggo/delete-artifact@v5
+        uses: geekyeggo/delete-artifact@f275313e70c08f6120db482d7a6b98377786765b # v5.1.0
         with:
-          name: marchat-${{ needs.build.outputs.VERSION }}-${{ matrix.platform }}.*
+          name: |
+            marchat-linux-amd64
+            marchat-linux-arm64
+            marchat-windows-amd64
+            marchat-darwin-amd64
+            marchat-darwin-arm64
+            marchat-android-arm64
 
   docker:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
     needs: [build, upload-assets]
+    permissions:
+      contents: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           fetch-depth: 0
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
 
       - name: Log in to Docker Hub
-        uses: docker/login-action@v3
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          password: ${{ secrets.DOCKER_PAT }}
 
       - name: Get metadata
         id: meta
@@ -187,7 +177,7 @@ jobs:
           echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           provenance: false
           context: .
@@ -205,17 +195,18 @@ jobs:
 
       - name: Add Docker Image Info to GitHub Release
         if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
         with:
           append_body: true
           body: |
+
             ## Docker Image
-            The Docker image is available on Docker Hub:
-            ```
+
+            A multi-architecture Docker image (linux/amd64, linux/arm64) is available on Docker Hub:
+
+            ```bash
             docker pull codecodesxyz/marchat:${{ needs.build.outputs.VERSION }}
-            ```
-            You can also use the `latest` tag to always get the most recent release:
-            ```
+            # or use latest tag
             docker pull codecodesxyz/marchat:latest
             ```
         env:
