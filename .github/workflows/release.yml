@@ -134,7 +134,8 @@ jobs:
         with:
           path: release-artifacts
 
-      - name: Create GitHub Release
+      - name: Add Artifacts to GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: softprops/action-gh-release@v2
         with:
           append_body: true
@@ -201,3 +202,21 @@ jobs:
             codecodesxyz/marchat:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Add Docker Image Info to GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: softprops/action-gh-release@v2
+        with:
+          append_body: true
+          body: |
+            ## Docker Image
+            The Docker image is available on Docker Hub:
+            ```
+            docker pull codecodesxyz/marchat:${{ needs.build.outputs.VERSION }}
+            ```
+            You can also use the `latest` tag to always get the most recent release:
+            ```
+            docker pull codecodesxyz/marchat:latest
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
