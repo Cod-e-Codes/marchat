@@ -141,7 +141,7 @@ go build -o marchat-client ./client
 ```
 
 **Prerequisites for source build:**
-- Go 1.24+ ([download](https://go.dev/dl/))
+- Go 1.25+ ([download](https://go.dev/dl/))
 - Linux clipboard support: `sudo apt install xclip` (Ubuntu/Debian) or `sudo yum install xclip` (RHEL/CentOS)
 
 ## Configuration

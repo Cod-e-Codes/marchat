@@ -116,7 +116,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 
 ### Prerequisites
 
-- Go 1.24 or later
+- Go 1.25 or later
 - SQLite support (built into Go)
 - PowerShell (for Windows test script)
 
