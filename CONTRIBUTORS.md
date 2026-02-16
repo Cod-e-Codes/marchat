@@ -8,3 +8,4 @@ Thanks to everyone who has helped improve marchat in any way!
 - [cmckerley](https://github.com/cmckerley) – Collaborated on Docker, testing, reverse proxy, and DevOps; suggested the :q quit command for safer application exit
 - [lmarsengill](https://github.com/lmarsengill) – Found a bug in query logic affecting message order
 - [aleksen](https://github.com/aleksen) – Added auto-generated JWT secret with persistence via interactive setup, fixed test isolation with `t.TempDir()`
+- [alexandzors](https://github.com/alexandzors) – Added automated release workflow with matrix builds, multi-arch Docker support, and SHA-pinned actions
