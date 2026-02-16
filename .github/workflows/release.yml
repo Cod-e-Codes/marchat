@@ -1,0 +1,213 @@
+name: Release Build
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build (e.g., v0.9.0-beta.4)'
+        required: true
+        default: 'v0.9.0-beta.4'
+
+jobs:
+  build:
+    name: Build Release Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          # Linux
+          - goos: linux
+            goarch: amd64
+            platform: linux-amd64
+          - goos: linux
+            goarch: arm64
+            platform: linux-arm64
+          # Windows
+          - goos: windows
+            goarch: amd64
+            platform: windows-amd64
+            ext: .exe
+          # macOS
+          - goos: darwin
+            goarch: amd64
+            platform: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            platform: darwin-arm64
+          # Android
+          - goos: android
+            goarch: arm64
+            platform: android-arm64
+
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
+        with:
+          go-version: '1.24'
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Get build metadata
+        id: metadata
+        run: |
+          echo "BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build client
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build \
+            -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=${{ steps.version.outputs.VERSION }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=${{ steps.version.outputs.VERSION }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.BuildTime=${{ steps.metadata.outputs.BUILD_TIME }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.GitCommit=${{ steps.metadata.outputs.GIT_COMMIT }}" \
+            -o "build/marchat-client-${{ matrix.platform }}${{ matrix.ext }}" \
+            ./client
+
+      - name: Build server
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+        run: |
+          go build \
+            -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=${{ steps.version.outputs.VERSION }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=${{ steps.version.outputs.VERSION }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.BuildTime=${{ steps.metadata.outputs.BUILD_TIME }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.GitCommit=${{ steps.metadata.outputs.GIT_COMMIT }}" \
+            -o "build/marchat-server-${{ matrix.platform }}${{ matrix.ext }}" \
+            ./cmd/server
+
+      - name: Create release archive
+        run: |
+          cd build
+          zip "../marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip" \
+            "marchat-client-${{ matrix.platform }}${{ matrix.ext }}" \
+            "marchat-server-${{ matrix.platform }}${{ matrix.ext }}"
+
+      - name: Upload release artifact
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: marchat-${{ matrix.platform }}
+          path: |
+            marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip
+
+  upload-assets:
+    name: Upload GitHub Release Assets
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name != 'workflow_dispatch' }}
+    needs: [build]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        with:
+          path: release-artifacts
+
+      - name: Add Artifacts to GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        with:
+          append_body: true
+          files: |
+            release-artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete Uploaded Artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: geekyeggo/delete-artifact@f275313e70c08f6120db482d7a6b98377786765b # v5.1.0
+        with:
+          name: |
+            marchat-linux-amd64
+            marchat-linux-arm64
+            marchat-windows-amd64
+            marchat-darwin-amd64
+            marchat-darwin-arm64
+            marchat-android-arm64
+
+  docker:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+    needs: [build, upload-assets]
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PAT }}
+
+      - name: Get metadata
+        id: meta
+        run: |
+          echo "BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> $GITHUB_OUTPUT
+          echo "GIT_COMMIT=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
+        with:
+          provenance: false
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: |
+            VERSION=${{ needs.build.outputs.VERSION }}
+            BUILD_TIME=${{ steps.meta.outputs.BUILD_TIME }}
+            GIT_COMMIT=${{ steps.meta.outputs.GIT_COMMIT }}
+          tags: |
+            codecodesxyz/marchat:${{ needs.build.outputs.VERSION }}
+            codecodesxyz/marchat:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Add Docker Image Info to GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' }}
+        uses: softprops/action-gh-release@a06a81a03ee405af7f2048a818ed3f03bbf83c7b # v2.5.0
+        with:
+          append_body: true
+          body: |
+
+            ## Docker Image
+
+            A multi-architecture Docker image (linux/amd64, linux/arm64) is available on Docker Hub:
+
+            ```bash
+            docker pull codecodesxyz/marchat:${{ needs.build.outputs.VERSION }}
+            # or use latest tag
+            docker pull codecodesxyz/marchat:latest
+            ```
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
