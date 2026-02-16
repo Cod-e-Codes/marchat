@@ -116,6 +116,7 @@ jobs:
           name: marchat-${{ matrix.platform }}
           path: |
             marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.*
+
   upload-assets:
     name: Upload GitHub Release Assets
     runs-on: ubuntu-latest
@@ -154,6 +155,7 @@ jobs:
 
         # Cleanup artifacts after upload instead of relying on retention period
       - name: Delete Uploaded Artifacts
+        if: ${{ github.event_name != 'workflow_dispatch' }}
         uses: geekyeggo/delete-artifact@v5
         with:
           name: marchat-${{ needs.build.outputs.VERSION }}-${{ matrix.platform }}.*
