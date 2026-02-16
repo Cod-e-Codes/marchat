@@ -606,18 +606,18 @@ go test ./... -timeout 10s # With timeout (CI recommended)
 |---------|----------|------|--------|
 | `plugin/license` | 83.1% | 229 LOC | High |
 | `shared` | 82.4% | 283 LOC | High |
-| `config` | 78.6% | 304 LOC | High |
-| `client/crypto` | 76.5% | 289 LOC | High |
-| `client/config` | 54.5% | 1816 LOC | Medium |
-| `plugin/store` | 46.8% | 559 LOC | Medium |
+| `client/crypto` | 76.9% | 302 LOC | High |
+| `config` | 74.2% | 319 LOC | High |
+| `client/config` | 54.5% | 1862 LOC | Medium |
+| `plugin/store` | 46.8% | 558 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 32.6% | 5500+ LOC | Medium |
-| `client` | 26.2% | 3700+ LOC | Medium |
-| `plugin/host` | 23.7% | 486 LOC | Low |
-| `plugin/manager` | 22.5% | 464 LOC | Low |
-| `cmd/server` | 5.3% | 403 LOC | Low |
+| `server` | 33.2% | 6100+ LOC | Medium |
+| `client` | 25.5% | 4900+ LOC | Medium |
+| `plugin/host` | 23.7% | 566 LOC | Low |
+| `plugin/manager` | 22.5% | 652 LOC | Low |
+| `cmd/server` | 5.3% | 454 LOC | Low |
 
-**Overall: 35.3%** - See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 34.8%** - See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

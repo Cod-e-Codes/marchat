@@ -12,7 +12,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. Overall coverage is 35.3% across all packages.
+**Note**: This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. Overall coverage is 34.8% across all packages.
 
 ## Test Structure
 
@@ -181,30 +181,30 @@ go test -cover ./...
 |---------|----------|--------|---------------|-----------------|
 | `plugin/license` | 83.1% | High | 229 | Small |
 | `shared` | 82.4% | High | 283 | Small |
-| `config` | 78.6% | High | 304 | Small |
-| `client/crypto` | 76.5% | High | 289 | Small |
-| `client/config` | 54.5% | Medium | 1816 | Medium |
-| `plugin/store` | 46.8% | Medium | 559 | Medium |
+| `client/crypto` | 76.9% | High | 302 | Small |
+| `config` | 74.2% | High | 319 | Small |
+| `client/config` | 54.5% | Medium | 1862 | Medium |
+| `plugin/store` | 46.8% | Medium | 558 | Medium |
 | `cmd/license` | 42.2% | Medium | 160 | Small |
-| `server` | 32.6% | Medium | 5500+ | Large |
-| `client` | 26.2% | Medium | 3700+ | Large |
-| `plugin/host` | 23.7% | Low | 486 | Medium |
-| `plugin/manager` | 22.5% | Low | 464 | Medium |
-| `cmd/server` | 5.3% | Low | 403 | Medium |
+| `server` | 33.2% | Medium | 6100+ | Large |
+| `client` | 25.5% | Medium | 4900+ | Large |
+| `plugin/host` | 23.7% | Low | 566 | Medium |
+| `plugin/manager` | 22.5% | Low | 652 | Medium |
+| `cmd/server` | 5.3% | Low | 454 | Medium |
 
-**Overall coverage: 35.3%** (all packages)
+**Overall coverage: 34.8%** (all packages)
 
 ### High Coverage (70%+)
 - **Plugin License Package**: License validation, signature verification, caching (83.1%)
 - **Shared Package**: Cryptographic operations, data types, message handling (82.4%)
-- **Config Package**: Configuration loading, validation, environment variables (78.6%)
-- **Client Crypto Package**: Keystore management, encryption/decryption, file operations (76.5%)
+- **Client Crypto Package**: Keystore management, encryption/decryption, file operations (76.9%)
+- **Config Package**: Configuration loading, validation, environment variables (74.2%)
 
 ### Medium Coverage (40-70%)
-- **Client Config Package**: Configuration management, path utilities, keystore migration, interactive UI (55.2%)
+- **Client Config Package**: Configuration management, path utilities, keystore migration, interactive UI (54.5%)
 - **Plugin Store**: Registry management, platform resolution, filtering, caching (46.8%)
-- **Server Package**: WebSocket handling, admin panel, database operations, configuration management (27.0%)
-- **Client Package**: Message rendering, user lists, encryption functions, flag validation (27.8%)
+- **Server Package**: WebSocket handling, admin panel, database operations, configuration management (33.2%)
+- **Client Package**: Message rendering, user lists, encryption functions, flag validation (25.5%)
 
 ### Low Coverage (<40%)
 - **Plugin Host**: Plugin lifecycle management, communication, enable/disable (22.3%)
@@ -242,8 +242,8 @@ go test -cover ./...
 | `cmd/server/main.go` | 5.6% | cmd/server | Server main application |
 
 ### Areas for Future Testing
-- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 35.4%)
-- **Client Package**: WebSocket communication, full TUI integration (current: 27.8%)
+- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 33.2%)
+- **Client Package**: WebSocket communication, full TUI integration (current: 25.5%)
 - **Plugin Host**: Live plugin execution, WebSocket communication (current: 22.3%)
 - **Plugin Manager**: Installation, uninstallation, command execution (current: 12.4%)
 - **Server Main**: Full main function execution, server startup, admin panel integration (current: 5.6%)
@@ -379,8 +379,8 @@ When adding new functionality to Marchat:
 ## Test Metrics
 
 - **Total Tests**: 366+ individual test cases across 11 packages
-- **Coverage by Package**: 83.1% (plugin/license), 82.4% (shared), 78.6% (config), 76.5% (client/crypto), 54.5% (client/config), 46.8% (plugin/store), 42.2% (cmd/license), 32.6% (server), 26.2% (client), 23.7% (plugin/host), 22.5% (plugin/manager), 5.3% (cmd/server)
-- **Overall Coverage**: 35.3% across all packages
+- **Coverage by Package**: 83.1% (plugin/license), 82.4% (shared), 76.9% (client/crypto), 74.2% (config), 54.5% (client/config), 46.8% (plugin/store), 42.2% (cmd/license), 33.2% (server), 25.5% (client), 23.7% (plugin/host), 22.5% (plugin/manager), 5.3% (cmd/server)
+- **Overall Coverage**: 34.8% across all packages
 - **Execution Time**: <3 seconds for full suite
 - **Reliability**: 100% deterministic, no flaky tests, no hanging tests
 - **Test Files**: 26 test files covering core functionality, client components, plugin system, server operations, and admin interfaces
