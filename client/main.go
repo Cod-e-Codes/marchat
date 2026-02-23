@@ -2487,7 +2487,8 @@ func (m *model) generateHelpContent() string {
 	// Basic keyboard shortcuts
 	shortcuts := "\nKeyboard Shortcuts:\n"
 	shortcuts += "  Ctrl+H               Toggle this help\n"
-	shortcuts += "  Esc                  Quit / Close menus\n"
+	shortcuts += "  :q                    Quit client\n"
+	shortcuts += "  Esc                  Close menus\n"
 	shortcuts += "  Enter                Send message\n"
 	shortcuts += "  ↑/↓                  Scroll chat\n"
 	shortcuts += "  PgUp/PgDn            Page through chat\n"
@@ -2501,6 +2502,7 @@ func (m *model) generateHelpContent() string {
 
 	// Text commands
 	commands := "\nText Commands:\n"
+	commands += "  :q                   Quit client\n"
 	commands += "  :sendfile [path]     Send a file (or Alt+F)\n"
 	commands += "  :savefile <name>     Save received file\n"
 	commands += "  :theme <name>        Change theme (or Ctrl+T to cycle)\n"
