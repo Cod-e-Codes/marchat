@@ -7,22 +7,18 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.9.0--beta.5-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.9.0-beta.5)
+[![Version](https://img.shields.io/badge/version-v0.9.0--beta.6-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.9.0-beta.6)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
 ## Latest Updates
 
-### v0.9.0-beta.5 (Current)
-- **Automated Releases**: New GitHub Actions workflow for matrix builds across all platforms with multi-arch Docker support ([@alexandzors](https://github.com/alexandzors))
-- **Security**: Replaced SHA256 with PBKDF2 for keystore key derivation
-- **JWT Secret**: Auto-generated JWT secret with persistence via interactive setup ([@aleksen](https://github.com/aleksen))
-- **Bug Fixes**: Fixed race conditions, error handling, WebSocket origin check, and doc inaccuracies
-- **Docker**: Added `.dockerignore` and optimized Dockerfile layer caching
-- **CI**: Enabled race detector in CI test step
-- **Dependencies**: Bumped `charmbracelet/bubbles` to 1.0.0, `modernc.org/sqlite` to 1.45.0, `golang.org/x/crypto` to 0.48.0; Go 1.25
+### v0.9.0-beta.6 (Current)
+- **Security**: Rebuilt with Go 1.25.8 to address CVE-2026-25679, CVE-2026-27142, CVE-2026-27139
+- **Dependencies**: Bumped `golang.org/x/crypto` from 0.48.0 to 0.49.0, `modernc.org/sqlite` to 1.46.1
 
 ### Recent Releases
+- **v0.9.0-beta.5**: Automated release workflow, PBKDF2 keystore key derivation, JWT secret auto-generation, race condition fixes, Docker optimizations
 - **v0.9.0-beta.4**: Fixed admin metrics, restored plugin commands in encrypted sessions, dependency updates
 - **v0.9.0-beta.3**: Added :q quit command, improved theme handling, ESC behavior tweaks, and better database backups
 - **v0.9.0-beta.2**: Database performance improvements, documentation enhancements, dependency updates
@@ -116,12 +112,12 @@ Key tables for message tracking and moderation:
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.5/marchat-v0.9.0-beta.5-linux-amd64.zip
-unzip marchat-v0.9.0-beta.5-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.6/marchat-v0.9.0-beta.6-linux-amd64.zip
+unzip marchat-v0.9.0-beta.6-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.5/marchat-v0.9.0-beta.5-darwin-amd64.zip
-unzip marchat-v0.9.0-beta.5-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.6/marchat-v0.9.0-beta.6-darwin-amd64.zip
+unzip marchat-v0.9.0-beta.6-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -129,11 +125,11 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.9.0-beta.5
+docker pull codecodesxyz/marchat:v0.9.0-beta.6
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.9.0-beta.5
+  codecodesxyz/marchat:v0.9.0-beta.6
 ```
 
 **From Source:**
