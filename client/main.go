@@ -1004,6 +1004,11 @@ func (e wsUsernameError) Error() string {
 
 type wsConnected bool
 
+// wsReaderClosed is sent when the WebSocket read loop exits because the
+// connection context was canceled (deliberate disconnect). It unblocks
+// listenWebSocket without implying a transport error or reconnect.
+type wsReaderClosed struct{}
+
 type UserList struct {
 	Users []string `json:"users"`
 }
@@ -1014,6 +1019,37 @@ type codeSnippetMsg struct {
 
 type fileSendMsg struct {
 	filePath string
+}
+
+// deliverWSMsg sends msg on m.msgChan. If the buffer is full, it drops one
+// older queued message and retries so the WebSocket reader never blocks
+// indefinitely when the UI falls behind.
+func (m *model) deliverWSMsg(msg tea.Msg) {
+	for {
+		select {
+		case m.msgChan <- msg:
+			return
+		default:
+			select {
+			case <-m.msgChan:
+			default:
+			}
+		}
+	}
+}
+
+// abortPartialWebSocketConnect tears down state after a dial succeeds but
+// setup fails before the read goroutine is started (no wg.Done is pending).
+func (m *model) abortPartialWebSocketConnect() {
+	if m.cancel != nil {
+		m.cancel()
+		m.cancel = nil
+	}
+	if m.conn != nil {
+		_ = m.conn.Close()
+		m.conn = nil
+	}
+	m.connected = false
 }
 
 func (m *model) connectWebSocket(serverURL string) error {
@@ -1062,7 +1098,6 @@ func (m *model) connectWebSocket(serverURL string) error {
 	m.connected = true
 	m.banner = "✅ Connected to server!"
 	m.ctx, m.cancel = context.WithCancel(context.Background())
-	m.wg.Add(1)
 
 	// Send handshake as first message
 	handshake := shared.Handshake{
@@ -1077,6 +1112,7 @@ func (m *model) connectWebSocket(serverURL string) error {
 	log.Printf("Sending handshake: %+v", handshake)
 	if err := m.conn.WriteJSON(handshake); err != nil {
 		log.Printf("Failed to send handshake: %v", err)
+		m.abortPartialWebSocketConnect()
 		return err
 	}
 	log.Printf("Handshake sent successfully")
@@ -1094,6 +1130,7 @@ func (m *model) connectWebSocket(serverURL string) error {
 			if ce, ok := err.(*websocket.CloseError); ok {
 				log.Printf("Close error detected - Code: %d, Text: '%s'", ce.Code, ce.Text)
 				if strings.Contains(ce.Text, "Username already taken") || strings.Contains(ce.Text, "already taken") {
+					m.abortPartialWebSocketConnect()
 					return wsUsernameError{message: "Username already taken - please choose a different username"}
 				}
 			}
@@ -1107,9 +1144,11 @@ func (m *model) connectWebSocket(serverURL string) error {
 			strings.Contains(errStr, "broken pipe") {
 			// Connection was closed immediately after handshake - likely duplicate username
 			log.Printf("Connection closed immediately after handshake - assuming duplicate username")
+			m.abortPartialWebSocketConnect()
 			return wsUsernameError{message: "Username already taken - please choose a different username"}
 		}
 
+		m.abortPartialWebSocketConnect()
 		return err
 	}
 
@@ -1132,11 +1171,13 @@ func (m *model) connectWebSocket(serverURL string) error {
 		}
 	}()
 
+	m.wg.Add(1)
 	go func() {
 		defer m.wg.Done()
 		for {
 			select {
 			case <-m.ctx.Done():
+				m.deliverWSMsg(wsReaderClosed{})
 				return
 			default:
 				msgType, raw, err := conn.ReadMessage()
@@ -1147,7 +1188,7 @@ func (m *model) connectWebSocket(serverURL string) error {
 							log.Printf("WebSocket closed: %d - %s", ce.Code, ce.Text)
 							// Check for duplicate username error
 							if strings.Contains(ce.Text, "Username already taken") {
-								m.msgChan <- wsUsernameError{message: ce.Text}
+								m.deliverWSMsg(wsUsernameError{message: ce.Text})
 								return
 							}
 						}
@@ -1157,12 +1198,12 @@ func (m *model) connectWebSocket(serverURL string) error {
 					errStr := err.Error()
 					if strings.Contains(errStr, "bad close code") {
 						log.Printf("Detected bad close code - likely duplicate username: %v", err)
-						m.msgChan <- wsUsernameError{message: "Username already taken - please choose a different username"}
+						m.deliverWSMsg(wsUsernameError{message: "Username already taken - please choose a different username"})
 						return
 					}
 
 					log.Printf("WebSocket read error: %v", err)
-					m.msgChan <- wsErr(err)
+					m.deliverWSMsg(wsErr(err))
 					return
 				}
 
@@ -1170,10 +1211,10 @@ func (m *model) connectWebSocket(serverURL string) error {
 				if msgType == websocket.CloseMessage {
 					log.Printf("Received close message: %s", string(raw))
 					if strings.Contains(string(raw), "Username already taken") {
-						m.msgChan <- wsUsernameError{message: string(raw)}
+						m.deliverWSMsg(wsUsernameError{message: string(raw)})
 						return
 					}
-					m.msgChan <- wsErr(fmt.Errorf("connection closed: %s", string(raw)))
+					m.deliverWSMsg(wsErr(fmt.Errorf("connection closed: %s", string(raw))))
 					return
 				}
 
@@ -1210,18 +1251,18 @@ func (m *model) connectWebSocket(serverURL string) error {
 									log.Printf("DEBUG: Failed to decrypt message: %v", err)
 									// Keep original message but mark as failed decryption
 									msg.Content = "[ENCRYPTED - DECRYPTION FAILED]"
-									m.msgChan <- msg
+									m.deliverWSMsg(msg)
 									continue
 								}
 
 								log.Printf("DEBUG: Successfully decrypted message")
-								m.msgChan <- *decryptedMsg
+								m.deliverWSMsg(*decryptedMsg)
 								continue
 							}
 						}
 
 						// Regular message (not encrypted or decryption not needed)
-						m.msgChan <- msg
+						m.deliverWSMsg(msg)
 						continue
 					}
 				}
@@ -1230,7 +1271,7 @@ func (m *model) connectWebSocket(serverURL string) error {
 				var ws wsMsg
 				if err := json.Unmarshal(raw, &ws); err == nil && ws.Type != "" {
 					log.Printf("Received wsMsg type: %s", ws.Type)
-					m.msgChan <- ws
+					m.deliverWSMsg(ws)
 					continue
 				}
 
@@ -1277,6 +1318,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.banner = "✅ Connected to server!"
 		m.reconnectDelay = time.Second // reset on success
 		return m, m.listenWebSocket()
+	case wsReaderClosed:
+		return m, nil
 	case wsMsg:
 		if v.Type == "userlist" {
 			var ul UserList
