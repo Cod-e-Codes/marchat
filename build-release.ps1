@@ -22,6 +22,9 @@ $BUILD_TIME = (Get-Date).ToUniversalTime().ToString('o')
 $GIT_COMMIT = git rev-parse --short HEAD 2>$null
 if (-not $GIT_COMMIT) { $GIT_COMMIT = "unknown" }
 
+# Disable CGO for static cross-compiled binaries
+$env:CGO_ENABLED = "0"
+
 # Build targets with version information
 Write-Host "Building for Linux AMD64..." -ForegroundColor Yellow
 $env:GOOS = "linux"; $env:GOARCH = "amd64"
