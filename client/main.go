@@ -1,14 +1,11 @@
 package main
 
 import (
-	"crypto/tls"
 	"flag"
 	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
-	"runtime"
 	"sort"
 	"strconv"
 	"strings"
@@ -17,13 +14,10 @@ import (
 	"github.com/Cod-e-Codes/marchat/client/config"
 	"github.com/Cod-e-Codes/marchat/client/crypto"
 	"github.com/Cod-e-Codes/marchat/shared"
-	"github.com/alecthomas/chroma/quick"
 
-	"os/exec"
 	"os/signal"
 	"syscall"
 
-	"encoding/base64"
 	"encoding/json"
 
 	"context"
@@ -50,277 +44,6 @@ const reconnectMaxDelay = 30 * time.Second // for exponential backoff
 var mentionRegex *regexp.Regexp
 var urlRegex *regexp.Regexp
 
-// keyMap defines all keybindings for the help system
-type keyMap struct {
-	Send        key.Binding
-	ScrollUp    key.Binding
-	ScrollDown  key.Binding
-	PageUp      key.Binding
-	PageDown    key.Binding
-	Copy        key.Binding
-	Paste       key.Binding
-	Cut         key.Binding
-	SelectAll   key.Binding
-	Help        key.Binding
-	Quit        key.Binding
-	TimeFormat  key.Binding
-	Clear       key.Binding
-	QuitCommand key.Binding
-	// Commands with both text commands and hotkey alternatives
-	SendFile    key.Binding
-	SaveFile    key.Binding
-	Theme       key.Binding
-	CodeSnippet key.Binding
-	// Hotkey alternatives for commands (work even in encrypted sessions)
-	SendFileHotkey    key.Binding
-	ThemeHotkey       key.Binding
-	TimeFormatHotkey  key.Binding
-	ClearHotkey       key.Binding
-	CodeSnippetHotkey key.Binding
-	// Notification controls
-	NotifyDesktop key.Binding
-	// Admin UI commands
-	DatabaseMenu key.Binding
-	SelectUser   key.Binding
-	CloseMenu    key.Binding
-	// Admin action hotkeys
-	BanUser             key.Binding
-	KickUser            key.Binding
-	UnbanUser           key.Binding
-	AllowUser           key.Binding
-	ForceDisconnectUser key.Binding
-	// Plugin management hotkeys (admin only)
-	PluginList      key.Binding
-	PluginStore     key.Binding
-	PluginRefresh   key.Binding
-	PluginInstall   key.Binding
-	PluginUninstall key.Binding
-	PluginEnable    key.Binding
-	PluginDisable   key.Binding
-	// Legacy admin commands (for help display only)
-	ClearDB key.Binding
-}
-
-// ShortHelp returns keybindings to be shown in the mini help view
-func (k keyMap) ShortHelp() []key.Binding {
-	return []key.Binding{k.Help, k.Quit}
-}
-
-// FullHelp returns keybindings for the expanded help view
-func (k keyMap) FullHelp() [][]key.Binding {
-	return [][]key.Binding{
-		{k.Send, k.ScrollUp, k.ScrollDown, k.PageUp, k.PageDown},
-		{k.Copy, k.Paste, k.Cut, k.SelectAll},
-		{k.TimeFormat, k.Clear, k.Help, k.Quit},
-	}
-}
-
-// GetCommandHelp returns command-specific help based on user permissions
-func (k keyMap) GetCommandHelp(isAdmin, useE2E bool) [][]key.Binding {
-	commands := [][]key.Binding{
-		{k.SendFile, k.SaveFile, k.Theme, k.CodeSnippet},
-		{k.SendFileHotkey, k.ThemeHotkey, k.TimeFormatHotkey, k.ClearHotkey, k.CodeSnippetHotkey},
-	}
-
-	// Individual E2E commands removed - only global E2E encryption is supported
-
-	if isAdmin {
-		commands = append(commands, []key.Binding{k.DatabaseMenu, k.SelectUser, k.BanUser, k.KickUser, k.UnbanUser, k.AllowUser, k.ForceDisconnectUser})
-	}
-
-	return commands
-}
-
-// newKeyMap creates a new keymap for the application
-// This function is kept for potential future use in help documentation
-func newKeyMap() keyMap {
-	return keyMap{
-		Send: key.NewBinding(
-			key.WithKeys("enter"),
-			key.WithHelp("enter", "send message"),
-		),
-		ScrollUp: key.NewBinding(
-			key.WithKeys("up"),
-			key.WithHelp("↑", "scroll up"),
-		),
-		ScrollDown: key.NewBinding(
-			key.WithKeys("down"),
-			key.WithHelp("↓", "scroll down"),
-		),
-		PageUp: key.NewBinding(
-			key.WithKeys("pgup"),
-			key.WithHelp("pgup", "page up"),
-		),
-		PageDown: key.NewBinding(
-			key.WithKeys("pgdown"),
-			key.WithHelp("pgdown", "page down"),
-		),
-		Copy: key.NewBinding(
-			key.WithKeys("ctrl+c"),
-			key.WithHelp("ctrl+c", "copy"),
-		),
-		Paste: key.NewBinding(
-			key.WithKeys("ctrl+v"),
-			key.WithHelp("ctrl+v", "paste"),
-		),
-		Cut: key.NewBinding(
-			key.WithKeys("ctrl+x"),
-			key.WithHelp("ctrl+x", "cut"),
-		),
-		SelectAll: key.NewBinding(
-			key.WithKeys("ctrl+a"),
-			key.WithHelp("ctrl+a", "select all"),
-		),
-		Help: key.NewBinding(
-			key.WithKeys("ctrl+h"),
-			key.WithHelp("ctrl+h", "toggle help"),
-		),
-		Quit: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "close menus"),
-		),
-		TimeFormat: key.NewBinding(
-			key.WithKeys(":time"),
-			key.WithHelp(":time", "toggle 12/24h format"),
-		),
-		Clear: key.NewBinding(
-			key.WithKeys(":clear"),
-			key.WithHelp(":clear", "clear chat history"),
-		),
-		QuitCommand: key.NewBinding(
-			key.WithKeys(":q"),
-			key.WithHelp(":q", "quit client"),
-		),
-		SendFile: key.NewBinding(
-			key.WithKeys(":sendfile"),
-			key.WithHelp(":sendfile <path>", "send a file"),
-		),
-		SaveFile: key.NewBinding(
-			key.WithKeys(":savefile"),
-			key.WithHelp(":savefile <name>", "save received file"),
-		),
-		Theme: key.NewBinding(
-			key.WithKeys(":theme"),
-			key.WithHelp(":theme <name>", "change theme"),
-		),
-		CodeSnippet: key.NewBinding(
-			key.WithKeys(":code"),
-			key.WithHelp(":code", "create syntax highlighted code snippet"),
-		),
-		// Hotkey alternatives for commands (work even in encrypted sessions)
-		SendFileHotkey: key.NewBinding(
-			key.WithKeys("alt+f"),
-			key.WithHelp("alt+f", "send a file (file picker)"),
-		),
-		ThemeHotkey: key.NewBinding(
-			key.WithKeys("ctrl+t"),
-			key.WithHelp("ctrl+t", "cycle through themes"),
-		),
-		TimeFormatHotkey: key.NewBinding(
-			key.WithKeys("alt+t"),
-			key.WithHelp("alt+t", "toggle 12/24h time format"),
-		),
-		ClearHotkey: key.NewBinding(
-			key.WithKeys("ctrl+l"),
-			key.WithHelp("ctrl+l", "clear chat history"),
-		),
-		CodeSnippetHotkey: key.NewBinding(
-			key.WithKeys("alt+c"),
-			key.WithHelp("alt+c", "create code snippet"),
-		),
-		// Notification controls
-		NotifyDesktop: key.NewBinding(
-			key.WithKeys("alt+n"),
-			key.WithHelp("alt+n", "toggle desktop notifications"),
-		),
-		// Admin UI commands
-		DatabaseMenu: key.NewBinding(
-			key.WithKeys("ctrl+d"),
-			key.WithHelp("ctrl+d", "database menu (admin)"),
-		),
-		SelectUser: key.NewBinding(
-			key.WithKeys("ctrl+u"),
-			key.WithHelp("ctrl+u", "select/cycle user (admin)"),
-		),
-		CloseMenu: key.NewBinding(
-			key.WithKeys("esc"),
-			key.WithHelp("esc", "close menu/clear selection"),
-		),
-		// Admin action hotkeys
-		BanUser: key.NewBinding(
-			key.WithKeys("ctrl+b"),
-			key.WithHelp("ctrl+b", "ban selected user (admin)"),
-		),
-		KickUser: key.NewBinding(
-			key.WithKeys("ctrl+k"),
-			key.WithHelp("ctrl+k", "kick selected user (admin)"),
-		),
-		UnbanUser: key.NewBinding(
-			key.WithKeys("ctrl+shift+b"),
-			key.WithHelp("ctrl+shift+b", "unban user (admin)"),
-		),
-		AllowUser: key.NewBinding(
-			key.WithKeys("ctrl+shift+a"),
-			key.WithHelp("ctrl+shift+a", "allow user (admin)"),
-		),
-		ForceDisconnectUser: key.NewBinding(
-			key.WithKeys("ctrl+f"),
-			key.WithHelp("ctrl+f", "force disconnect selected user (admin)"),
-		),
-		// Plugin management hotkeys (admin only)
-		PluginList: key.NewBinding(
-			key.WithKeys("alt+p"),
-			key.WithHelp("alt+p", "list plugins (admin)"),
-		),
-		PluginStore: key.NewBinding(
-			key.WithKeys("alt+s"),
-			key.WithHelp("alt+s", "plugin store (admin)"),
-		),
-		PluginRefresh: key.NewBinding(
-			key.WithKeys("alt+r"),
-			key.WithHelp("alt+r", "refresh plugins (admin)"),
-		),
-		PluginInstall: key.NewBinding(
-			key.WithKeys("alt+i"),
-			key.WithHelp("alt+i", "install plugin (admin)"),
-		),
-		PluginUninstall: key.NewBinding(
-			key.WithKeys("alt+u"),
-			key.WithHelp("alt+u", "uninstall plugin (admin)"),
-		),
-		PluginEnable: key.NewBinding(
-			key.WithKeys("alt+e"),
-			key.WithHelp("alt+e", "enable plugin (admin)"),
-		),
-		PluginDisable: key.NewBinding(
-			key.WithKeys("alt+d"),
-			key.WithHelp("alt+d", "disable plugin (admin)"),
-		),
-		// Legacy admin commands (for help display only)
-		ClearDB: key.NewBinding(
-			key.WithKeys(""),
-			key.WithHelp("", ""),
-		),
-	}
-}
-
-// sortMessagesByTimestamp ensures messages are displayed in chronological order
-// This provides client-side protection against server ordering issues
-func sortMessagesByTimestamp(messages []shared.Message) {
-	sort.Slice(messages, func(i, j int) bool {
-		// Primary sort: by timestamp
-		if !messages[i].CreatedAt.Equal(messages[j].CreatedAt) {
-			return messages[i].CreatedAt.Before(messages[j].CreatedAt)
-		}
-		// Secondary sort: by sender for deterministic ordering when timestamps are identical
-		if messages[i].Sender != messages[j].Sender {
-			return messages[i].Sender < messages[j].Sender
-		}
-		// Tertiary sort: by content for full deterministic ordering
-		return messages[i].Content < messages[j].Content
-	})
-}
-
 func init() {
 	mentionRegex = regexp.MustCompile(`\B@([a-zA-Z0-9_]+)\b`)
 	// URL regex pattern to match http/https URLs and common domain patterns
@@ -342,30 +65,22 @@ func init() {
 	}
 }
 
-// getClientConfigDir returns the client config directory using same logic as server
+// getClientConfigDir returns the client config directory, delegating to
+// config.GetConfigDir for the canonical platform-aware path. Environment
+// variable MARCHAT_CONFIG_DIR and dev-mode (go.mod present) overrides are
+// checked first for backward compatibility.
 func getClientConfigDir() string {
-	// Check environment variable first
 	if envConfigDir := os.Getenv("MARCHAT_CONFIG_DIR"); envConfigDir != "" {
 		return envConfigDir
 	}
-
-	// Check if we're in development mode (running from project root)
 	if _, err := os.Stat("go.mod"); err == nil {
 		return "./config"
 	}
-
-	// Production mode - use XDG config home
-	if xdgConfig := os.Getenv("XDG_CONFIG_HOME"); xdgConfig != "" {
-		return filepath.Join(xdgConfig, "marchat")
-	}
-
-	// Fallback to user's home directory
-	homeDir, err := os.UserHomeDir()
+	dir, err := config.GetConfigDir()
 	if err != nil {
 		return "./config"
 	}
-
-	return filepath.Join(homeDir, ".config", "marchat")
+	return dir
 }
 
 var (
@@ -414,219 +129,6 @@ func checkClipboardSupport() bool {
 		return clipboard.WriteAll("test")
 	}, 1*time.Second)
 	return err == nil
-}
-
-// Add these helper functions after the existing imports and before the model struct
-
-// debugEncryptAndSend provides comprehensive logging around encryption
-func debugEncryptAndSend(recipients []string, plaintext string, ws *websocket.Conn, keystore *crypto.KeyStore, username string) error {
-	log.Printf("DEBUG: Starting global encryption for %d recipients", len(recipients))
-	log.Printf("DEBUG: Plaintext length: %d", len(plaintext))
-
-	// Check keystore status
-	if keystore == nil {
-		log.Printf("ERROR: Keystore is nil")
-		return fmt.Errorf("keystore not initialized")
-	}
-	log.Printf("DEBUG: Keystore loaded: %t", keystore != nil)
-
-	// Verify global key is available
-	globalKey := keystore.GetSessionKey("global")
-	if globalKey == nil {
-		log.Printf("ERROR: Global key not found")
-		return fmt.Errorf("global key not available - global E2E encryption not initialized")
-	}
-	log.Printf("DEBUG: Global key available (ID: %s)", globalKey.KeyID)
-
-	// Perform encryption using global key
-	conversationID := "global"
-	encryptedMsg, err := keystore.EncryptMessage(username, plaintext, conversationID)
-	if err != nil {
-		log.Printf("ERROR: Global encryption failed: %v", err)
-		return fmt.Errorf("global encryption failed: %v", err)
-	}
-
-	log.Printf("DEBUG: Global encryption successful - encrypted length: %d", len(encryptedMsg.Encrypted))
-
-	// Guard against empty ciphertext
-	if len(encryptedMsg.Encrypted) == 0 {
-		log.Printf("ERROR: Encryption returned empty ciphertext")
-		return fmt.Errorf("encryption returned empty ciphertext; aborting send")
-	}
-
-	// Combine nonce + encrypted data and base64 encode for safe JSON transport
-	combinedData := make([]byte, 0, len(encryptedMsg.Nonce)+len(encryptedMsg.Encrypted))
-	combinedData = append(combinedData, encryptedMsg.Nonce...)
-	combinedData = append(combinedData, encryptedMsg.Encrypted...)
-
-	finalContent := base64.StdEncoding.EncodeToString(combinedData)
-	log.Printf("DEBUG: Base64 encoded nonce+ciphertext - length: %d", len(finalContent))
-
-	// Verify final content is not empty
-	if len(finalContent) == 0 {
-		log.Printf("ERROR: Final content is empty after encoding")
-		return fmt.Errorf("final content is empty after encoding")
-	}
-
-	// Create a regular Message struct for the server
-	msg := shared.Message{
-		Content:   finalContent,
-		Sender:    username,
-		CreatedAt: time.Now(),
-		Type:      shared.TextMessage,
-		Encrypted: true, // Mark as encrypted
-	}
-
-	log.Printf("DEBUG: Final message - Content length: %d, Type: %s",
-		len(msg.Content), msg.Type)
-
-	// Send message
-	if err := ws.WriteJSON(msg); err != nil {
-		log.Printf("ERROR: WebSocket write failed: %v", err)
-		return err
-	}
-
-	log.Printf("DEBUG: Global encrypted message sent successfully")
-	return nil
-}
-
-// validateEncryptionRoundtrip tests encryption primitives using global key
-func validateEncryptionRoundtrip(keystore *crypto.KeyStore, username string) error {
-	testPlaintext := "Hello, global encryption test!"
-
-	log.Printf("DEBUG: Testing global encryption roundtrip")
-
-	// Test global conversation encryption
-	conversationID := "global"
-
-	// Verify global key exists
-	globalKey := keystore.GetSessionKey(conversationID)
-	if globalKey == nil {
-		return fmt.Errorf("global key not found - global E2E encryption not available")
-	}
-
-	log.Printf("DEBUG: Global key found (ID: %s)", globalKey.KeyID)
-
-	// Test encryption using global key
-	encryptedMsg, err := keystore.EncryptMessage(username, testPlaintext, conversationID)
-	if err != nil {
-		return fmt.Errorf("global encryption test failed: %v", err)
-	}
-
-	if len(encryptedMsg.Encrypted) == 0 {
-		return fmt.Errorf("global encryption test produced empty ciphertext")
-	}
-
-	log.Printf("DEBUG: Global encryption test successful - ciphertext length: %d", len(encryptedMsg.Encrypted))
-
-	// Test decryption roundtrip
-	decryptedMsg, err := keystore.DecryptMessage(encryptedMsg, conversationID)
-	if err != nil {
-		return fmt.Errorf("global decryption test failed: %v", err)
-	}
-
-	if decryptedMsg.Content != testPlaintext {
-		return fmt.Errorf("global decryption roundtrip failed: expected '%s', got '%s'", testPlaintext, decryptedMsg.Content)
-	}
-
-	log.Printf("DEBUG: Global encryption roundtrip test successful")
-	return nil
-}
-
-// verifyKeystoreUnlocked verifies keystore is properly unlocked (global encryption only)
-func verifyKeystoreUnlocked(keystore *crypto.KeyStore) error {
-	if keystore == nil {
-		return fmt.Errorf("keystore is nil")
-	}
-
-	// Check if global key is available
-	globalKey := keystore.GetGlobalKey()
-	if globalKey == nil {
-		return fmt.Errorf("global key not available")
-	}
-
-	log.Printf("DEBUG: Keystore properly unlocked for global encryption")
-	return nil
-}
-
-// debugWebSocketWrite logs what's being sent over the wire
-func debugWebSocketWrite(ws *websocket.Conn, msg interface{}) error {
-	// Marshal to JSON to see what's being sent
-	jsonData, err := json.Marshal(msg)
-	if err != nil {
-		log.Printf("ERROR: JSON marshal failed: %v", err)
-		return err
-	}
-
-	// Log without exposing sensitive content
-	log.Printf("DEBUG: Sending WebSocket message - length: %d bytes", len(jsonData))
-
-	// Check if content field is present and non-empty
-	var parsed map[string]interface{}
-	if err := json.Unmarshal(jsonData, &parsed); err == nil {
-		if content, exists := parsed["content"]; exists {
-			if contentStr, ok := content.(string); ok {
-				log.Printf("DEBUG: Message content length: %d", len(contentStr))
-				if len(contentStr) == 0 {
-					log.Printf("WARNING: Sending message with empty content!")
-				}
-			}
-		}
-	}
-
-	return ws.WriteJSON(msg)
-}
-
-// getCurrentProfileName finds the profile name that matches the current config
-func getCurrentProfileName(cfg *config.Config) string {
-	loader, err := config.NewInteractiveConfigLoader()
-	if err != nil {
-		return "" // Can't determine profile name
-	}
-
-	profiles, err := loader.LoadProfiles()
-	if err != nil {
-		return "" // Can't load profiles
-	}
-
-	// Find matching profile
-	for _, profile := range profiles.Profiles {
-		if profile.Username == cfg.Username &&
-			profile.ServerURL == cfg.ServerURL &&
-			profile.IsAdmin == cfg.IsAdmin &&
-			profile.UseE2E == cfg.UseE2E {
-			return profile.Name
-		}
-	}
-
-	return "" // No matching profile found
-}
-
-// updateProfileTheme updates the theme in the corresponding profile in profiles.json
-func (m *model) updateProfileTheme(newTheme string) error {
-	if m.profileName == "" {
-		return nil // No profile to update
-	}
-
-	loader, err := config.NewInteractiveConfigLoader()
-	if err != nil {
-		return err
-	}
-
-	profiles, err := loader.LoadProfiles()
-	if err != nil {
-		return err
-	}
-
-	// Find and update the matching profile
-	for i, profile := range profiles.Profiles {
-		if profile.Name == m.profileName {
-			profiles.Profiles[i].Theme = newTheme
-			return loader.SaveProfiles(profiles)
-		}
-	}
-
-	return nil // Profile not found, nothing to update
 }
 
 type model struct {
@@ -691,6 +193,13 @@ type model struct {
 
 	// Plugin command input system
 	pendingPluginAction string // e.g., "install", "uninstall", "enable", "disable"
+
+	typingUsers    map[string]time.Time
+	typingTimeout  time.Duration
+	dmRecipient    string
+	reactions      map[int64]map[string]map[string]bool
+	lastTypingSent time.Time
+	unreadCount    int
 }
 
 // configToNotificationConfig converts Config to NotificationConfig
@@ -760,30 +269,33 @@ func notificationConfigToConfig(notifCfg NotificationConfig, cfg *config.Config)
 
 // shouldNotify determines the notification level for a message
 func (m *model) shouldNotify(msg shared.Message) (bool, NotificationLevel) {
-	// Don't notify for our own messages
 	if msg.Sender == m.cfg.Username {
 		return false, NotificationLevelInfo
 	}
 
-	// Check if the message mentions the current user
-	mentionPattern := fmt.Sprintf("@%s", m.cfg.Username)
-	isMention := strings.Contains(strings.ToLower(msg.Content), strings.ToLower(mentionPattern))
-
-	// Determine notification level
-	level := NotificationLevelInfo
-	if isMention {
-		level = NotificationLevelMention
+	switch msg.Type {
+	case shared.TypingMessage, shared.ReadReceiptType, shared.ReactionMessage,
+		shared.EditMessageType, shared.DeleteMessage, shared.PinMessage:
+		return false, NotificationLevelInfo
 	}
 
-	// DM detection will be added when DM support is implemented.
-	// When available, DM messages should use NotificationLevelDM.
+	if msg.Type == shared.DirectMessage {
+		return true, NotificationLevelDM
+	}
 
-	return true, level
+	mentionPattern := fmt.Sprintf("@%s", m.cfg.Username)
+	if strings.Contains(strings.ToLower(msg.Content), strings.ToLower(mentionPattern)) {
+		return true, NotificationLevelMention
+	}
+
+	return true, NotificationLevelInfo
 }
 
 type themeStyles struct {
 	User      lipgloss.Style
 	Time      lipgloss.Style
+	Info      lipgloss.Style // empty state, date headers, system lines
+	Timestamp lipgloss.Style // bracketed message times in transcript
 	Msg       lipgloss.Style
 	Banner    lipgloss.Style
 	Box       lipgloss.Style // frame color
@@ -806,9 +318,12 @@ type themeStyles struct {
 
 // Base theme style helper
 func baseThemeStyles() themeStyles {
+	timeStyle := lipgloss.NewStyle().Faint(true)
 	return themeStyles{
 		User:       lipgloss.NewStyle().Bold(true),
-		Time:       lipgloss.NewStyle().Faint(true),
+		Time:       timeStyle,
+		Info:       timeStyle,
+		Timestamp:  timeStyle,
 		Msg:        lipgloss.NewStyle(),
 		Banner:     lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F5F")).Bold(true),
 		Box:        lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#AAAAAA")),
@@ -909,108 +424,9 @@ func getThemeStyles(theme string) themeStyles {
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#23272E")).Foreground(lipgloss.Color("#E0E0E0"))
 		s.HelpOverlay = s.HelpOverlay.BorderForeground(lipgloss.Color("#4F8EF7")).Background(lipgloss.Color("#181C24"))
 	}
+	s.Timestamp = s.Time
+	s.Info = s.Time
 	return s
-}
-
-func renderMessages(msgs []shared.Message, styles themeStyles, username string, users []string, width int, twentyFourHour bool) string {
-	const max = maxMessages
-	if len(msgs) > max {
-		msgs = msgs[len(msgs)-max:]
-	}
-
-	// CRITICAL FIX: Sort messages client-side to ensure consistent ordering
-	// This handles cases where server-side ordering may be inconsistent
-	sortMessagesByTimestamp(msgs)
-
-	var b strings.Builder
-	var prevDate string
-	for _, msg := range msgs {
-		sender := msg.Sender
-		align := lipgloss.Left
-		msgBoxStyle := lipgloss.NewStyle().Width(width - 4)
-		if sender == username {
-			align = lipgloss.Right
-			msgBoxStyle = msgBoxStyle.Background(lipgloss.Color("#222244")).Foreground(lipgloss.Color("#FFFFFF"))
-		} else {
-			msgBoxStyle = msgBoxStyle.Background(lipgloss.Color("#222222")).Foreground(lipgloss.Color("#AAAAAA"))
-		}
-		// Date header if date changes
-		dateStr := msg.CreatedAt.Format("2006-01-02")
-		if dateStr != prevDate {
-			b.WriteString(styles.Time.Render(dateStr) + "\n")
-			prevDate = dateStr
-		}
-		// Time format
-		timeFmt := "15:04:05"
-		if !twentyFourHour {
-			timeFmt = "03:04:05 PM"
-		}
-		timestamp := styles.Time.Render(msg.CreatedAt.Format(timeFmt))
-		var content string
-		if msg.Type == shared.FileMessageType && msg.File != nil {
-			fileInfo := styles.Mention.Render("[File] ") + styles.User.Render(msg.File.Filename) + styles.Time.Render(fmt.Sprintf(" (%d bytes)", msg.File.Size))
-			content = fileInfo + "\n" + styles.Msg.Render("Type :savefile "+msg.File.Filename+" to save.")
-		} else {
-			content = renderEmojis(msg.Content)
-			// Render code blocks with syntax highlighting
-			content = renderCodeBlocks(content)
-			// Render hyperlinks
-			content = renderHyperlinks(content, styles)
-			// Improved mention highlighting: highlight if any @username in user list (case-insensitive)
-			matches := mentionRegex.FindAllStringSubmatch(msg.Content, -1)
-			highlight := false
-			for _, m := range matches {
-				if len(m) > 1 {
-					for _, u := range users {
-						if strings.EqualFold(m[1], u) {
-							highlight = true
-							break
-						}
-					}
-					if highlight {
-						break
-					}
-				}
-			}
-			if highlight {
-				content = styles.Mention.Render(content)
-			} else {
-				content = styles.Msg.Render(content)
-			}
-		}
-		meta := styles.User.Render(sender) + " " + timestamp
-		wrapped := msgBoxStyle.Render(content)
-		msgBlock := lipgloss.JoinVertical(lipgloss.Left, meta, wrapped)
-		b.WriteString(msgBoxStyle.Align(align).Render(msgBlock) + "\n\n")
-	}
-	return b.String()
-}
-
-type wsMsg struct {
-	Type string          `json:"type"`
-	Data json.RawMessage `json:"data"`
-}
-
-type wsErr error
-
-// wsUsernameError represents a username-related connection error
-type wsUsernameError struct {
-	message string
-}
-
-func (e wsUsernameError) Error() string {
-	return e.message
-}
-
-type wsConnected bool
-
-// wsReaderClosed is sent when the WebSocket read loop exits because the
-// connection context was canceled (deliberate disconnect). It unblocks
-// listenWebSocket without implying a transport error or reconnect.
-type wsReaderClosed struct{}
-
-type UserList struct {
-	Users []string `json:"users"`
 }
 
 type codeSnippetMsg struct {
@@ -1019,277 +435,6 @@ type codeSnippetMsg struct {
 
 type fileSendMsg struct {
 	filePath string
-}
-
-// deliverWSMsg sends msg on m.msgChan. If the buffer is full, it drops one
-// older queued message and retries so the WebSocket reader never blocks
-// indefinitely when the UI falls behind.
-func (m *model) deliverWSMsg(msg tea.Msg) {
-	for {
-		select {
-		case m.msgChan <- msg:
-			return
-		default:
-			select {
-			case <-m.msgChan:
-			default:
-			}
-		}
-	}
-}
-
-// abortPartialWebSocketConnect tears down state after a dial succeeds but
-// setup fails before the read goroutine is started (no wg.Done is pending).
-func (m *model) abortPartialWebSocketConnect() {
-	if m.cancel != nil {
-		m.cancel()
-		m.cancel = nil
-	}
-	if m.conn != nil {
-		_ = m.conn.Close()
-		m.conn = nil
-	}
-	m.connected = false
-}
-
-func (m *model) connectWebSocket(serverURL string) error {
-	escapedUsername := url.QueryEscape(m.cfg.Username)
-	fullURL := serverURL + "?username=" + escapedUsername
-
-	log.Printf("Attempting to connect to: %s", fullURL)
-	log.Printf("Username: %s, Admin: %v", m.cfg.Username, *isAdmin)
-	if *isAdmin {
-		log.Printf("Admin key: %s", *adminKey)
-	}
-
-	// Create custom dialer with TLS configuration
-	dialer := websocket.DefaultDialer
-	if *skipTLSVerify {
-		dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
-	}
-
-	log.Printf("Attempting WebSocket connection to: %s", fullURL)
-	conn, resp, err := dialer.Dial(fullURL, nil)
-	if err != nil {
-		log.Printf("WebSocket dial failed - Error: %v (Type: %T)", err, err)
-		if resp != nil {
-			log.Printf("HTTP Response - Status: %d, Headers: %v", resp.StatusCode, resp.Header)
-			// Try to read response body for more details
-			if resp.Body != nil {
-				body := make([]byte, 1024)
-				if n, readErr := resp.Body.Read(body); readErr == nil && n > 0 {
-					log.Printf("Response body: %s", string(body[:n]))
-				}
-				resp.Body.Close()
-			}
-		}
-
-		// Check if this might be a duplicate username error based on response
-		if resp != nil && resp.StatusCode == 403 {
-			log.Printf("Connection forbidden - likely duplicate username")
-			return wsUsernameError{message: "Username already taken - please choose a different username"}
-		}
-
-		return err
-	}
-
-	log.Printf("WebSocket connection established successfully")
-	m.conn = conn
-	m.connected = true
-	m.banner = "✅ Connected to server!"
-	m.ctx, m.cancel = context.WithCancel(context.Background())
-
-	// Send handshake as first message
-	handshake := shared.Handshake{
-		Username: m.cfg.Username,
-		Admin:    *isAdmin,
-		AdminKey: "",
-	}
-	if *isAdmin {
-		handshake.AdminKey = *adminKey
-	}
-
-	log.Printf("Sending handshake: %+v", handshake)
-	if err := m.conn.WriteJSON(handshake); err != nil {
-		log.Printf("Failed to send handshake: %v", err)
-		m.abortPartialWebSocketConnect()
-		return err
-	}
-	log.Printf("Handshake sent successfully")
-
-	// Brief pause to allow server to process handshake and potentially close connection
-	time.Sleep(100 * time.Millisecond)
-
-	// Test if connection is still alive after handshake
-	if err := m.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-		log.Printf("Connection test failed after handshake: %v", err)
-		log.Printf("Error type: %T", err)
-
-		// Check different types of errors that might indicate connection was closed
-		if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-			if ce, ok := err.(*websocket.CloseError); ok {
-				log.Printf("Close error detected - Code: %d, Text: '%s'", ce.Code, ce.Text)
-				if strings.Contains(ce.Text, "Username already taken") || strings.Contains(ce.Text, "already taken") {
-					m.abortPartialWebSocketConnect()
-					return wsUsernameError{message: "Username already taken - please choose a different username"}
-				}
-			}
-		}
-
-		// Also check for "connection closed" type errors which might indicate duplicate username
-		errStr := err.Error()
-		log.Printf("Error string: '%s'", errStr)
-		if strings.Contains(errStr, "use of closed network connection") ||
-			strings.Contains(errStr, "connection reset") ||
-			strings.Contains(errStr, "broken pipe") {
-			// Connection was closed immediately after handshake - likely duplicate username
-			log.Printf("Connection closed immediately after handshake - assuming duplicate username")
-			m.abortPartialWebSocketConnect()
-			return wsUsernameError{message: "Username already taken - please choose a different username"}
-		}
-
-		m.abortPartialWebSocketConnect()
-		return err
-	}
-
-	// Set pong handler
-	m.conn.SetPongHandler(func(appData string) error {
-		return nil
-	})
-
-	// Start ping goroutine
-	go func() {
-		ticker := time.NewTicker(pingPeriod)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-m.ctx.Done():
-				return
-			case <-ticker.C:
-				_ = m.conn.WriteMessage(websocket.PingMessage, nil)
-			}
-		}
-	}()
-
-	m.wg.Add(1)
-	go func() {
-		defer m.wg.Done()
-		for {
-			select {
-			case <-m.ctx.Done():
-				m.deliverWSMsg(wsReaderClosed{})
-				return
-			default:
-				msgType, raw, err := conn.ReadMessage()
-				if err != nil {
-					// Check if it's a close error with a specific message
-					if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway, websocket.CloseAbnormalClosure) {
-						if ce, ok := err.(*websocket.CloseError); ok {
-							log.Printf("WebSocket closed: %d - %s", ce.Code, ce.Text)
-							// Check for duplicate username error
-							if strings.Contains(ce.Text, "Username already taken") {
-								m.deliverWSMsg(wsUsernameError{message: ce.Text})
-								return
-							}
-						}
-					}
-
-					// Check for the specific "bad close code" error that indicates duplicate username
-					errStr := err.Error()
-					if strings.Contains(errStr, "bad close code") {
-						log.Printf("Detected bad close code - likely duplicate username: %v", err)
-						m.deliverWSMsg(wsUsernameError{message: "Username already taken - please choose a different username"})
-						return
-					}
-
-					log.Printf("WebSocket read error: %v", err)
-					m.deliverWSMsg(wsErr(err))
-					return
-				}
-
-				// Handle close messages explicitly
-				if msgType == websocket.CloseMessage {
-					log.Printf("Received close message: %s", string(raw))
-					if strings.Contains(string(raw), "Username already taken") {
-						m.deliverWSMsg(wsUsernameError{message: string(raw)})
-						return
-					}
-					m.deliverWSMsg(wsErr(fmt.Errorf("connection closed: %s", string(raw))))
-					return
-				}
-
-				log.Printf("Received message: %s", string(raw))
-
-				// Try to unmarshal as shared.Message first
-				var msg shared.Message
-				if err := json.Unmarshal(raw, &msg); err == nil {
-					if msg.Sender != "" {
-						// Check if this is an encrypted message
-						if m.useE2E && msg.Encrypted && msg.Content != "" {
-							// Try to decode base64 encrypted content (nonce + encrypted_data)
-							if decoded, err := base64.StdEncoding.DecodeString(msg.Content); err == nil && len(decoded) > 12 {
-								// This might be encrypted content, try to decrypt it
-								log.Printf("DEBUG: Detected potential encrypted content, attempting decryption")
-
-								// Extract nonce (first 12 bytes) and encrypted data (rest)
-								nonce := decoded[:12]
-								encryptedData := decoded[12:]
-
-								// Create an EncryptedMessage struct for decryption
-								encryptedMsg := shared.EncryptedMessage{
-									Sender:      msg.Sender,
-									CreatedAt:   msg.CreatedAt,
-									Encrypted:   encryptedData,
-									Nonce:       nonce,
-									IsEncrypted: true,
-									Type:        msg.Type,
-								}
-
-								conversationID := "global" // Same as sending
-								decryptedMsg, err := m.keystore.DecryptMessage(&encryptedMsg, conversationID)
-								if err != nil {
-									log.Printf("DEBUG: Failed to decrypt message: %v", err)
-									// Keep original message but mark as failed decryption
-									msg.Content = "[ENCRYPTED - DECRYPTION FAILED]"
-									m.deliverWSMsg(msg)
-									continue
-								}
-
-								log.Printf("DEBUG: Successfully decrypted message")
-								m.deliverWSMsg(*decryptedMsg)
-								continue
-							}
-						}
-
-						// Regular message (not encrypted or decryption not needed)
-						m.deliverWSMsg(msg)
-						continue
-					}
-				}
-
-				// Then try as wsMsg
-				var ws wsMsg
-				if err := json.Unmarshal(raw, &ws); err == nil && ws.Type != "" {
-					log.Printf("Received wsMsg type: %s", ws.Type)
-					m.deliverWSMsg(ws)
-					continue
-				}
-
-				log.Printf("Could not parse message: %s", string(raw))
-			}
-		}
-	}()
-	return nil
-}
-
-func (m *model) closeWebSocket() {
-	if m.cancel != nil {
-		m.cancel()
-	}
-	if m.conn != nil {
-		m.conn.Close()
-	}
-	m.wg.Wait()
 }
 
 func (m *model) Init() tea.Cmd {
@@ -1305,9 +450,9 @@ func (m *model) Init() tea.Cmd {
 				return usernameErr
 			}
 			log.Printf("Returning generic wsErr")
-			return wsErr(err)
+			return wsErr{err}
 		}
-		return wsConnected(true)
+		return wsConnected{}
 	}
 }
 
@@ -1415,6 +560,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				},
 			}
 
+			if m.useE2E && m.keystore != nil {
+				globalKey := m.keystore.GetSessionKey("global")
+				if globalKey != nil {
+					encData, encErr := m.keystore.EncryptRaw(data, "global")
+					if encErr != nil {
+						m.banner = "❌ Failed to encrypt file: " + encErr.Error()
+						m.sending = false
+						m.showFilePicker = false
+						return m, nil
+					}
+					msg.File.Data = encData
+					msg.Encrypted = true
+				}
+			}
+
 			err = m.conn.WriteJSON(msg)
 			if err != nil {
 				m.banner = "❌ Failed to send file (connection lost)"
@@ -1429,27 +589,74 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showFilePicker = false
 		return m, m.listenWebSocket()
 	case shared.Message:
-		// Check if we should notify for this message
 		if shouldNotify, level := m.shouldNotify(v); shouldNotify {
 			m.notificationManager.Notify(v.Sender, v.Content, level)
 		}
 
-		if len(m.messages) >= maxMessages {
-			m.messages = m.messages[len(m.messages)-maxMessages+1:]
-		}
-		m.messages = append(m.messages, v)
-
-		// CRITICAL FIX: Sort messages after adding new ones to maintain order
-		sortMessagesByTimestamp(m.messages)
-
-		if v.Type == shared.FileMessageType && v.File != nil {
-			if m.receivedFiles == nil {
-				m.receivedFiles = make(map[string]*shared.FileMeta)
+		switch v.Type {
+		case shared.EditMessageType:
+			for i, m2 := range m.messages {
+				if m2.MessageID == v.MessageID {
+					m.messages[i].Content = v.Content
+					m.messages[i].Edited = true
+					break
+				}
 			}
-			m.receivedFiles[v.File.Filename] = v.File
+		case shared.DeleteMessage:
+			for i, m2 := range m.messages {
+				if m2.MessageID == v.MessageID {
+					m.messages[i].Content = "[deleted]"
+					m.messages[i].Type = shared.DeleteMessage
+					break
+				}
+			}
+		case shared.TypingMessage:
+			if v.Sender != m.cfg.Username {
+				m.typingUsers[v.Sender] = time.Now()
+			}
+		case shared.ReactionMessage:
+			if v.Reaction != nil {
+				tid := v.Reaction.TargetID
+				if m.reactions[tid] == nil {
+					m.reactions[tid] = make(map[string]map[string]bool)
+				}
+				if m.reactions[tid][v.Reaction.Emoji] == nil {
+					m.reactions[tid][v.Reaction.Emoji] = make(map[string]bool)
+				}
+				if v.Reaction.IsRemoval {
+					delete(m.reactions[tid][v.Reaction.Emoji], v.Sender)
+					if len(m.reactions[tid][v.Reaction.Emoji]) == 0 {
+						delete(m.reactions[tid], v.Reaction.Emoji)
+					}
+				} else {
+					m.reactions[tid][v.Reaction.Emoji][v.Sender] = true
+				}
+			}
+		case shared.ReadReceiptType:
+			// Display-only; no state change needed
+		default:
+			if len(m.messages) >= maxMessages {
+				m.messages = m.messages[len(m.messages)-maxMessages+1:]
+			}
+			m.messages = append(m.messages, v)
+			sortMessagesByTimestamp(m.messages)
+
+			if v.Type == shared.FileMessageType && v.File != nil {
+				if m.receivedFiles == nil {
+					m.receivedFiles = make(map[string]*shared.FileMeta)
+				}
+				m.receivedFiles[v.File.Filename] = v.File
+			}
 		}
-		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
-		m.viewport.GotoBottom()
+
+		wasAtBottom := m.viewport.AtBottom()
+		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+		if wasAtBottom {
+			m.viewport.GotoBottom()
+			m.unreadCount = 0
+		} else {
+			m.unreadCount++
+		}
 		m.sending = false
 		return m, m.listenWebSocket()
 	case wsUsernameError:
@@ -1627,7 +834,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.banner = fmt.Sprintf("Theme: %s", themeInfo)
 
 			// Redraw viewport and user list with new theme
-			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
 			m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
 			return m, nil
 		case key.Matches(v, m.keys.TimeFormatHotkey):
@@ -1636,7 +843,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.TwentyFourHour = m.twentyFourHour
 			_ = config.SaveConfig(m.configFilePath, m.cfg)
 			m.banner = "Timestamp format: " + map[bool]string{true: "24h", false: "12h"}[m.twentyFourHour]
-			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
 			return m, nil
 		case key.Matches(v, m.keys.ClearHotkey):
 			// Clear chat history
@@ -1742,6 +949,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				m.userListViewport.ScrollDown(1)
 			}
+			if m.viewport.AtBottom() {
+				m.unreadCount = 0
+			}
 			return m, nil
 		case key.Matches(v, m.keys.PageUp):
 			if m.showHelp {
@@ -1755,6 +965,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.helpViewport.ScrollDown(m.helpViewport.Height)
 			} else {
 				m.viewport.ScrollDown(m.viewport.Height)
+			}
+			if m.viewport.AtBottom() {
+				m.unreadCount = 0
 			}
 			return m, nil
 		case key.Matches(v, m.keys.Copy): // Custom Copy
@@ -1948,6 +1161,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								Data:     data,
 							},
 						}
+						if m.useE2E && m.keystore != nil {
+							globalKey := m.keystore.GetSessionKey("global")
+							if globalKey != nil {
+								encData, encErr := m.keystore.EncryptRaw(data, "global")
+								if encErr != nil {
+									m.banner = "❌ Failed to encrypt file: " + encErr.Error()
+									m.textarea.SetValue("")
+									return m, nil
+								}
+								msg.File.Data = encData
+								msg.Encrypted = true
+							}
+						}
 						if m.conn != nil {
 							err := m.conn.WriteJSON(msg)
 							if err != nil {
@@ -2022,7 +1248,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.messages = m.messages[len(m.messages)-maxMessages+1:]
 				}
 				m.messages = append(m.messages, systemMsg)
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
 				m.viewport.GotoBottom()
 
 				m.textarea.SetValue("")
@@ -2068,7 +1294,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.banner = fmt.Sprintf("Theme changed to: %s", GetThemeInfo(actualThemeName))
 
 						// Redraw viewport and user list with new theme
-						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
 						m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
 					}
 				} else {
@@ -2095,7 +1321,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cfg.TwentyFourHour = m.twentyFourHour
 				_ = config.SaveConfig(m.configFilePath, m.cfg)
 				m.banner = "Timestamp format: " + map[bool]string{true: "24h", false: "12h"}[m.twentyFourHour]
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
 				return m, nil
@@ -2291,13 +1517,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 
 			if text == ":code" {
-				// Launch code snippet interface
 				m.textarea.SetValue("")
 				m.showCodeSnippet = true
-				// Initialize code snippet model
 				m.codeSnippetModel = newCodeSnippetModel(m.styles, m.width, m.height,
 					func(code string) {
-						// Send the code as a message using a channel to avoid race conditions
 						select {
 						case m.msgChan <- codeSnippetMsg{content: code}:
 						default:
@@ -2305,9 +1528,205 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					},
 					func() {
-						// Cancel - just hide the code snippet interface
 						m.showCodeSnippet = false
 					})
+				return m, nil
+			}
+			if strings.HasPrefix(text, ":edit ") {
+				parts := strings.Fields(text)
+				if len(parts) < 3 {
+					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :edit <message_id> <new content>", CreatedAt: time.Now(), Type: shared.TextMessage})
+				} else {
+					id, err := strconv.ParseInt(parts[1], 10, 64)
+					if err != nil {
+						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
+					} else {
+						newContent := strings.Join(parts[2:], " ")
+						editMsg := shared.Message{Type: shared.EditMessageType, MessageID: id, Content: newContent, Sender: m.cfg.Username}
+						if m.conn != nil {
+							_ = m.conn.WriteJSON(editMsg)
+						}
+					}
+				}
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+				m.viewport.GotoBottom()
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if strings.HasPrefix(text, ":delete ") {
+				parts := strings.Fields(text)
+				if len(parts) < 2 {
+					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :delete <message_id>", CreatedAt: time.Now(), Type: shared.TextMessage})
+				} else {
+					id, err := strconv.ParseInt(parts[1], 10, 64)
+					if err != nil {
+						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
+					} else {
+						delMsg := shared.Message{Type: shared.DeleteMessage, MessageID: id, Sender: m.cfg.Username}
+						if m.conn != nil {
+							_ = m.conn.WriteJSON(delMsg)
+						}
+					}
+				}
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+				m.viewport.GotoBottom()
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if strings.HasPrefix(text, ":dm") {
+				parts := strings.Fields(text)
+				if len(parts) == 1 {
+					m.dmRecipient = ""
+					m.banner = "DM mode disabled"
+				} else if len(parts) == 2 {
+					target := parts[1]
+					if m.dmRecipient == target {
+						m.dmRecipient = ""
+						m.banner = "DM mode disabled"
+					} else {
+						m.dmRecipient = target
+						m.banner = fmt.Sprintf("DM mode: messages go to %s", target)
+					}
+				} else {
+					target := parts[1]
+					content := strings.Join(parts[2:], " ")
+					dmMsg := shared.Message{Type: shared.DirectMessage, Sender: m.cfg.Username, Recipient: target, Content: content}
+					if m.conn != nil {
+						_ = m.conn.WriteJSON(dmMsg)
+					}
+				}
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if strings.HasPrefix(text, ":search ") {
+				query := strings.TrimSpace(strings.TrimPrefix(text, ":search "))
+				if query != "" {
+					searchMsg := shared.Message{Type: shared.SearchMessage, Sender: m.cfg.Username, Content: query}
+					if m.conn != nil {
+						_ = m.conn.WriteJSON(searchMsg)
+					}
+				} else {
+					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :search <query>", CreatedAt: time.Now(), Type: shared.TextMessage})
+					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+					m.viewport.GotoBottom()
+				}
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if strings.HasPrefix(text, ":react ") {
+				parts := strings.Fields(text)
+				if len(parts) < 3 {
+					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :react <message_id> <emoji>", CreatedAt: time.Now(), Type: shared.TextMessage})
+					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+					m.viewport.GotoBottom()
+				} else {
+					id, err := strconv.ParseInt(parts[1], 10, 64)
+					if err != nil {
+						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
+						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+						m.viewport.GotoBottom()
+					} else {
+						emoji := resolveReactionEmoji(parts[2])
+						reactMsg := shared.Message{
+							Type:   shared.ReactionMessage,
+							Sender: m.cfg.Username,
+							Reaction: &shared.ReactionMeta{
+								Emoji:    emoji,
+								TargetID: id,
+							},
+						}
+						if m.conn != nil {
+							_ = m.conn.WriteJSON(reactMsg)
+						}
+					}
+				}
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if strings.HasPrefix(text, ":pin ") {
+				parts := strings.Fields(text)
+				if len(parts) < 2 {
+					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :pin <message_id>", CreatedAt: time.Now(), Type: shared.TextMessage})
+					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+					m.viewport.GotoBottom()
+				} else {
+					id, err := strconv.ParseInt(parts[1], 10, 64)
+					if err != nil {
+						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
+						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+						m.viewport.GotoBottom()
+					} else {
+						pinMsg := shared.Message{Type: shared.PinMessage, MessageID: id, Sender: m.cfg.Username}
+						if m.conn != nil {
+							_ = m.conn.WriteJSON(pinMsg)
+						}
+					}
+				}
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if text == ":pinned" {
+				pinMsg := shared.Message{Type: shared.PinMessage, Sender: m.cfg.Username, Content: "list"}
+				if m.conn != nil {
+					_ = m.conn.WriteJSON(pinMsg)
+				}
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if text == ":channels" {
+				if m.conn != nil {
+					_ = m.conn.WriteJSON(shared.Message{
+						Type:   shared.ListChannelsType,
+						Sender: m.cfg.Username,
+					})
+				}
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if strings.HasPrefix(text, ":join ") {
+				channel := strings.TrimSpace(strings.TrimPrefix(text, ":join "))
+				if channel != "" {
+					joinMsg := shared.Message{
+						Type:    shared.JoinChannelType,
+						Sender:  m.cfg.Username,
+						Channel: channel,
+					}
+					_ = m.conn.WriteJSON(joinMsg)
+				}
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if text == ":leave" {
+				leaveMsg := shared.Message{
+					Type:   shared.LeaveChannelType,
+					Sender: m.cfg.Username,
+				}
+				_ = m.conn.WriteJSON(leaveMsg)
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if text == ":export" || strings.HasPrefix(text, ":export ") {
+				filename := "marchat-export.txt"
+				if strings.HasPrefix(text, ":export ") {
+					filename = strings.TrimSpace(strings.TrimPrefix(text, ":export "))
+				}
+				var sb strings.Builder
+				for _, msg := range m.messages {
+					ts := msg.CreatedAt.Format("2006-01-02 15:04:05")
+					sb.WriteString(fmt.Sprintf("[%s] %s: %s\n", ts, msg.Sender, msg.Content))
+				}
+				if err := os.WriteFile(filename, []byte(sb.String()), 0644); err != nil {
+					m.messages = append(m.messages, shared.Message{
+						Sender: "System", Content: "Export failed: " + err.Error(),
+						CreatedAt: time.Now(), Type: shared.TextMessage,
+					})
+				} else {
+					m.messages = append(m.messages, shared.Message{
+						Sender: "System", Content: "History exported to " + filename,
+						CreatedAt: time.Now(), Type: shared.TextMessage,
+					})
+				}
+				m.textarea.SetValue("")
 				return m, nil
 			}
 			if text != "" {
@@ -2315,7 +1734,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.conn != nil {
 					// Check if this is a server-side command (admin/plugin) that should bypass encryption
 					// Client-side commands are handled above and never reach this point
-					clientOnlyCommands := []string{":theme", ":time", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q"}
+					clientOnlyCommands := []string{":theme", ":time", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":search", ":react", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
 					isClientCommand := false
 					for _, cmd := range clientOnlyCommands {
 						// Check if text is exactly the command or starts with "command "
@@ -2345,8 +1764,20 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							return m, m.listenWebSocket()
 						}
 						m.banner = ""
+					} else if m.dmRecipient != "" {
+						dmMsg := shared.Message{
+							Type:      shared.DirectMessage,
+							Sender:    m.cfg.Username,
+							Recipient: m.dmRecipient,
+							Content:   text,
+						}
+						if err := m.conn.WriteJSON(dmMsg); err != nil {
+							m.banner = "❌ Failed to send DM (connection lost)"
+							m.sending = false
+							return m, m.listenWebSocket()
+						}
+						m.banner = ""
 					} else if m.useE2E {
-						// Use E2E encryption for global chat
 						log.Printf("DEBUG: Attempting to send global encrypted message: '%s'", text)
 
 						// Validate keystore is unlocked
@@ -2389,8 +1820,30 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, m.listenWebSocket()
 			}
 			return m, nil
+		case key.Matches(v, key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))):
+			current := m.textarea.Value()
+			m.textarea.SetValue(current + "\n")
+			m.textarea.CursorEnd()
+			return m, nil
+		case key.Matches(v, key.NewBinding(key.WithKeys("tab"))):
+			text := m.textarea.Value()
+			words := strings.Fields(text)
+			if len(words) > 0 {
+				last := words[len(words)-1]
+				if strings.HasPrefix(last, "@") && len(last) > 1 {
+					partial := strings.ToLower(last[1:])
+					for _, user := range m.users {
+						if strings.HasPrefix(strings.ToLower(user), partial) {
+							words[len(words)-1] = "@" + user + " "
+							m.textarea.SetValue(strings.Join(words, " "))
+							m.textarea.CursorEnd()
+							break
+						}
+					}
+				}
+			}
+			return m, nil
 		default:
-			// Handle database menu selections
 			if m.showDBMenu && len(v.Runes) > 0 {
 				switch string(v.Runes) {
 				case "1":
@@ -2404,6 +1857,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			var cmd tea.Cmd
 			m.textarea, cmd = m.textarea.Update(v)
+
+			if time.Since(m.lastTypingSent) > 2*time.Second && m.conn != nil {
+				m.lastTypingSent = time.Now()
+				typingMsg := shared.Message{Type: shared.TypingMessage, Sender: m.cfg.Username}
+				go func(c *websocket.Conn) {
+					_ = c.WriteJSON(typingMsg)
+				}(m.conn)
+			}
+
 			return m, cmd
 		}
 	case tea.WindowSizeMsg:
@@ -2441,7 +1903,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.helpViewport.Width = helpWidth
 		m.helpViewport.Height = helpHeight
 
-		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour))
+		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
 		m.viewport.GotoBottom()
 		m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, userListWidth, *isAdmin, m.selectedUserIndex))
 		return m, nil
@@ -2474,309 +1936,26 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 }
 
-func (m *model) listenWebSocket() tea.Cmd {
-	return func() tea.Msg {
-		return <-m.msgChan
-	}
-}
-
-// renderMessagesContent returns the raw content of messages for URL detection
-func (m *model) renderMessagesContent() string {
-	var content strings.Builder
-	for _, msg := range m.messages {
-		content.WriteString(msg.Content)
-		content.WriteString(" ")
-	}
-	return content.String()
-}
-
-// findURLAtClickPosition attempts to find a URL at the given click position
-func (m *model) findURLAtClickPosition(clickX, clickY int) string {
-	// Get all URLs from the current messages
-	allURLs := urlRegex.FindAllString(m.renderMessagesContent(), -1)
-	if len(allURLs) == 0 {
-		return ""
-	}
-
-	// Adjust clickY to account for header and other UI elements
-	// This is an approximation - the exact calculation would need to account for
-	// header height, banner height, etc.
-	adjustedY := clickY - 3 // Approximate offset for header/banner
-
-	// If the click is in a reasonable area of the viewport, return the first URL
-	// This is a simplified approach - in a full implementation, you'd need to
-	// track the exact position of each URL in the rendered text
-	if adjustedY >= 0 && adjustedY < m.viewport.Height && clickX >= 0 && clickX < m.viewport.Width {
-		// For now, we'll return the first URL found in the visible area
-		// This works reasonably well for most use cases where there's typically
-		// only one URL visible at a time
-		return allURLs[0]
-	}
-
-	return ""
-}
-
-func (m *model) generateHelpContent() string {
-	title := m.styles.HelpTitle.Render("marchat help")
-
-	// Session status first
-	var sessionInfo string
-	if m.useE2E {
-		sessionInfo = "Session: 🔒 E2E Encrypted (messages are encrypted for privacy)\n"
-	} else {
-		sessionInfo = "Session: 🔓 Unencrypted (messages are sent in plain text)\n"
-	}
-
-	// Basic keyboard shortcuts
-	shortcuts := "\nKeyboard Shortcuts:\n"
-	shortcuts += "  Ctrl+H               Toggle this help\n"
-	shortcuts += "  :q                    Quit client\n"
-	shortcuts += "  Esc                  Close menus\n"
-	shortcuts += "  Enter                Send message\n"
-	shortcuts += "  ↑/↓                  Scroll chat\n"
-	shortcuts += "  PgUp/PgDn            Page through chat\n"
-	shortcuts += "  Ctrl+C/V/X/A         Copy/Paste/Cut/Select all\n"
-	shortcuts += "  Alt+F                Send file (file picker)\n"
-	shortcuts += "  Alt+C                Create code snippet\n"
-	shortcuts += "  Ctrl+T               Cycle themes\n"
-	shortcuts += "  Alt+T                Toggle 12/24h time\n"
-	shortcuts += "  Alt+N                Toggle desktop notifications\n"
-	shortcuts += "  Ctrl+L               Clear chat history\n"
-
-	// Text commands
-	commands := "\nText Commands:\n"
-	commands += "  :q                   Quit client\n"
-	commands += "  :sendfile [path]     Send a file (or Alt+F)\n"
-	commands += "  :savefile <name>     Save received file\n"
-	commands += "  :theme <name>        Change theme (or Ctrl+T to cycle)\n"
-	commands += "  :themes              List all available themes\n"
-	commands += "  :time                Toggle 12/24h time (or Alt+T)\n"
-	commands += "  :clear               Clear chat history (or Ctrl+L)\n"
-	commands += "  :code                Create code snippet (or Alt+C)\n"
-	commands += "\nNotifications:\n"
-	commands += "  :bell                Toggle message bell\n"
-	commands += "  :bell-mention        Bell on mentions only\n"
-	commands += "  :notify-mode <mode>  Set notification mode (none/bell/desktop/both)\n"
-	commands += "  :notify-desktop      Toggle desktop notifications\n"
-	commands += "  :notify-status       Show notification settings\n"
-	commands += "  :quiet <start> <end> Enable quiet hours (e.g., :quiet 22 8)\n"
-	commands += "  :quiet-off           Disable quiet hours\n"
-	commands += "  :focus [duration]    Enable focus mode (e.g., :focus 30m)\n"
-	commands += "  :focus-off           Disable focus mode\n"
-
-	// Admin section
-	var adminSection string
-	if *isAdmin {
-		adminSection = "\nAdmin Features:\n"
-		adminSection += "\n  User Management:\n"
-		adminSection += "    Ctrl+U             Select/cycle user\n"
-		adminSection += "    Ctrl+K             Kick selected user (or :kick <user>)\n"
-		adminSection += "    Ctrl+B             Ban selected user (or :ban <user>)\n"
-		adminSection += "    Ctrl+F             Force disconnect (or :forcedisconnect <user>)\n"
-		adminSection += "    Ctrl+Shift+B       Unban user (or :unban <user>)\n"
-		adminSection += "    Ctrl+Shift+A       Allow user (or :allow <user>)\n"
-		adminSection += "    :cleanup           Clean stale connections\n"
-		adminSection += "\n  Plugin Management:\n"
-		adminSection += "    Alt+P              List plugins (or :list)\n"
-		adminSection += "    Alt+S              Plugin store (or :store)\n"
-		adminSection += "    Alt+R              Refresh plugins (or :refresh)\n"
-		adminSection += "    Alt+I              Install plugin (or :install <name>)\n"
-		adminSection += "    Alt+U              Uninstall plugin (or :uninstall <name>)\n"
-		adminSection += "    Alt+E              Enable plugin (or :enable <name>)\n"
-		adminSection += "    Alt+D              Disable plugin (or :disable <name>)\n"
-		adminSection += "\n  Database:\n"
-		adminSection += "    Ctrl+D             Database menu (or :cleardb, :backup, :stats)\n"
-		adminSection += "\n  Note: Both hotkeys and text commands work in encrypted sessions.\n"
-	}
-
-	return title + "\n\n" + sessionInfo + shortcuts + commands + adminSection
-}
-
-// generateDBMenuContent creates the database operations menu content
-func (m *model) generateDBMenuContent() string {
-	title := m.styles.HelpTitle.Render("Database Operations")
-
-	content := "\nAvailable Operations:\n\n"
-	content += "  1. Clear Database (delete all messages)\n"
-	content += "  2. Backup Database (save current state)\n"
-	content += "  3. Show Database Stats\n\n"
-	content += "Press 1-3 to select operation, Esc to cancel"
-
-	return title + content
-}
-
-// executeAdminAction performs the selected admin action
-func (m *model) executeAdminAction(action, targetUser string) (tea.Model, tea.Cmd) {
-	if !*isAdmin || targetUser == "" {
-		return m, nil
-	}
-
-	var command string
-	switch action {
-	case "kick":
-		command = fmt.Sprintf(":kick %s", targetUser)
-	case "ban":
-		command = fmt.Sprintf(":ban %s", targetUser)
-	case "unban":
-		command = fmt.Sprintf(":unban %s", targetUser)
-	case "allow":
-		command = fmt.Sprintf(":allow %s", targetUser)
-	case "forcedisconnect":
-		command = fmt.Sprintf(":forcedisconnect %s", targetUser)
-	default:
-		return m, nil
-	}
-
-	// Send the admin command directly (unencrypted for server processing)
-	if m.conn != nil {
-		msg := shared.Message{
-			Sender:  m.cfg.Username,
-			Content: command,
-			Type:    shared.AdminCommandType, // Special type for admin commands
-		}
-		err := m.conn.WriteJSON(msg)
-		if err != nil {
-			m.banner = "❌ Failed to send admin command"
-		} else {
-			m.banner = fmt.Sprintf("✅ %s action sent for %s", action, targetUser)
-			// Clear selection after successful action
-			if action == "kick" || action == "ban" || action == "forcedisconnect" {
-				m.selectedUserIndex = -1
-				m.selectedUser = ""
-			}
-		}
-	}
-
-	return m, m.listenWebSocket()
-}
-
-// promptForUsername prompts for a username for actions like unban/allow
-func (m *model) promptForUsername(action string) (tea.Model, tea.Cmd) {
-	// For now, we'll use the textarea to get the username
-	// This is a simple implementation - could be improved with a dedicated prompt
-	switch action {
-	case "unban":
-		m.banner = "Type username to unban in chat and press Enter (prefix with :unban)"
-	case "allow":
-		m.banner = "Type username to allow in chat and press Enter (prefix with :allow)"
-	}
-	return m, nil
-}
-
-// promptForPluginName prompts for a plugin name for plugin management actions
-func (m *model) promptForPluginName(action string) (tea.Model, tea.Cmd) {
-	// Set pending action and update banner
-	m.pendingPluginAction = action
-	switch action {
-	case "install":
-		m.banner = "Enter plugin name to install (press Enter to confirm, Esc to cancel)"
-	case "uninstall":
-		m.banner = "Enter plugin name to uninstall (press Enter to confirm, Esc to cancel)"
-	case "enable":
-		m.banner = "Enter plugin name to enable (press Enter to confirm, Esc to cancel)"
-	case "disable":
-		m.banner = "Enter plugin name to disable (press Enter to confirm, Esc to cancel)"
-	}
-	// Focus the textarea for input
-	m.textarea.Focus()
-	return m, nil
-}
-
-// executePluginCommand executes a plugin management command
-func (m *model) executePluginCommand(command string) (tea.Model, tea.Cmd) {
-	if !*isAdmin {
-		return m, nil
-	}
-
-	// Send the plugin command as an admin command (unencrypted)
-	if m.conn != nil {
-		msg := shared.Message{
-			Sender:  m.cfg.Username,
-			Content: command,
-			Type:    shared.AdminCommandType, // Use admin command type to bypass encryption
-		}
-		err := m.conn.WriteJSON(msg)
-		if err != nil {
-			m.banner = "❌ Failed to send plugin command (connection lost)"
-		} else {
-			m.banner = fmt.Sprintf("✅ Sent: %s", command)
-		}
-	}
-
-	return m, m.listenWebSocket()
-}
-
-// executeDBAction performs the selected database action
-func (m *model) executeDBAction(action string) (tea.Model, tea.Cmd) {
-	if !*isAdmin {
-		m.showDBMenu = false
-		return m, nil
-	}
-
-	switch action {
-	case "cleardb":
-		if m.conn != nil {
-			msg := shared.Message{
-				Sender:  m.cfg.Username,
-				Content: ":cleardb",
-				Type:    shared.AdminCommandType,
-			}
-			err := m.conn.WriteJSON(msg)
-			if err != nil {
-				m.banner = "❌ Failed to send cleardb command"
-			} else {
-				m.banner = "✅ Database clear command sent"
-			}
-		}
-	case "backup":
-		if m.conn != nil {
-			msg := shared.Message{
-				Sender:  m.cfg.Username,
-				Content: ":backup",
-				Type:    shared.AdminCommandType,
-			}
-			err := m.conn.WriteJSON(msg)
-			if err != nil {
-				m.banner = "❌ Failed to send backup command"
-			} else {
-				m.banner = "✅ Database backup command sent"
-			}
-		}
-	case "stats":
-		if m.conn != nil {
-			msg := shared.Message{
-				Sender:  m.cfg.Username,
-				Content: ":stats",
-				Type:    shared.AdminCommandType,
-			}
-			err := m.conn.WriteJSON(msg)
-			if err != nil {
-				m.banner = "❌ Failed to send stats command"
-			} else {
-				m.banner = "✅ Database stats command sent"
-			}
-		}
-	}
-
-	m.showDBMenu = false
-	return m, m.listenWebSocket()
-}
-
 func (m *model) View() string {
 	// Header with version
 	headerText := fmt.Sprintf(" marchat %s ", shared.ClientVersion)
 	header := m.styles.Header.Width(m.viewport.Width + userListWidth + 4).Render(headerText)
 
-	// Footer with encryption status
-	footerText := "Press Ctrl+H for help"
-	if m.showHelp {
-		footerText = "Press Ctrl+H to close help"
+	connStatus := "🔴 Disconnected"
+	if m.connected {
+		connStatus = "🟢 Connected"
 	}
-	// Add encryption status indicator
+	footerText := connStatus + " | Press Ctrl+H for help"
+	if m.showHelp {
+		footerText = connStatus + " | Press Ctrl+H to close help"
+	}
 	if m.useE2E {
 		footerText += " | 🔒 E2E Encrypted"
 	} else {
 		footerText += " | 🔓 Unencrypted"
+	}
+	if m.unreadCount > 0 {
+		footerText += fmt.Sprintf(" | 📬 %d unread", m.unreadCount)
 	}
 	footer := m.styles.Footer.Width(m.viewport.Width + userListWidth + 4).Render(footerText)
 
@@ -2806,14 +1985,44 @@ func (m *model) View() string {
 	userPanel := m.userListViewport.View()
 	row := lipgloss.JoinHorizontal(lipgloss.Top, userPanel, chatPanel)
 
+	// Typing indicator
+	var typingLine string
+	now := time.Now()
+	var activeTypers []string
+	for user, lastTyped := range m.typingUsers {
+		if now.Sub(lastTyped) < m.typingTimeout {
+			activeTypers = append(activeTypers, user)
+		}
+	}
+	if len(activeTypers) > 0 {
+		sort.Strings(activeTypers)
+		if len(activeTypers) == 1 {
+			typingLine = activeTypers[0] + " is typing..."
+		} else {
+			typingLine = strings.Join(activeTypers, ", ") + " are typing..."
+		}
+	}
+	typingIndicator := lipgloss.NewStyle().Faint(true).Italic(true).Width(m.viewport.Width).Render(typingLine)
+
+	// DM mode indicator
+	var dmIndicator string
+	if m.dmRecipient != "" {
+		dmIndicator = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5F5F")).Render(fmt.Sprintf("[DM: %s] ", m.dmRecipient))
+	}
+
 	// Input
-	inputPanel := m.styles.Input.Width(m.viewport.Width).Render(m.textarea.View())
+	inputContent := m.textarea.View()
+	if dmIndicator != "" {
+		inputContent = dmIndicator + inputContent
+	}
+	inputPanel := m.styles.Input.Width(m.viewport.Width).Render(inputContent)
 
 	// Compose layout
 	ui := lipgloss.JoinVertical(lipgloss.Left,
 		header,
 		bannerBox,
 		row,
+		typingIndicator,
 		inputPanel,
 		footer,
 	)
@@ -2953,130 +2162,6 @@ func (m *model) View() string {
 
 	return m.styles.Background.Render(ui)
 }
-
-func renderEmojis(s string) string {
-	emojis := map[string]string{
-		":)": "😊",
-		":(": "🙁",
-		":D": "😃",
-		"<3": "❤️",
-		":P": "😛",
-	}
-	for k, v := range emojis {
-		s = strings.ReplaceAll(s, k, v)
-	}
-	return s
-}
-
-// renderHyperlinks detects and formats URLs in text
-func renderHyperlinks(content string, styles themeStyles) string {
-	return urlRegex.ReplaceAllStringFunc(content, func(url string) string {
-		return styles.Hyperlink.Render(url)
-	})
-}
-
-// openURL opens a URL in the default browser
-func openURL(url string) error {
-	// Ensure URL has a protocol
-	if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
-		url = "https://" + url
-	}
-
-	var cmd *exec.Cmd
-
-	switch runtime.GOOS {
-	case "windows":
-		// Try multiple methods for Windows
-		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", url)
-		if err := cmd.Start(); err != nil {
-			// Fallback to start command
-			cmd = exec.Command("cmd", "/c", "start", url)
-			return cmd.Start()
-		}
-		return nil
-	case "darwin":
-		cmd = exec.Command("open", url)
-	case "linux":
-		// Try xdg-open first, then fallback to other methods
-		cmd = exec.Command("xdg-open", url)
-		if err := cmd.Start(); err != nil {
-			// Try other common Linux methods
-			cmd = exec.Command("sensible-browser", url)
-			if err := cmd.Start(); err != nil {
-				cmd = exec.Command("firefox", url)
-				return cmd.Start()
-			}
-			return nil
-		}
-		return nil
-	default:
-		return fmt.Errorf("unsupported platform: %s", runtime.GOOS)
-	}
-
-	return cmd.Start()
-}
-
-// renderCodeBlocks detects and renders syntax highlighted code blocks in messages
-func renderCodeBlocks(content string) string {
-	// Look for markdown code blocks
-	codeBlockRegex := regexp.MustCompile("```([a-zA-Z0-9+]*)\n([\\s\\S]*?)```")
-
-	return codeBlockRegex.ReplaceAllStringFunc(content, func(match string) string {
-		// Extract language and code
-		parts := codeBlockRegex.FindStringSubmatch(match)
-		if len(parts) < 3 {
-			return match // Return original if parsing fails
-		}
-
-		language := parts[1]
-		code := parts[2]
-
-		// Use Chroma directly for syntax highlighting
-		var sb strings.Builder
-		err := quick.Highlight(&sb, code, language, "terminal256", "monokai")
-		if err != nil {
-			return match // Return original if highlighting fails
-		}
-
-		return sb.String()
-	})
-}
-
-func renderUserList(users []string, me string, styles themeStyles, width int, isAdmin bool, selectedUserIndex int) string {
-	var b strings.Builder
-	title := " Users "
-	b.WriteString(styles.UserList.Width(width).Render(title) + "\n")
-	max := maxUsersDisplay
-	for i, u := range users {
-		if i >= max {
-			b.WriteString(lipgloss.NewStyle().Italic(true).Faint(true).Width(width).Render(fmt.Sprintf("+%d more", len(users)-max)) + "\n")
-			break
-		}
-
-		var userStyle lipgloss.Style
-		var prefix string
-
-		if u == me {
-			userStyle = styles.Me
-			prefix = "• "
-		} else {
-			userStyle = styles.Other
-			prefix = "• "
-
-			// Highlight selected user
-			if isAdmin && selectedUserIndex == i {
-				userStyle = userStyle.Background(lipgloss.Color("#444444")).Bold(true)
-				prefix = "► " // Arrow to indicate selection
-			}
-		}
-
-		b.WriteString(userStyle.Render(prefix+u) + "\n")
-	}
-	return b.String()
-}
-
-// Add a custom quitMsg type
-type quitMsg struct{}
 
 func main() {
 	flag.Parse()
@@ -3494,7 +2579,10 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 		keystore:          keystore,
 		useE2E:            cfg.UseE2E,
 		keys:              newKeyMap(),
-		selectedUserIndex: -1, // No user selected initially
+		selectedUserIndex: -1,
+		typingUsers:       make(map[string]time.Time),
+		typingTimeout:     3 * time.Second,
+		reactions:         make(map[int64]map[string]map[string]bool),
 	}
 
 	// Initialize notification manager with config settings

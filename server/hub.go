@@ -35,6 +35,9 @@ type Hub struct {
 
 	// Database reference for message state management
 	db *sql.DB
+
+	channels     map[string]map[*Client]bool
+	channelMutex sync.RWMutex
 }
 
 func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
@@ -51,6 +54,7 @@ func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
 		pluginManager:        pluginManager,
 		pluginCommandHandler: pluginCommandHandler,
 		db:                   db,
+		channels:             make(map[string]map[*Client]bool),
 	}
 }
 
@@ -395,6 +399,10 @@ func (h *Hub) Run() {
 			h.metricsMutex.Unlock()
 
 			h.broadcastUserList() // Broadcast after register
+			h.joinChannel(client, "general")
+			if h.pluginCommandHandler != nil {
+				h.pluginCommandHandler.UpdateUserListForPlugins(h.getConnectedUsernames())
+			}
 		case client := <-h.unregister:
 			h.clientsMutex.Lock()
 			if _, ok := h.clients[client]; ok {
@@ -411,26 +419,143 @@ func (h *Hub) Run() {
 				h.metricsMutex.Unlock()
 			}
 			h.clientsMutex.Unlock()
+			h.channelMutex.Lock()
+			for ch, clients := range h.channels {
+				delete(clients, client)
+				if len(clients) == 0 {
+					delete(h.channels, ch)
+				}
+			}
+			h.channelMutex.Unlock()
 			h.broadcastUserList()
+			if h.pluginCommandHandler != nil {
+				h.pluginCommandHandler.UpdateUserListForPlugins(h.getConnectedUsernames())
+			}
 		case message := <-h.broadcast:
 			h.clientsMutex.Lock()
-			for client := range h.clients {
-				select {
-				case client.send <- message:
-				default:
-					log.Printf("Dropping client %s due to full send channel\n", client.username)
-					close(client.send)
-					delete(h.clients, client)
+			if sharedMsg, ok := message.(shared.Message); ok && sharedMsg.Channel != "" && sharedMsg.Sender != "System" {
+				h.channelMutex.RLock()
+				channelClients := h.channels[sharedMsg.Channel]
+				for client := range h.clients {
+					if channelClients[client] {
+						select {
+						case client.send <- message:
+						default:
+							log.Printf("Dropping client %s due to full send channel\n", client.username)
+							close(client.send)
+							delete(h.clients, client)
+						}
+					}
+				}
+				h.channelMutex.RUnlock()
+			} else {
+				for client := range h.clients {
+					select {
+					case client.send <- message:
+					default:
+						log.Printf("Dropping client %s due to full send channel\n", client.username)
+						close(client.send)
+						delete(h.clients, client)
+					}
 				}
 			}
 			h.clientsMutex.Unlock()
+
+			if sharedMsg, ok := message.(shared.Message); ok && sharedMsg.Type == shared.TextMessage {
+				if h.pluginCommandHandler != nil {
+					h.pluginCommandHandler.SendMessageToPlugins(sharedMsg)
+				}
+			}
 		}
 	}
+}
+
+func (h *Hub) broadcastDM(msg shared.Message) {
+	h.clientsMutex.RLock()
+	defer h.clientsMutex.RUnlock()
+	for client := range h.clients {
+		if strings.EqualFold(client.username, msg.Sender) || strings.EqualFold(client.username, msg.Recipient) {
+			select {
+			case client.send <- msg:
+			default:
+				log.Printf("Dropping DM for client %s due to full send channel", client.username)
+			}
+		}
+	}
+}
+
+// getConnectedUsernames returns the usernames of all connected clients.
+// Caller must NOT hold clientsMutex.
+func (h *Hub) getConnectedUsernames() []string {
+	h.clientsMutex.RLock()
+	defer h.clientsMutex.RUnlock()
+
+	var usernames []string
+	for client := range h.clients {
+		if client.username != "" {
+			usernames = append(usernames, client.username)
+		}
+	}
+	return usernames
 }
 
 // getDB returns the database reference
 func (h *Hub) getDB() *sql.DB {
 	return h.db
+}
+
+func (h *Hub) joinChannel(client *Client, channel string) {
+	h.channelMutex.Lock()
+	defer h.channelMutex.Unlock()
+	if h.channels[channel] == nil {
+		h.channels[channel] = make(map[*Client]bool)
+	}
+	h.channels[channel][client] = true
+}
+
+func (h *Hub) leaveChannel(client *Client, channel string) {
+	h.channelMutex.Lock()
+	defer h.channelMutex.Unlock()
+	if h.channels[channel] != nil {
+		delete(h.channels[channel], client)
+		if len(h.channels[channel]) == 0 {
+			delete(h.channels, channel)
+		}
+	}
+}
+
+func (h *Hub) getClientChannel(client *Client) string {
+	h.channelMutex.RLock()
+	defer h.channelMutex.RUnlock()
+	for channel, clients := range h.channels {
+		if clients[client] {
+			return channel
+		}
+	}
+	return "general"
+}
+
+func (h *Hub) getChannelUsers(channel string) []*Client {
+	h.channelMutex.RLock()
+	defer h.channelMutex.RUnlock()
+	var users []*Client
+	for c := range h.channels[channel] {
+		users = append(users, c)
+	}
+	return users
+}
+
+func (h *Hub) listChannels() []string {
+	h.channelMutex.RLock()
+	defer h.channelMutex.RUnlock()
+	var channels []string
+	for ch := range h.channels {
+		channels = append(channels, ch)
+	}
+	if len(channels) == 0 {
+		channels = append(channels, "general")
+	}
+	return channels
 }
 
 // GetPluginManager returns the plugin manager reference

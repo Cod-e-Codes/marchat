@@ -91,9 +91,12 @@ func GetCustomThemeNames() []string {
 
 // ApplyCustomTheme applies a custom theme definition to create theme styles
 func ApplyCustomTheme(def ThemeDefinition) themeStyles {
+	timeStyle := lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color(def.Colors.Time))
 	s := themeStyles{
 		User:       lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(def.Colors.User)),
-		Time:       lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color(def.Colors.Time)),
+		Time:       timeStyle,
+		Info:       timeStyle,
+		Timestamp:  timeStyle,
 		Msg:        lipgloss.NewStyle().Foreground(lipgloss.Color(def.Colors.Message)),
 		Banner:     lipgloss.NewStyle().Foreground(lipgloss.Color(def.Colors.Banner)).Bold(true),
 		Box:        lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color(def.Colors.BoxBorder)),

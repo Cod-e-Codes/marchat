@@ -10,16 +10,27 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/Cod-e-Codes/marchat/plugin/host"
+	"github.com/Cod-e-Codes/marchat/plugin/license"
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
 	"github.com/Cod-e-Codes/marchat/plugin/store"
+	"github.com/Cod-e-Codes/marchat/shared"
 )
+
+const (
+	pluginDownloadTimeout = 60 * time.Second
+	maxPluginDownloadSize = 100 * 1024 * 1024 // 100 MB
+)
+
+var pluginHTTPClient = &http.Client{Timeout: pluginDownloadTimeout}
 
 // Valid plugin name pattern: lowercase letters, numbers, hyphens, underscores only
 var validPluginNameRegex = regexp.MustCompile(`^[a-z0-9_-]+$`)
@@ -51,12 +62,13 @@ type PluginState struct {
 
 // PluginManager manages plugin installation and commands
 type PluginManager struct {
-	host        *host.PluginHost
-	store       *store.Store
-	pluginDir   string
-	dataDir     string
-	registryURL string
-	stateFile   string
+	host             *host.PluginHost
+	store            *store.Store
+	pluginDir        string
+	dataDir          string
+	registryURL      string
+	stateFile        string
+	licenseValidator *license.LicenseValidator
 }
 
 // NewPluginManager creates a new plugin manager
@@ -160,8 +172,16 @@ func (pm *PluginManager) discoverInstalledPlugins() {
 
 		// Load plugin
 		if err := pm.host.LoadPlugin(pluginName); err != nil {
-			// Log error but continue with other plugins
 			continue
+		}
+
+		if instance := pm.host.GetPlugin(pluginName); instance != nil && instance.Manifest != nil {
+			if err := pm.validateManifestConstraints(pluginName, instance.Manifest); err != nil {
+				log.Printf("Plugin %s skipped: %v", pluginName, err)
+				pm.host.UnloadPlugin(pluginName)
+				continue
+			}
+			pm.checkLicense(pluginName, instance.Manifest)
 		}
 
 		// Set enabled status from saved state (default to true if not found)
@@ -221,6 +241,14 @@ func (pm *PluginManager) InstallPluginWithPlatform(name, osName, arch string) er
 	// Load plugin into host
 	if err := pm.host.LoadPlugin(name); err != nil {
 		return fmt.Errorf("failed to load plugin: %w", err)
+	}
+
+	if instance := pm.host.GetPlugin(name); instance != nil && instance.Manifest != nil {
+		if err := pm.validateManifestConstraints(name, instance.Manifest); err != nil {
+			pm.host.UnloadPlugin(name)
+			return err
+		}
+		pm.checkLicense(name, instance.Manifest)
 	}
 
 	// Start plugin
@@ -361,7 +389,7 @@ func (pm *PluginManager) downloadPlugin(plugin *store.StorePlugin, pluginPath st
 		reader = file
 	} else {
 		// Handle HTTP URLs
-		resp, err := http.Get(plugin.DownloadURL)
+		resp, err := pluginHTTPClient.Get(plugin.DownloadURL)
 		if err != nil {
 			return fmt.Errorf("failed to download plugin: %w", err)
 		}
@@ -379,8 +407,9 @@ func (pm *PluginManager) downloadPlugin(plugin *store.StorePlugin, pluginPath st
 		defer os.Remove(tempFile.Name())
 		defer tempFile.Close()
 
-		// Copy the response to temp file and reader
-		teeReader := io.TeeReader(resp.Body, tempFile)
+		// Cap download size to prevent resource exhaustion
+		limitedBody := io.LimitReader(resp.Body, maxPluginDownloadSize)
+		teeReader := io.TeeReader(limitedBody, tempFile)
 		reader = teeReader
 	}
 
@@ -623,6 +652,72 @@ func (pm *PluginManager) validateDownloadChecksum(file *os.File, expectedChecksu
 	}
 
 	return nil
+}
+
+// knownPermissions lists the permission values that plugins may request.
+var knownPermissions = map[string]bool{
+	"messages": true,
+	"commands": true,
+	"users":    true,
+}
+
+// validateManifestConstraints checks min_version, max_version, and permissions on a manifest.
+// Returns an error if the server version is outside the allowed range.
+func (pm *PluginManager) validateManifestConstraints(name string, manifest *sdk.PluginManifest) error {
+	if manifest == nil {
+		return nil
+	}
+
+	serverVer := shared.ServerVersion
+
+	if manifest.MinVersion != "" && serverVer != "dev" {
+		if shared.CompareVersions(serverVer, manifest.MinVersion) < 0 {
+			return fmt.Errorf("plugin %s requires server version >= %s (current: %s)", name, manifest.MinVersion, serverVer)
+		}
+	}
+
+	if manifest.MaxVersion != "" && serverVer != "dev" {
+		if shared.CompareVersions(serverVer, manifest.MaxVersion) > 0 {
+			return fmt.Errorf("plugin %s requires server version <= %s (current: %s)", name, manifest.MaxVersion, serverVer)
+		}
+	}
+
+	for _, perm := range manifest.Permissions {
+		if !knownPermissions[perm] {
+			log.Printf("Warning: plugin %s requests unknown permission %q", name, perm)
+		}
+	}
+
+	return nil
+}
+
+// SetLicenseValidator sets an optional license validator for commercial plugin enforcement
+func (pm *PluginManager) SetLicenseValidator(lv *license.LicenseValidator) {
+	pm.licenseValidator = lv
+}
+
+// checkLicense logs a warning if a commercial plugin has no valid license.
+// It never blocks loading (graceful degradation).
+func (pm *PluginManager) checkLicense(name string, manifest *sdk.PluginManifest) {
+	if manifest == nil {
+		return
+	}
+	licenseType := strings.ToLower(manifest.License)
+	if licenseType != "commercial" && licenseType != "proprietary" {
+		return
+	}
+	if pm.licenseValidator == nil {
+		log.Printf("Warning: plugin %s has a %s license but no license validator is configured", name, manifest.License)
+		return
+	}
+	valid, err := pm.licenseValidator.IsLicenseValid(name)
+	if err != nil {
+		log.Printf("Warning: license check error for plugin %s: %v", name, err)
+		return
+	}
+	if !valid {
+		log.Printf("Warning: plugin %s requires a %s license but no valid license was found", name, manifest.License)
+	}
 }
 
 // GetPluginCommands returns all available plugin commands

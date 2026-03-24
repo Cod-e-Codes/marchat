@@ -7,13 +7,18 @@ import (
 	"path/filepath"
 )
 
+// Deprecated: Config is the legacy JSON-based server configuration.
+// The main startup path uses config.Config from the config package instead.
+// This type and its loaders are retained only for backward-compatible JSON file loading
+// and may be removed in a future release.
 type Config struct {
 	Port     int      `json:"port"`
 	Admins   []string `json:"admins"`
 	AdminKey string   `json:"admin_key"`
 }
 
-// LoadConfig loads configuration from a JSON file (for backward compatibility)
+// Deprecated: LoadConfig loads configuration from a JSON file.
+// Use config.LoadConfig from the config package for the primary startup path.
 func LoadConfig(path string) (Config, error) {
 	var cfg Config
 	f, err := os.Open(path)
@@ -27,7 +32,8 @@ func LoadConfig(path string) (Config, error) {
 	return cfg, nil
 }
 
-// LoadConfigFromDir loads configuration from a directory, checking for JSON config files
+// Deprecated: LoadConfigFromDir loads configuration from a directory, checking for JSON config files.
+// Use config.LoadConfig from the config package for the primary startup path.
 func LoadConfigFromDir(configDir string) (Config, error) {
 	var cfg Config
 

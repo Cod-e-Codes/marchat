@@ -15,6 +15,7 @@ import (
 	"sync"
 	"time"
 
+	"golang.org/x/crypto/chacha20poly1305"
 	"golang.org/x/crypto/pbkdf2"
 
 	"github.com/Cod-e-Codes/marchat/shared"
@@ -157,6 +158,57 @@ func (ks *KeyStore) DecryptMessage(encrypted *shared.EncryptedMessage, conversat
 	}
 
 	return shared.DecryptTextMessage(sessionKey, encrypted)
+}
+
+// EncryptRaw encrypts raw bytes using the session key for the given conversation.
+func (ks *KeyStore) EncryptRaw(data []byte, conversationID string) ([]byte, error) {
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+
+	if ks.globalKey == nil {
+		return nil, fmt.Errorf("no session key for conversation %s", conversationID)
+	}
+
+	aead, err := chacha20poly1305.New(ks.globalKey.Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AEAD: %w", err)
+	}
+
+	nonce := make([]byte, aead.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, fmt.Errorf("failed to generate nonce: %w", err)
+	}
+
+	ciphertext := aead.Seal(nil, nonce, data, nil)
+	result := make([]byte, len(nonce)+len(ciphertext))
+	copy(result, nonce)
+	copy(result[len(nonce):], ciphertext)
+	return result, nil
+}
+
+// DecryptRaw decrypts raw bytes using the session key for the given conversation.
+// The input should be nonce || ciphertext.
+func (ks *KeyStore) DecryptRaw(data []byte, conversationID string) ([]byte, error) {
+	ks.mu.RLock()
+	defer ks.mu.RUnlock()
+
+	if ks.globalKey == nil {
+		return nil, fmt.Errorf("no session key for conversation %s", conversationID)
+	}
+
+	aead, err := chacha20poly1305.New(ks.globalKey.Key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create AEAD: %w", err)
+	}
+
+	nonceSize := aead.NonceSize()
+	if len(data) < nonceSize {
+		return nil, fmt.Errorf("ciphertext too short")
+	}
+
+	nonce := data[:nonceSize]
+	ciphertext := data[nonceSize:]
+	return aead.Open(nil, nonce, ciphertext, nil)
 }
 
 // save encrypts and saves the keystore to disk

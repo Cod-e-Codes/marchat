@@ -94,8 +94,7 @@ func TestInsertMessage(t *testing.T) {
 		Encrypted: false,
 	}
 
-	// Insert message
-	if err := InsertMessage(db, msg); err != nil {
+	if _, err := InsertMessage(db, msg); err != nil {
 		t.Fatalf("InsertMessage failed: %v", err)
 	}
 
@@ -179,7 +178,7 @@ func TestGetRecentMessages(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		if err := InsertMessage(db, msg); err != nil {
+		if _, err := InsertMessage(db, msg); err != nil {
 			t.Fatalf("InsertMessage failed: %v", err)
 		}
 	}
@@ -226,7 +225,7 @@ func TestGetMessagesAfter(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		if err := InsertMessage(db, msg); err != nil {
+		if _, err := InsertMessage(db, msg); err != nil {
 			t.Fatalf("InsertMessage failed: %v", err)
 		}
 	}
@@ -315,7 +314,7 @@ func TestClearMessages(t *testing.T) {
 		CreatedAt: time.Now(),
 		Encrypted: false,
 	}
-	if err := InsertMessage(db, msg); err != nil {
+	if _, err := InsertMessage(db, msg); err != nil {
 		t.Fatalf("InsertMessage failed: %v", err)
 	}
 
@@ -358,7 +357,7 @@ func TestBackupDatabase(t *testing.T) {
 		CreatedAt: time.Now(),
 		Encrypted: false,
 	}
-	if err := InsertMessage(db, msg); err != nil {
+	if _, err := InsertMessage(db, msg); err != nil {
 		t.Fatalf("InsertMessage failed: %v", err)
 	}
 
@@ -405,7 +404,7 @@ func TestGetDatabaseStats(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		if err := InsertMessage(db, msg); err != nil {
+		if _, err := InsertMessage(db, msg); err != nil {
 			t.Fatalf("InsertMessage failed: %v", err)
 		}
 	}
@@ -426,5 +425,329 @@ func TestGetDatabaseStats(t *testing.T) {
 
 	if !strings.Contains(stats, "Database Statistics:") {
 		t.Errorf("Expected stats to contain 'Database Statistics:', got: %s", stats)
+	}
+}
+
+func TestEditMessage(t *testing.T) {
+	db, err := InitDB(":memory:")
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
+	defer db.Close()
+
+	CreateSchema(db)
+
+	now := time.Now()
+	id, err := InsertMessage(db, shared.Message{
+		Sender:    "alice",
+		Content:   "original",
+		CreatedAt: now,
+		Encrypted: false,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
+
+	t.Run("success", func(t *testing.T) {
+		if err := EditMessage(db, id, "alice", "updated"); err != nil {
+			t.Fatalf("EditMessage failed: %v", err)
+		}
+		var content string
+		var edited bool
+		if err := db.QueryRow(`SELECT content, edited FROM messages WHERE message_id = ?`, id).Scan(&content, &edited); err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if content != "updated" {
+			t.Errorf("content = %q, want updated", content)
+		}
+		if !edited {
+			t.Error("edited flag not set")
+		}
+	})
+
+	t.Run("wrong user", func(t *testing.T) {
+		id2, err := InsertMessage(db, shared.Message{
+			Sender:    "bob",
+			Content:   "bob says",
+			CreatedAt: now.Add(time.Minute),
+			Encrypted: false,
+		})
+		if err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
+		err = EditMessage(db, id2, "alice", "hijack")
+		if err == nil {
+			t.Fatal("expected error for wrong sender")
+		}
+		if !strings.Contains(err.Error(), "message not found or you are not the sender") {
+			t.Errorf("unexpected error: %v", err)
+		}
+	})
+}
+
+func TestDeleteMessage(t *testing.T) {
+	db, err := InitDB(":memory:")
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
+	defer db.Close()
+
+	CreateSchema(db)
+
+	now := time.Now()
+	id, err := InsertMessage(db, shared.Message{
+		Sender:    "alice",
+		Content:   "to delete",
+		CreatedAt: now,
+		Encrypted: false,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
+
+	t.Run("by sender", func(t *testing.T) {
+		if err := DeleteMessage(db, id, "alice", false); err != nil {
+			t.Fatalf("DeleteMessage failed: %v", err)
+		}
+		var content string
+		var deleted bool
+		if err := db.QueryRow(`SELECT content, deleted FROM messages WHERE message_id = ?`, id).Scan(&content, &deleted); err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if content != "[deleted]" {
+			t.Errorf("content = %q, want [deleted]", content)
+		}
+		if !deleted {
+			t.Error("deleted flag not set")
+		}
+	})
+
+	id2, err := InsertMessage(db, shared.Message{
+		Sender:    "bob",
+		Content:   "admin deletes me",
+		CreatedAt: now.Add(2 * time.Minute),
+		Encrypted: false,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
+
+	t.Run("by admin", func(t *testing.T) {
+		if err := DeleteMessage(db, id2, "moderator", true); err != nil {
+			t.Fatalf("DeleteMessage failed: %v", err)
+		}
+		var content string
+		if err := db.QueryRow(`SELECT content FROM messages WHERE message_id = ?`, id2).Scan(&content); err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if content != "[deleted]" {
+			t.Errorf("content = %q, want [deleted]", content)
+		}
+	})
+
+	id3, err := InsertMessage(db, shared.Message{
+		Sender:    "carol",
+		Content:   "hands off",
+		CreatedAt: now.Add(3 * time.Minute),
+		Encrypted: false,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
+
+	t.Run("wrong user", func(t *testing.T) {
+		err := DeleteMessage(db, id3, "dave", false)
+		if err == nil {
+			t.Fatal("expected error for non-sender")
+		}
+		if !strings.Contains(err.Error(), "message not found or you are not the sender") {
+			t.Errorf("unexpected error: %v", err)
+		}
+		var content string
+		if err := db.QueryRow(`SELECT content FROM messages WHERE message_id = ?`, id3).Scan(&content); err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if content != "hands off" {
+			t.Errorf("content was changed: %q", content)
+		}
+	})
+}
+
+func TestSearchMessages(t *testing.T) {
+	db, err := InitDB(":memory:")
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
+	defer db.Close()
+
+	CreateSchema(db)
+
+	now := time.Now()
+	msgs := []shared.Message{
+		{Sender: "u1", Content: "hello world alpha", CreatedAt: now.Add(-3 * time.Hour), Encrypted: false},
+		{Sender: "u2", Content: "other text", CreatedAt: now.Add(-2 * time.Hour), Encrypted: false},
+		{Sender: "u1", Content: "alpha beta", CreatedAt: now.Add(-1 * time.Hour), Encrypted: false},
+	}
+	for _, m := range msgs {
+		if _, err := InsertMessage(db, m); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
+	}
+
+	tests := []struct {
+		name      string
+		query     string
+		limit     int
+		wantCount int
+		wantSub   string
+	}{
+		{
+			name:      "finds matching",
+			query:     "alpha",
+			limit:     10,
+			wantCount: 2,
+			wantSub:   "alpha",
+		},
+		{
+			name:      "empty query matches non-deleted up to limit",
+			query:     "",
+			limit:     10,
+			wantCount: 3,
+			wantSub:   "",
+		},
+		{
+			name:      "no results",
+			query:     "zzzznonexistent999",
+			limit:     10,
+			wantCount: 0,
+			wantSub:   "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := SearchMessages(db, tt.query, tt.limit)
+			if len(got) != tt.wantCount {
+				t.Fatalf("len = %d, want %d", len(got), tt.wantCount)
+			}
+			if tt.wantSub != "" {
+				for _, m := range got {
+					if !strings.Contains(m.Content, tt.wantSub) {
+						t.Errorf("result %q should contain %q", m.Content, tt.wantSub)
+					}
+				}
+			}
+		})
+	}
+
+	t.Run("deleted excluded", func(t *testing.T) {
+		res := SearchMessages(db, "other", 10)
+		if len(res) != 1 {
+			t.Fatalf("before delete: len = %d, want 1", len(res))
+		}
+		if err := DeleteMessage(db, res[0].MessageID, "u2", false); err != nil {
+			t.Fatalf("DeleteMessage: %v", err)
+		}
+		res = SearchMessages(db, "other", 10)
+		if len(res) != 0 {
+			t.Errorf("after delete: len = %d, want 0", len(res))
+		}
+	})
+}
+
+func TestTogglePinMessage(t *testing.T) {
+	db, err := InitDB(":memory:")
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
+	defer db.Close()
+
+	CreateSchema(db)
+
+	id, err := InsertMessage(db, shared.Message{
+		Sender:    "alice",
+		Content:   "pin me",
+		CreatedAt: time.Now(),
+		Encrypted: false,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
+
+	t.Run("pin", func(t *testing.T) {
+		pinned, err := TogglePinMessage(db, id)
+		if err != nil {
+			t.Fatalf("TogglePinMessage: %v", err)
+		}
+		if !pinned {
+			t.Error("expected pinned true")
+		}
+		var dbPinned bool
+		if err := db.QueryRow(`SELECT COALESCE(pinned, 0) FROM messages WHERE message_id = ?`, id).Scan(&dbPinned); err != nil {
+			t.Fatalf("query: %v", err)
+		}
+		if !dbPinned {
+			t.Error("db pinned not set")
+		}
+	})
+
+	t.Run("unpin", func(t *testing.T) {
+		pinned, err := TogglePinMessage(db, id)
+		if err != nil {
+			t.Fatalf("TogglePinMessage: %v", err)
+		}
+		if pinned {
+			t.Error("expected pinned false after toggle")
+		}
+	})
+}
+
+func TestGetPinnedMessages(t *testing.T) {
+	db, err := InitDB(":memory:")
+	if err != nil {
+		t.Fatalf("InitDB failed: %v", err)
+	}
+	defer db.Close()
+
+	CreateSchema(db)
+
+	now := time.Now()
+	idOld, err := InsertMessage(db, shared.Message{
+		Sender:    "a",
+		Content:   "older",
+		CreatedAt: now.Add(-time.Hour),
+		Encrypted: false,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
+	idNew, err := InsertMessage(db, shared.Message{
+		Sender:    "b",
+		Content:   "newer",
+		CreatedAt: now,
+		Encrypted: false,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage failed: %v", err)
+	}
+
+	if _, err := TogglePinMessage(db, idOld); err != nil {
+		t.Fatalf("TogglePinMessage: %v", err)
+	}
+	if _, err := TogglePinMessage(db, idNew); err != nil {
+		t.Fatalf("TogglePinMessage: %v", err)
+	}
+
+	pinned := GetPinnedMessages(db)
+	if len(pinned) != 2 {
+		t.Fatalf("len = %d, want 2", len(pinned))
+	}
+	if pinned[0].Content != "newer" || pinned[1].Content != "older" {
+		t.Errorf("order: got [%q, %q], want [newer, older]", pinned[0].Content, pinned[1].Content)
+	}
+	for _, m := range pinned {
+		if m.MessageID != idNew && m.MessageID != idOld {
+			t.Errorf("unexpected message_id %d", m.MessageID)
+		}
 	}
 }

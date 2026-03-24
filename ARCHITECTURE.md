@@ -28,9 +28,16 @@ Marchat is a self-hosted, terminal-based chat application built in Go with a cli
 
 ## Component Architecture
 
-### Client Application (`client/main.go`)
+### Client Application (`client/`)
 
-The client is a standalone terminal user interface built with the Bubble Tea framework. It's a complete application that can be built and run independently.
+The client is a standalone terminal user interface built with the Bubble Tea framework. It's a complete application that can be built and run independently. The code is split across several files:
+
+- **`main.go`**: Core model, state, Update loop, and command handlers
+- **`hotkeys.go`**: Key binding definitions and methods
+- **`render.go`**: Message rendering and UI display logic
+- **`websocket.go`**: WebSocket connection management, send/receive, and E2E encryption helpers
+- **`commands.go`**: Help text generation and command-related utilities
+- **`notification_manager.go`**: Desktop/bell notification system
 
 #### Core Models
 
@@ -45,13 +52,23 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 #### Key Features
 
 - Real-time chat with message history and user list
-- File sharing with configurable size limits (default 1MB)
+- Message editing, deletion, pinning, and reactions
+- Direct messages between users
+- Channel-based messaging (join/leave channels)
+- Typing indicators (throttled, with timeout)
+- Message search (server-side)
+- Chat history export to file
+- File sharing with configurable size limits (default 1MB), with optional E2E encryption
 - Theme system supporting built-in and custom themes
 - Administrative commands for user management
-- End-to-end encryption with global key support
+- End-to-end encryption with global key support (text and file transfers)
 - Code snippet rendering with syntax highlighting
 - Clipboard integration for text operations
 - URL detection and external opening
+- Tab completion for @mentions
+- Connection status indicator
+- Unread message count
+- Multi-line input via Alt+Enter / Ctrl+J
 
 ### Server Application (`cmd/server/main.go`)
 
@@ -59,7 +76,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 
 #### Core Structures
 
-- **`Hub`**: Central message routing system managing client connections, message broadcasting, and user state
+- **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state
 - **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing
 - **`AdminPanel`**: Terminal-based administrative interface for server management
 - **`WebAdminServer`**: Web-based administrative interface with session authentication
@@ -68,13 +85,19 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 
 #### Key Features
 
-- Real-time message broadcasting to connected clients
+- Real-time message broadcasting to connected clients (channel-aware)
+- Channel management: clients join/leave channels, messages routed per-channel
+- Direct message routing between specific users
+- Message editing, deletion, pinning, and search
+- Typing indicator and read receipt broadcasting
+- Reaction broadcasting
 - User management including ban, kick, and allow operations
 - Plugin command execution and management
 - Database backup and maintenance operations
 - System metrics collection and health monitoring
 - Web-based admin panel with CSRF protection
 - Health check endpoints for monitoring systems
+- WebSocket message rate limiting
 
 ### Server Library (`server/`)
 
@@ -94,7 +117,9 @@ Common types and utilities used across client and server components.
 
 #### Core Types
 
-- **`Message`**: Standard chat message structure with encryption support
+- **`Message`**: Standard chat message structure with encryption support, message IDs, recipient, channel, edited flag, and reaction metadata
+- **`MessageType`**: Type discriminator — `text`, `file`, `admin_command`, `edit`, `delete`, `typing`, `reaction`, `dm`, `search`, `pin`, `read_receipt`, `join_channel`, `leave_channel`, `list_channels`
+- **`ReactionMeta`**: Emoji, target message ID, and removal flag
 - **`EncryptedMessage`**: End-to-end encrypted message format
 - **`Handshake`**: WebSocket connection authentication structure
 - **`KeyPair`**: X25519 cryptographic identity for key exchange
@@ -109,6 +134,7 @@ The encryption system provides end-to-end security using modern cryptographic pr
 - **ChaCha20-Poly1305**: Authenticated encryption for message confidentiality and integrity
 - **Global E2E**: Server-wide encryption key for simplified key management
 - **Session Keys**: Derived keys for efficient message encryption
+- **File Transfer Encryption**: Raw byte encryption/decryption via `EncryptRaw`/`DecryptRaw` in the keystore
 
 ### Plugin System (`plugin/`)
 
@@ -203,9 +229,12 @@ Client: WebSocket Receive → Decrypt → Display
 The WebSocket communication uses JSON messages with the following structure:
 
 - **Handshake**: Initial authentication with username and admin credentials
-- **Messages**: Chat messages with optional encryption
+- **Messages**: Chat messages with optional encryption, message IDs, and channel/recipient metadata
+- **Extended Types**: Edit, delete, typing, reaction, DM, search, pin, read receipt, join/leave/list channels
 - **Commands**: Administrative and plugin commands
 - **System Messages**: Connection status and user list updates
+
+See [PROTOCOL.md](PROTOCOL.md) for the full message format specification.
 
 ### Encryption Flow
 
@@ -230,7 +259,10 @@ CREATE TABLE messages (
     is_encrypted BOOLEAN DEFAULT 0,
     encrypted_data BLOB,
     nonce BLOB,
-    recipient TEXT
+    recipient TEXT,
+    edited BOOLEAN DEFAULT 0,
+    deleted BOOLEAN DEFAULT 0,
+    pinned BOOLEAN DEFAULT 0
 );
 ```
 
@@ -315,7 +347,8 @@ The web-based interface provides the same functionality through a browser:
 ### Concurrency
 
 - **Goroutine-based**: Concurrent handling of WebSocket connections
-- **Channel Communication**: Non-blocking message passing between components
+- **Go Channel Communication**: Non-blocking message passing between components
+- **Chat Channels**: Server-side channel management with per-channel broadcast routing
 - **Connection Pooling**: Efficient database connection management
 - **Plugin Isolation**: Separate processes prevent plugin crashes from affecting server
 

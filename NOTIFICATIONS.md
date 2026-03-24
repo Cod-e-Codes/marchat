@@ -18,7 +18,7 @@ The marchat client now features a comprehensive notification system that goes be
 Messages are classified by priority:
 - **Info**: Regular chat messages
 - **Mention**: When someone @mentions you
-- **DM**: Direct messages (future support)
+- **DM**: Direct messages (use `:dm <user> <message>` or `:dm <user>` to toggle DM mode)
 - **Urgent**: System alerts and critical messages
 
 ### 3. Desktop Notifications

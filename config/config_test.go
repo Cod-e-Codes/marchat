@@ -119,7 +119,7 @@ MARCHAT_ADMIN_KEY=env-file-key
 MARCHAT_USERS=envuser1,envuser2
 MARCHAT_DB_PATH=/custom/db/path
 MARCHAT_LOG_LEVEL=debug
-MARCHAT_JWT_SECRET=custom-jwt-secret`
+MARCHAT_SESSION_SECRET=custom-jwt-secret`
 
 	err := os.WriteFile(envPath, []byte(envContent), 0644)
 	if err != nil {
@@ -153,8 +153,8 @@ MARCHAT_JWT_SECRET=custom-jwt-secret`
 	if cfg.LogLevel != "debug" {
 		t.Errorf("Expected log level 'debug', got '%s'", cfg.LogLevel)
 	}
-	if cfg.JWTSecret != "custom-jwt-secret" {
-		t.Errorf("Expected JWT secret 'custom-jwt-secret', got '%s'", cfg.JWTSecret)
+	if cfg.SessionSecret != "custom-jwt-secret" {
+		t.Errorf("Expected session secret 'custom-jwt-secret', got '%s'", cfg.SessionSecret)
 	}
 }
 
@@ -349,11 +349,12 @@ func TestGetEnvIntWithDefault(t *testing.T) {
 	}
 }
 
-// TestJWTSecretGeneratedRandomly checks that JWTSecret is a 64 char long generated hex when not provided
-func TestJWTSecretGeneratedRandomly(t *testing.T) {
+// TestSessionSecretGeneratedRandomly checks that SessionSecret is a 64 char long generated hex when not provided
+func TestSessionSecretGeneratedRandomly(t *testing.T) {
 	os.Setenv("MARCHAT_PORT", "8080")
 	os.Setenv("MARCHAT_ADMIN_KEY", "test-key")
 	os.Setenv("MARCHAT_USERS", "user1,user2")
+	os.Unsetenv("MARCHAT_SESSION_SECRET")
 	os.Unsetenv("MARCHAT_JWT_SECRET")
 	defer func() {
 		os.Unsetenv("MARCHAT_PORT")
@@ -366,17 +367,16 @@ func TestJWTSecretGeneratedRandomly(t *testing.T) {
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	if len(cfg.JWTSecret) != 64 {
-		t.Fatalf("invalid JWTSecret length: %s (%d)", cfg.JWTSecret, len(cfg.JWTSecret))
+	if len(cfg.SessionSecret) != 64 {
+		t.Fatalf("invalid SessionSecret length: %s (%d)", cfg.SessionSecret, len(cfg.SessionSecret))
 	}
 
 	dest := make([]byte, 32)
-	n, err := hex.Decode(dest, []byte(cfg.JWTSecret))
+	n, err := hex.Decode(dest, []byte(cfg.SessionSecret))
 	if err != nil {
-		t.Fatalf("JWT Secret is not made of hex: %s", err.Error())
+		t.Fatalf("SessionSecret is not made of hex: %s", err.Error())
 	}
 	if n != 32 {
 		t.Errorf("unexpected number of bytes decoded: %d", n)
 	}
-
 }

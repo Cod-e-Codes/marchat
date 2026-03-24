@@ -29,8 +29,8 @@ type Config struct {
 	// Logging
 	LogLevel string `json:"log_level"`
 
-	// JWT settings
-	JWTSecret string `json:"jwt_secret"`
+	// Session secret (used for authentication tokens)
+	SessionSecret string `json:"session_secret"`
 
 	// Config directory
 	ConfigDir string `json:"config_dir"`
@@ -136,15 +136,17 @@ func (c *Config) loadFromEnv() error {
 		c.LogLevel = "info"
 	}
 
-	// JWT secret configuration
-	if jwtSecret := os.Getenv("MARCHAT_JWT_SECRET"); jwtSecret != "" {
-		c.JWTSecret = jwtSecret
+	// Session secret configuration (MARCHAT_SESSION_SECRET preferred, MARCHAT_JWT_SECRET for backward compat)
+	if secret := os.Getenv("MARCHAT_SESSION_SECRET"); secret != "" {
+		c.SessionSecret = secret
+	} else if secret := os.Getenv("MARCHAT_JWT_SECRET"); secret != "" {
+		c.SessionSecret = secret
 	} else {
-		jwtSecret, err := GenerateJWTSecret()
+		secret, err := GenerateSessionSecret()
 		if err != nil {
-			return fmt.Errorf("when generating JWT secret: %w", err)
+			return fmt.Errorf("when generating session secret: %w", err)
 		}
-		c.JWTSecret = jwtSecret
+		c.SessionSecret = secret
 	}
 
 	// TLS configuration
@@ -309,11 +311,17 @@ func (c *Config) GetWebSocketScheme() string {
 	return "ws"
 }
 
-func GenerateJWTSecret() (string, error) {
-	jwtSecret := make([]byte, 32)
-	_, err := rand.Read(jwtSecret)
+// GenerateSessionSecret generates a cryptographically random 32-byte hex-encoded secret.
+func GenerateSessionSecret() (string, error) {
+	secret := make([]byte, 32)
+	_, err := rand.Read(secret)
 	if err != nil {
 		return "", fmt.Errorf("when reading random bytes: %w", err)
 	}
-	return hex.EncodeToString(jwtSecret), nil
+	return hex.EncodeToString(secret), nil
+}
+
+// Deprecated: Use GenerateSessionSecret instead. Kept for backward compatibility.
+func GenerateJWTSecret() (string, error) {
+	return GenerateSessionSecret()
 }

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/hmac"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -18,25 +19,27 @@ import (
 	"github.com/gorilla/websocket"
 )
 
+// CheckOrigin policy:
+//   - Empty Origin is allowed because terminal/TUI clients do not send one.
+//   - Same-host and localhost/loopback are allowed for dev and browser-based admin panels.
+//   - All other origins are rejected. If you need to allow specific external
+//     origins (e.g. a web frontend on a different domain), add them to the
+//     allowlist below or set MARCHAT_ALLOWED_ORIGINS.
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		// Allow non-browser clients (terminal clients don't send Origin)
 		origin := r.Header.Get("Origin")
 		if origin == "" {
 			return true
 		}
-		// Allow same-host connections (browser-based clients)
 		host := r.Host
 		if host == "" {
 			host = r.Header.Get("Host")
 		}
-		// Accept if origin matches the server host
 		if strings.Contains(origin, host) {
 			return true
 		}
-		// Allow localhost/loopback origins for local development
 		for _, local := range []string{"localhost", "127.0.0.1", "[::1]"} {
 			if strings.Contains(origin, local) {
 				return true
@@ -99,20 +102,31 @@ func CreateSchema(db *sql.DB) {
 		log.Fatal("failed to create basic schema:", err)
 	}
 
-	// Check if message_id column exists, if not add it
-	var columnExists int
-	err = db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name='message_id'`).Scan(&columnExists)
-	if err != nil {
-		log.Printf("Warning: failed to check for message_id column: %v", err)
+	// Migrations: add columns if they don't exist
+	migrations := []struct {
+		column string
+		ddl    string
+	}{
+		{"message_id", `ALTER TABLE messages ADD COLUMN message_id INTEGER DEFAULT 0`},
+		{"edited", `ALTER TABLE messages ADD COLUMN edited BOOLEAN DEFAULT 0`},
+		{"deleted", `ALTER TABLE messages ADD COLUMN deleted BOOLEAN DEFAULT 0`},
+		{"pinned", `ALTER TABLE messages ADD COLUMN pinned BOOLEAN DEFAULT 0`},
 	}
 
-	if columnExists == 0 {
-		// Add message_id column to existing table
-		_, err = db.Exec(`ALTER TABLE messages ADD COLUMN message_id INTEGER DEFAULT 0`)
+	for _, m := range migrations {
+		var exists int
+		err = db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name=?`, m.column).Scan(&exists)
 		if err != nil {
-			log.Printf("Warning: failed to add message_id column: %v", err)
-		} else {
-			log.Printf("Added message_id column to messages table")
+			log.Printf("Warning: failed to check for %s column: %v", m.column, err)
+			continue
+		}
+		if exists == 0 {
+			_, err = db.Exec(m.ddl)
+			if err != nil {
+				log.Printf("Warning: failed to add %s column: %v", m.column, err)
+			} else {
+				log.Printf("Added %s column to messages table", m.column)
+			}
 		}
 	}
 
@@ -148,6 +162,7 @@ func CreateSchema(db *sql.DB) {
 	indexes := []string{
 		`CREATE INDEX IF NOT EXISTS idx_messages_message_id ON messages(message_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_message_state_username ON user_message_state(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_ban_history_username ON ban_history(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_ban_history_banned_at ON ban_history(banned_at)`,
@@ -170,23 +185,23 @@ func CreateSchema(db *sql.DB) {
 	}
 }
 
-func InsertMessage(db *sql.DB, msg shared.Message) error {
+func InsertMessage(db *sql.DB, msg shared.Message) (int64, error) {
 	result, err := db.Exec(`INSERT INTO messages (sender, content, created_at, is_encrypted) VALUES (?, ?, ?, ?)`,
 		msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted)
 	if err != nil {
 		log.Println("Insert error:", err)
-		return fmt.Errorf("insert message: %w", err)
+		return 0, fmt.Errorf("insert message: %w", err)
 	}
 
-	// Get the inserted ID and update message_id
 	id, err := result.LastInsertId()
 	if err != nil {
 		log.Println("Error getting last insert ID:", err)
-	} else {
-		_, err = db.Exec(`UPDATE messages SET message_id = ? WHERE id = ?`, id, id)
-		if err != nil {
-			log.Println("Error updating message_id:", err)
-		}
+		return 0, fmt.Errorf("last insert id: %w", err)
+	}
+
+	_, err = db.Exec(`UPDATE messages SET message_id = ? WHERE id = ?`, id, id)
+	if err != nil {
+		log.Println("Error updating message_id:", err)
 	}
 
 	// Enforce message cap: keep only the most recent 1000 messages
@@ -194,7 +209,7 @@ func InsertMessage(db *sql.DB, msg shared.Message) error {
 	if err != nil {
 		log.Println("Error enforcing message cap:", err)
 	}
-	return nil
+	return id, nil
 }
 
 // InsertEncryptedMessage stores an encrypted message in the database
@@ -227,8 +242,7 @@ func InsertEncryptedMessage(db *sql.DB, encryptedMsg *shared.EncryptedMessage) e
 }
 
 func GetRecentMessages(db *sql.DB) []shared.Message {
-	// FIXED: Changed ORDER BY created_at ASC to DESC to fetch newest messages first
-	rows, err := db.Query(`SELECT sender, content, created_at, is_encrypted FROM messages ORDER BY created_at DESC LIMIT 50`)
+	rows, err := db.Query(`SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		log.Println("Query error:", err)
 		return nil
@@ -238,10 +252,14 @@ func GetRecentMessages(db *sql.DB) []shared.Message {
 	var messages []shared.Message
 	for rows.Next() {
 		var msg shared.Message
-		var isEncrypted bool
-		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted)
+		var isEncrypted, edited, deleted bool
+		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted)
 		if err == nil {
 			msg.Encrypted = isEncrypted
+			msg.Edited = edited
+			if deleted {
+				msg.Type = shared.DeleteMessage
+			}
 			messages = append(messages, msg)
 		}
 	}
@@ -332,8 +350,7 @@ func GetRecentMessagesForUser(db *sql.DB, username string, defaultLimit int, ban
 
 // GetMessagesAfter retrieves messages with ID > lastMessageID
 func GetMessagesAfter(db *sql.DB, lastMessageID int64, limit int) []shared.Message {
-	// FIXED: Changed ORDER BY created_at ASC to DESC to fetch newest messages first
-	rows, err := db.Query(`SELECT sender, content, created_at, is_encrypted FROM messages WHERE message_id > ? ORDER BY created_at DESC LIMIT ?`, lastMessageID, limit)
+	rows, err := db.Query(`SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages WHERE message_id > ? ORDER BY created_at DESC LIMIT ?`, lastMessageID, limit)
 	if err != nil {
 		log.Println("Query error in GetMessagesAfter:", err)
 		return nil
@@ -343,10 +360,14 @@ func GetMessagesAfter(db *sql.DB, lastMessageID int64, limit int) []shared.Messa
 	var messages []shared.Message
 	for rows.Next() {
 		var msg shared.Message
-		var isEncrypted bool
-		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted)
+		var isEncrypted, edited, deleted bool
+		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted)
 		if err == nil {
 			msg.Encrypted = isEncrypted
+			msg.Edited = edited
+			if deleted {
+				msg.Type = shared.DeleteMessage
+			}
 			messages = append(messages, msg)
 		}
 	}
@@ -481,6 +502,98 @@ func ClearMessages(db *sql.DB) error {
 	return err
 }
 
+func EditMessage(db *sql.DB, messageID int64, sender, newContent string) error {
+	result, err := db.Exec(
+		`UPDATE messages SET content = ?, edited = 1, is_encrypted = 0 WHERE message_id = ? AND sender = ?`,
+		newContent, messageID, sender)
+	if err != nil {
+		return fmt.Errorf("edit message: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("message not found or you are not the sender")
+	}
+	return nil
+}
+
+func DeleteMessage(db *sql.DB, messageID int64, sender string, isAdmin bool) error {
+	var query string
+	var args []interface{}
+	if isAdmin {
+		query = `UPDATE messages SET content = '[deleted]', deleted = 1, is_encrypted = 0 WHERE message_id = ?`
+		args = []interface{}{messageID}
+	} else {
+		query = `UPDATE messages SET content = '[deleted]', deleted = 1, is_encrypted = 0 WHERE message_id = ? AND sender = ?`
+		args = []interface{}{messageID, sender}
+	}
+	result, err := db.Exec(query, args...)
+	if err != nil {
+		return fmt.Errorf("delete message: %w", err)
+	}
+	rows, _ := result.RowsAffected()
+	if rows == 0 {
+		return fmt.Errorf("message not found or you are not the sender")
+	}
+	return nil
+}
+
+func SearchMessages(db *sql.DB, query string, limit int) []shared.Message {
+	if limit <= 0 {
+		limit = 20
+	}
+	rows, err := db.Query(
+		`SELECT sender, content, created_at, is_encrypted, message_id FROM messages WHERE content LIKE ? AND deleted = 0 ORDER BY created_at DESC LIMIT ?`,
+		"%"+query+"%", limit)
+	if err != nil {
+		log.Println("Search query error:", err)
+		return nil
+	}
+	defer rows.Close()
+	var messages []shared.Message
+	for rows.Next() {
+		var msg shared.Message
+		var isEncrypted bool
+		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID)
+		if err == nil {
+			msg.Encrypted = isEncrypted
+			messages = append(messages, msg)
+		}
+	}
+	return messages
+}
+
+func TogglePinMessage(db *sql.DB, messageID int64) (bool, error) {
+	var currentlyPinned bool
+	err := db.QueryRow(`SELECT COALESCE(pinned, 0) FROM messages WHERE message_id = ?`, messageID).Scan(&currentlyPinned)
+	if err != nil {
+		return false, fmt.Errorf("message not found: %w", err)
+	}
+	newPinned := !currentlyPinned
+	_, err = db.Exec(`UPDATE messages SET pinned = ? WHERE message_id = ?`, newPinned, messageID)
+	if err != nil {
+		return false, fmt.Errorf("toggle pin: %w", err)
+	}
+	return newPinned, nil
+}
+
+func GetPinnedMessages(db *sql.DB) []shared.Message {
+	rows, err := db.Query(`SELECT sender, content, created_at, message_id FROM messages WHERE pinned = 1 ORDER BY created_at DESC`)
+	if err != nil {
+		log.Println("Pinned messages query error:", err)
+		return nil
+	}
+	defer rows.Close()
+	var messages []shared.Message
+	for rows.Next() {
+		var msg shared.Message
+		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &msg.MessageID)
+		if err == nil {
+			messages = append(messages, msg)
+		}
+	}
+	return messages
+}
+
 // BackupDatabase creates a backup of the current database
 func BackupDatabase(dbPath string) (string, error) {
 	// Generate backup filename with timestamp
@@ -582,34 +695,6 @@ type adminAuth struct {
 	adminKey string
 }
 
-// validateUsernameHandler validates username format (same logic as client.go validateUsername)
-func validateUsernameHandler(username string) error {
-	if username == "" {
-		return fmt.Errorf("username cannot be empty")
-	}
-	if len(username) > 32 {
-		return fmt.Errorf("username too long (max 32 characters)")
-	}
-	// Allow letters, numbers, underscores, hyphens, and periods
-	for _, char := range username {
-		if !((char >= 'a' && char <= 'z') ||
-			(char >= 'A' && char <= 'Z') ||
-			(char >= '0' && char <= '9') ||
-			char == '_' || char == '-' || char == '.') {
-			return fmt.Errorf("username contains invalid characters (only letters, numbers, _, -, . allowed)")
-		}
-	}
-	// Prevent usernames that could be confused with system messages or commands
-	if strings.HasPrefix(username, ":") || strings.HasPrefix(username, ".") {
-		return fmt.Errorf("username cannot start with ':' or '.'")
-	}
-	// Prevent path traversal attempts
-	if strings.Contains(username, "..") {
-		return fmt.Errorf("username cannot contain '..'")
-	}
-	return nil
-}
-
 func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsHistory bool, maxFileBytes int64, dbPath string) http.HandlerFunc {
 	auth := adminAuth{admins: make(map[string]struct{}), adminKey: adminKey}
 	for _, u := range adminList {
@@ -655,7 +740,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		}
 
 		// Validate username format
-		if err := validateUsernameHandler(username); err != nil {
+		if err := validateUsername(username); err != nil {
 			SecurityLogger.Warn("Invalid username attempt", map[string]interface{}{
 				"username": username,
 				"error":    err.Error(),
@@ -694,7 +779,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 				conn.Close()
 				return
 			}
-			if hs.AdminKey != auth.adminKey {
+			if !hmac.Equal([]byte(hs.AdminKey), []byte(auth.adminKey)) {
 				// Send auth_failed message before closing
 				failMsg, _ := json.Marshal(map[string]string{"reason": "invalid admin key"})
 				if err := conn.WriteJSON(WSMessage{Type: "auth_failed", Data: failMsg}); err != nil {

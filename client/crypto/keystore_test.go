@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -369,5 +370,88 @@ func TestDecryptDataInvalidCiphertext(t *testing.T) {
 	_, err = decryptData(key, []byte{})
 	if err == nil {
 		t.Error("Expected error with empty ciphertext")
+	}
+}
+
+func TestEncryptRawDecryptRaw(t *testing.T) {
+	dir := t.TempDir()
+	ksPath := filepath.Join(dir, "keystore.dat")
+
+	ks := NewKeyStore(ksPath)
+	if err := ks.Initialize("testpass"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	plaintext := []byte("binary file contents here 0x00 0xFF")
+
+	encrypted, err := ks.EncryptRaw(plaintext, "global")
+	if err != nil {
+		t.Fatalf("EncryptRaw failed: %v", err)
+	}
+
+	if bytes.Equal(encrypted, plaintext) {
+		t.Error("encrypted data should differ from plaintext")
+	}
+
+	decrypted, err := ks.DecryptRaw(encrypted, "global")
+	if err != nil {
+		t.Fatalf("DecryptRaw failed: %v", err)
+	}
+
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Errorf("round-trip mismatch: got %q, want %q", decrypted, plaintext)
+	}
+}
+
+func TestEncryptRawNoSessionKey(t *testing.T) {
+	dir := t.TempDir()
+	ksPath := filepath.Join(dir, "keystore.dat")
+	ks := NewKeyStore(ksPath)
+
+	_, err := ks.EncryptRaw([]byte("data"), "global")
+	if err == nil {
+		t.Error("expected error when no session key is set")
+	}
+}
+
+func TestDecryptRawNoSessionKey(t *testing.T) {
+	dir := t.TempDir()
+	ksPath := filepath.Join(dir, "keystore.dat")
+	ks := NewKeyStore(ksPath)
+
+	_, err := ks.DecryptRaw([]byte("data"), "global")
+	if err == nil {
+		t.Error("expected error when no session key is set")
+	}
+}
+
+func TestDecryptRawTooShort(t *testing.T) {
+	dir := t.TempDir()
+	ksPath := filepath.Join(dir, "keystore.dat")
+	ks := NewKeyStore(ksPath)
+	if err := ks.Initialize("testpass"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	_, err := ks.DecryptRaw([]byte("short"), "global")
+	if err == nil {
+		t.Error("expected error with too-short ciphertext")
+	}
+}
+
+func TestEncryptRawDifferentEachTime(t *testing.T) {
+	dir := t.TempDir()
+	ksPath := filepath.Join(dir, "keystore.dat")
+	ks := NewKeyStore(ksPath)
+	if err := ks.Initialize("testpass"); err != nil {
+		t.Fatalf("Initialize failed: %v", err)
+	}
+
+	data := []byte("same input")
+	enc1, _ := ks.EncryptRaw(data, "global")
+	enc2, _ := ks.EncryptRaw(data, "global")
+
+	if bytes.Equal(enc1, enc2) {
+		t.Error("two encryptions of the same data should produce different ciphertexts (random nonce)")
 	}
 }

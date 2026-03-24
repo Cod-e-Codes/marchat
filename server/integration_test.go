@@ -36,9 +36,8 @@ func TestIntegrationMessageFlow(t *testing.T) {
 		{Sender: "alice", Content: "How are you?", CreatedAt: now, Encrypted: false},
 	}
 
-	// Insert messages
 	for _, msg := range testMessages {
-		if err := InsertMessage(db, msg); err != nil {
+		if _, err := InsertMessage(db, msg); err != nil {
 			t.Fatalf("InsertMessage failed: %v", err)
 		}
 	}
@@ -155,7 +154,7 @@ func TestIntegrationDatabaseStats(t *testing.T) {
 	}
 
 	for _, msg := range messages {
-		if err := InsertMessage(db, msg); err != nil {
+		if _, err := InsertMessage(db, msg); err != nil {
 			t.Fatalf("InsertMessage failed: %v", err)
 		}
 	}
@@ -241,7 +240,7 @@ func TestIntegrationMessageCap(t *testing.T) {
 			CreatedAt: time.Now().Add(time.Duration(i) * time.Minute),
 			Encrypted: false,
 		}
-		if err := InsertMessage(db, msg); err != nil {
+		if _, err := InsertMessage(db, msg); err != nil {
 			t.Fatalf("InsertMessage failed: %v", err)
 		}
 	}
@@ -347,7 +346,7 @@ func TestIntegrationConcurrentOperations(t *testing.T) {
 			}
 			// Synchronize database access
 			dbMutex.Lock()
-			if err := InsertMessage(db, msg); err != nil {
+			if _, err := InsertMessage(db, msg); err != nil {
 				t.Errorf("InsertMessage failed: %v", err)
 			}
 			dbMutex.Unlock()

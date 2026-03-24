@@ -73,7 +73,8 @@ func (s *Store) Refresh() error {
 		}
 	} else {
 		// Handle HTTP URLs
-		resp, err := http.Get(s.registryURL)
+		client := &http.Client{Timeout: 30 * time.Second}
+		resp, err := client.Get(s.registryURL)
 		if err != nil {
 			return fmt.Errorf("failed to fetch registry: %w", err)
 		}
@@ -83,7 +84,8 @@ func (s *Store) Refresh() error {
 			return fmt.Errorf("registry returned status %d", resp.StatusCode)
 		}
 
-		data, err = io.ReadAll(resp.Body)
+		// Cap registry response size to 10 MB
+		data, err = io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 		if err != nil {
 			return fmt.Errorf("failed to read registry: %w", err)
 		}
@@ -509,20 +511,12 @@ func (s *StoreUI) refreshStore() tea.Cmd {
 	}
 }
 
-// installPlugin installs a plugin
+// installPlugin returns a message directing the user to the chat command
 func (s *StoreUI) installPlugin(plugin StorePlugin) tea.Cmd {
 	return func() tea.Msg {
-		// This would integrate with the plugin host to install the plugin
-		// For now, just simulate installation with the actual plugin data
-		time.Sleep(2 * time.Second)
-
-		// Log the plugin being installed for debugging
-		fmt.Printf("Installing plugin: %s v%s\n", plugin.Name, plugin.Version)
-
-		// Plugin installation is handled by the plugin manager when invoked
-		// from the server's plugin command handler (see server/plugin_commands.go).
-
-		return installMsg{err: nil}
+		return installMsg{
+			err: fmt.Errorf("use :install %s from the chat to install this plugin", plugin.Name),
+		}
 	}
 }
 

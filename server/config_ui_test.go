@@ -35,7 +35,7 @@ func TestServerConfigUISavesEnv(t *testing.T) {
 		"MARCHAT_PORT=8123",
 		"MARCHAT_ADMIN_KEY=adminkey123",
 		"MARCHAT_USERS=alice,bob",
-		"MARCHAT_JWT_SECRET=", // The value is random, so we only check for the presence of the env var
+		"MARCHAT_SESSION_SECRET=", // The value is random, so we only check for the presence of the env var
 	} {
 		if !strings.Contains(content, needle) {
 			t.Fatalf("missing .env content: %s", needle)

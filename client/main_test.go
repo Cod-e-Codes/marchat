@@ -939,6 +939,253 @@ func TestDebugEncryptAndSend(t *testing.T) {
 	}
 }
 
+func TestRenderMessagesEdited(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "Updated content",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+			MessageID: 1,
+			Edited:    true,
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	if !strings.Contains(result, "edited") {
+		t.Error("edited message should show (edited) tag")
+	}
+}
+
+func TestRenderMessagesDeleted(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "[deleted]",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+			MessageID: 2,
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	if !strings.Contains(result, "[deleted]") {
+		t.Error("deleted message should show [deleted]")
+	}
+}
+
+func TestRenderMessagesDirectMessage(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "alice",
+			Content:   "secret DM",
+			CreatedAt: now,
+			Type:      shared.DirectMessage,
+			Recipient: "bob",
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "bob", []string{"alice", "bob"}, 80, true)
+	if !strings.Contains(result, "DM") {
+		t.Error("DM message should show [DM] indicator")
+	}
+}
+
+func TestRenderMessagesFiltersTypingAndReadReceipt(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "visible",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+		},
+		{
+			Sender:    "user2",
+			Content:   "",
+			CreatedAt: now.Add(time.Second),
+			Type:      shared.TypingMessage,
+		},
+		{
+			Sender:    "user3",
+			Content:   "",
+			CreatedAt: now.Add(2 * time.Second),
+			Type:      shared.ReadReceiptType,
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "user1", []string{"user1", "user2", "user3"}, 80, true)
+	if !strings.Contains(result, "visible") {
+		t.Error("text message should be visible")
+	}
+	// Typing and read receipt messages should not appear as chat messages
+}
+
+func TestRenderMessagesWithMessageID(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "hello",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+			MessageID: 42,
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	if !strings.Contains(result, "#42") {
+		t.Error("message should show #42 ID")
+	}
+}
+
+func TestRenderMessagesWithReactions(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "nice work",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+			MessageID: 10,
+		},
+	}
+	reactions := map[int64]map[string]map[string]bool{
+		10: {
+			"👍": {"alice": true, "bob": true},
+			"🎉": {"charlie": true},
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, reactions)
+	if !strings.Contains(result, "👍") {
+		t.Error("should render thumbs up reaction")
+	}
+	if !strings.Contains(result, "🎉") {
+		t.Error("should render party popper reaction")
+	}
+}
+
+func TestRenderMessagesNoReactionsWithoutMap(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "hello",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+			MessageID: 5,
+		},
+	}
+	styles := baseThemeStyles()
+	// Call without reactions parameter -- should work fine
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	if !strings.Contains(result, "hello") {
+		t.Error("should render message content")
+	}
+}
+
+func TestResolveReactionEmoji(t *testing.T) {
+	tests := []struct {
+		input    string
+		expected string
+	}{
+		{"+1", "👍"},
+		{"-1", "👎"},
+		{"heart", "❤️"},
+		{"fire", "🔥"},
+		{"party", "🎉"},
+		{"FIRE", "🔥"},
+		{"Heart", "❤️"},
+		{"think", "🤔"},
+		{"rocket", "🚀"},
+		{"👍", "👍"},
+		{"custom", "custom"},
+		{"", ""},
+	}
+	for _, tt := range tests {
+		got := resolveReactionEmoji(tt.input)
+		if got != tt.expected {
+			t.Errorf("resolveReactionEmoji(%q) = %q, want %q", tt.input, got, tt.expected)
+		}
+	}
+}
+
+func TestNewMessageTypes(t *testing.T) {
+	types := map[shared.MessageType]string{
+		shared.EditMessageType:  "edit",
+		shared.DeleteMessage:    "delete",
+		shared.TypingMessage:    "typing",
+		shared.ReactionMessage:  "reaction",
+		shared.DirectMessage:    "dm",
+		shared.SearchMessage:    "search",
+		shared.PinMessage:       "pin",
+		shared.ReadReceiptType:  "read_receipt",
+		shared.JoinChannelType:  "join_channel",
+		shared.LeaveChannelType: "leave_channel",
+		shared.ListChannelsType: "list_channels",
+	}
+	for mt, expected := range types {
+		if string(mt) != expected {
+			t.Errorf("MessageType %v != %q", mt, expected)
+		}
+	}
+}
+
+func TestReactionMetaSerialization(t *testing.T) {
+	meta := shared.ReactionMeta{
+		Emoji:     "👍",
+		TargetID:  10,
+		IsRemoval: false,
+	}
+	data, err := json.Marshal(meta)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	var parsed shared.ReactionMeta
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if parsed.Emoji != meta.Emoji || parsed.TargetID != meta.TargetID || parsed.IsRemoval != meta.IsRemoval {
+		t.Errorf("round-trip mismatch: got %+v, want %+v", parsed, meta)
+	}
+}
+
+func TestMessageWithChannelSerialization(t *testing.T) {
+	msg := shared.Message{
+		Sender:    "alice",
+		Content:   "hello room",
+		Type:      shared.TextMessage,
+		Channel:   "dev",
+		MessageID: 5,
+		Edited:    true,
+		Recipient: "bob",
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("marshal failed: %v", err)
+	}
+	var parsed shared.Message
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("unmarshal failed: %v", err)
+	}
+	if parsed.Channel != "dev" {
+		t.Errorf("channel mismatch: got %q", parsed.Channel)
+	}
+	if parsed.MessageID != 5 {
+		t.Errorf("message_id mismatch: got %d", parsed.MessageID)
+	}
+	if !parsed.Edited {
+		t.Error("edited flag should be true")
+	}
+	if parsed.Recipient != "bob" {
+		t.Errorf("recipient mismatch: got %q", parsed.Recipient)
+	}
+}
+
 func TestDebugWebSocketWriteDetailed(t *testing.T) {
 	// Test debugWebSocketWrite function
 	// We can't test the actual WebSocket write, but we can test JSON marshaling

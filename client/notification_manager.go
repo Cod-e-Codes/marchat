@@ -166,16 +166,15 @@ func (nm *NotificationManager) shouldNotifyBell(level NotificationLevel) bool {
 		return false
 	}
 
-	// Check level-based rules
 	switch level {
 	case NotificationLevelDM:
 		return nm.config.BellOnDM
 	case NotificationLevelMention:
-		return nm.config.BellOnMention || !nm.config.BellOnMention // If BellOnMention is false, bell for all
+		return true
 	case NotificationLevelUrgent:
 		return true
 	case NotificationLevelInfo:
-		return !nm.config.BellOnMention // Only if not in mention-only mode
+		return !nm.config.BellOnMention
 	}
 
 	return false

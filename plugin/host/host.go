@@ -62,6 +62,7 @@ type PluginInstance struct {
 	Stderr   io.ReadCloser
 	Config   sdk.Config
 	Enabled  bool
+	decoder  *json.Decoder
 	mu       sync.Mutex
 }
 
@@ -442,10 +443,8 @@ func (h *PluginHost) UpdateUserList(users []string) {
 	h.mu.Unlock()
 }
 
-// initializePlugin sends an initialization request to the plugin
+// initializePlugin sends an initialization request to the plugin and waits for acknowledgment
 func (h *PluginHost) initializePlugin(instance *PluginInstance) error {
-	// Initializing plugin
-
 	initData := map[string]interface{}{
 		"config": instance.Config,
 	}
@@ -455,13 +454,42 @@ func (h *PluginHost) initializePlugin(instance *PluginInstance) error {
 		Data: mustMarshal(initData),
 	}
 
-	// Sending init request to plugin
 	if err := h.sendRequest(instance, initRequest); err != nil {
 		return fmt.Errorf("failed to send init request: %w", err)
 	}
 
-	// Plugin initialized successfully
-	return nil
+	instance.decoder = json.NewDecoder(instance.Stdout)
+
+	type initResult struct {
+		resp sdk.PluginResponse
+		err  error
+	}
+	ch := make(chan initResult, 1)
+	go func() {
+		var resp sdk.PluginResponse
+		if err := instance.decoder.Decode(&resp); err != nil {
+			ch <- initResult{err: fmt.Errorf("failed to read init response: %w", err)}
+			return
+		}
+		ch <- initResult{resp: resp}
+	}()
+
+	select {
+	case result := <-ch:
+		if result.err != nil {
+			return result.err
+		}
+		if !result.resp.Success {
+			errMsg := result.resp.Error
+			if errMsg == "" {
+				errMsg = "plugin returned unsuccessful init response"
+			}
+			return fmt.Errorf("plugin init failed: %s", errMsg)
+		}
+		return nil
+	case <-time.After(5 * time.Second):
+		return fmt.Errorf("plugin did not respond to init within 5 seconds")
+	}
 }
 
 // sendRequest sends a request to a plugin
@@ -491,8 +519,10 @@ func (h *PluginHost) sendRequest(instance *PluginInstance, req sdk.PluginRequest
 
 // handlePluginOutput handles stdout from a plugin
 func (h *PluginHost) handlePluginOutput(instance *PluginInstance) {
-	// Starting output handler for plugin
-	decoder := json.NewDecoder(instance.Stdout)
+	decoder := instance.decoder
+	if decoder == nil {
+		decoder = json.NewDecoder(instance.Stdout)
+	}
 	for {
 		var response sdk.PluginResponse
 		if err := decoder.Decode(&response); err != nil {
@@ -543,6 +573,27 @@ func (h *PluginHost) handlePluginResponse(instance *PluginInstance, response sdk
 			default:
 				log.Printf("Message channel full, dropping message from plugin %s", instance.Name)
 			}
+		}
+	case "command_response":
+		if response.Success {
+			var text string
+			if err := json.Unmarshal(response.Data, &text); err != nil {
+				log.Printf("Failed to unmarshal command_response from plugin %s: %v", instance.Name, err)
+				return
+			}
+			msg := sdk.Message{
+				Sender:    instance.Name,
+				Content:   text,
+				CreatedAt: time.Now(),
+				Type:      "text",
+			}
+			select {
+			case h.messageChan <- msg:
+			default:
+				log.Printf("Message channel full, dropping command_response from plugin %s", instance.Name)
+			}
+		} else {
+			log.Printf("Plugin %s command error: %s", instance.Name, response.Error)
 		}
 	case "log":
 		if !response.Success {

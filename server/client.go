@@ -8,13 +8,16 @@ import (
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/shared"
-
 	"github.com/gorilla/websocket"
 )
 
 const (
 	pongWait   = 60 * time.Second
 	pingPeriod = (pongWait * 9) / 10 // send pings at 90% of pongWait
+
+	rateLimitMessages = 20               // max messages per rate window
+	rateLimitWindow   = 5 * time.Second  // sliding window duration
+	rateLimitCooldown = 10 * time.Second // cooldown after exceeding limit
 )
 
 type Client struct {
@@ -50,6 +53,11 @@ func (c *Client) readPump() {
 		}
 		return nil
 	})
+
+	// Rate limiting state
+	var msgTimestamps []time.Time
+	var cooldownUntil time.Time
+
 	for {
 		var msg shared.Message
 		err := c.conn.ReadJSON(&msg)
@@ -61,8 +69,28 @@ func (c *Client) readPump() {
 			}
 			break
 		}
+
+		// Rate limiting: drop messages that exceed the per-client threshold
+		now := time.Now()
+		if now.Before(cooldownUntil) {
+			continue
+		}
+		cutoff := now.Add(-rateLimitWindow)
+		filtered := msgTimestamps[:0]
+		for _, ts := range msgTimestamps {
+			if ts.After(cutoff) {
+				filtered = append(filtered, ts)
+			}
+		}
+		msgTimestamps = filtered
+		if len(msgTimestamps) >= rateLimitMessages {
+			log.Printf("Rate limit exceeded for client %s, cooldown %v", c.username, rateLimitCooldown)
+			cooldownUntil = now.Add(rateLimitCooldown)
+			continue
+		}
+		msgTimestamps = append(msgTimestamps, now)
+
 		if msg.Type == shared.FileMessageType && msg.File != nil {
-			// File message: enforce configured limit
 			maxBytes := c.maxFileBytes
 			if maxBytes <= 0 {
 				maxBytes = 1024 * 1024
@@ -71,12 +99,191 @@ func (c *Client) readPump() {
 				log.Printf("Rejected file from %s: too large (%d bytes)", c.username, msg.File.Size)
 				continue
 			}
-			// Broadcast file message, do not store in DB
 			msg.CreatedAt = time.Now()
 			c.hub.broadcast <- msg
 			continue
 		}
-		// Handle commands (both plugin and admin commands)
+
+		if msg.Type == shared.EditMessageType && msg.MessageID > 0 {
+			if err := EditMessage(c.db, msg.MessageID, c.username, msg.Content); err != nil {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Edit failed: " + err.Error(),
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+			} else {
+				msg.Sender = c.username
+				msg.CreatedAt = time.Now()
+				msg.Edited = true
+				c.hub.broadcast <- msg
+			}
+			continue
+		}
+
+		if msg.Type == shared.DeleteMessage && msg.MessageID > 0 {
+			if err := DeleteMessage(c.db, msg.MessageID, c.username, c.isAdmin); err != nil {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Delete failed: " + err.Error(),
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+			} else {
+				msg.Sender = c.username
+				msg.CreatedAt = time.Now()
+				c.hub.broadcast <- msg
+			}
+			continue
+		}
+
+		if msg.Type == shared.TypingMessage {
+			msg.Sender = c.username
+			c.hub.broadcast <- msg
+			continue
+		}
+
+		if msg.Type == shared.ReactionMessage && msg.Reaction != nil {
+			msg.Sender = c.username
+			msg.CreatedAt = time.Now()
+			c.hub.broadcast <- msg
+			continue
+		}
+
+		if msg.Type == shared.DirectMessage && msg.Recipient != "" {
+			msg.Sender = c.username
+			msg.CreatedAt = time.Now()
+			c.hub.broadcastDM(msg)
+			continue
+		}
+
+		if msg.Type == shared.SearchMessage {
+			results := SearchMessages(c.db, msg.Content, 20)
+			var sb strings.Builder
+			if len(results) == 0 {
+				sb.WriteString("No results found for: " + msg.Content)
+			} else {
+				sb.WriteString(fmt.Sprintf("Search results for '%s' (%d found):\n", msg.Content, len(results)))
+				for _, r := range results {
+					sb.WriteString(fmt.Sprintf("  [%s] %s: %s\n", r.CreatedAt.Format("01/02 15:04"), r.Sender, r.Content))
+				}
+			}
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   sb.String(),
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			continue
+		}
+
+		if msg.Type == shared.PinMessage {
+			if msg.MessageID == 0 {
+				pinned := GetPinnedMessages(c.db)
+				var sb strings.Builder
+				if len(pinned) == 0 {
+					sb.WriteString("No pinned messages")
+				} else {
+					sb.WriteString(fmt.Sprintf("Pinned messages (%d):\n", len(pinned)))
+					for _, p := range pinned {
+						sb.WriteString(fmt.Sprintf("  #%d [%s] %s: %s\n", p.MessageID, p.CreatedAt.Format("01/02 15:04"), p.Sender, p.Content))
+					}
+				}
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   sb.String(),
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
+			if !c.isAdmin {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Only admins can pin messages",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
+			pinned, err := TogglePinMessage(c.db, msg.MessageID)
+			if err != nil {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Pin failed: " + err.Error(),
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+			} else {
+				action := "pinned"
+				if !pinned {
+					action = "unpinned"
+				}
+				c.hub.broadcast <- shared.Message{
+					Sender:    "System",
+					Content:   fmt.Sprintf("Message %d %s by %s", msg.MessageID, action, c.username),
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+			}
+			continue
+		}
+
+		if msg.Type == shared.ReadReceiptType {
+			msg.Sender = c.username
+			c.hub.broadcast <- msg
+			continue
+		}
+
+		if msg.Type == shared.JoinChannelType && msg.Channel != "" {
+			old := c.hub.getClientChannel(c)
+			if old != msg.Channel {
+				c.hub.leaveChannel(c, old)
+			}
+			c.hub.joinChannel(c, msg.Channel)
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   "Joined channel #" + msg.Channel,
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			continue
+		}
+		if msg.Type == shared.LeaveChannelType {
+			current := c.hub.getClientChannel(c)
+			if current != "general" {
+				c.hub.leaveChannel(c, current)
+				c.hub.joinChannel(c, "general")
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Left #" + current + ", back to #general",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+			}
+			continue
+		}
+		if msg.Type == shared.ListChannelsType {
+			channels := c.hub.listChannels()
+			current := c.hub.getClientChannel(c)
+			var lines []string
+			for _, ch := range channels {
+				n := len(c.hub.getChannelUsers(ch))
+				marker := ""
+				if ch == current {
+					marker = " (current)"
+				}
+				lines = append(lines, fmt.Sprintf("  #%s — %d user(s)%s", ch, n, marker))
+			}
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   "Active channels:\n" + strings.Join(lines, "\n"),
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			continue
+		}
+
 		if strings.HasPrefix(msg.Content, ":") || msg.Type == shared.AdminCommandType {
 			AdminLogger.Info("Command received", map[string]interface{}{
 				"user":    c.username,
@@ -84,15 +291,18 @@ func (c *Client) readPump() {
 				"admin":   c.isAdmin,
 				"type":    msg.Type,
 			})
-			// Let handleCommand process both plugin and admin commands
-			// It will check permissions for each command individually
 			c.handleCommand(msg.Content)
-			continue // Don't insert commands as normal messages
+			continue
 		}
 		msg.CreatedAt = time.Now()
+		if msg.Channel == "" {
+			msg.Channel = c.hub.getClientChannel(c)
+		}
 		if msg.Type == "" || msg.Type == shared.TextMessage {
-			if err := InsertMessage(c.db, msg); err != nil {
+			if msgID, err := InsertMessage(c.db, msg); err != nil {
 				log.Printf("Failed to persist message from %s: %v", c.username, err)
+			} else {
+				msg.MessageID = msgID
 			}
 		}
 		c.hub.broadcast <- msg

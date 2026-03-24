@@ -47,10 +47,10 @@ type ServerConfigModel struct {
 }
 
 type ServerConfig struct {
-	AdminKey   string
-	AdminUsers string
-	Port       string
-	JWTSecret  string
+	AdminKey      string
+	AdminUsers    string
+	Port          string
+	SessionSecret string
 }
 
 func NewServerConfigUI() ServerConfigModel {
@@ -140,7 +140,7 @@ func (m *ServerConfigModel) saveConfigToEnv() error {
 	envContent.WriteString(fmt.Sprintf("MARCHAT_PORT=%s\n", m.config.Port))
 	envContent.WriteString(fmt.Sprintf("MARCHAT_ADMIN_KEY=%s\n", m.config.AdminKey))
 	envContent.WriteString(fmt.Sprintf("MARCHAT_USERS=%s\n", m.config.AdminUsers))
-	envContent.WriteString(fmt.Sprintf("MARCHAT_JWT_SECRET=%s\n", m.config.JWTSecret))
+	envContent.WriteString(fmt.Sprintf("MARCHAT_SESSION_SECRET=%s\n", m.config.SessionSecret))
 
 	// Write to file
 	if err := os.WriteFile(envPath, []byte(envContent.String()), 0600); err != nil {
@@ -291,17 +291,17 @@ func (m *ServerConfigModel) validateAndBuildConfig() error {
 		return fmt.Errorf("port must be a number between 1 and 65535")
 	}
 
-	jwtSecret, err := config.GenerateJWTSecret()
+	sessionSecret, err := config.GenerateSessionSecret()
 	if err != nil {
-		return fmt.Errorf("failed at generating JWT secret: %w", err)
+		return fmt.Errorf("failed at generating session secret: %w", err)
 	}
 
 	// Build config
 	m.config = &ServerConfig{
-		AdminKey:   adminKey,
-		AdminUsers: adminUsers,
-		Port:       port,
-		JWTSecret:  jwtSecret,
+		AdminKey:      adminKey,
+		AdminUsers:    adminUsers,
+		Port:          port,
+		SessionSecret: sessionSecret,
 	}
 
 	// Save configuration to .env file

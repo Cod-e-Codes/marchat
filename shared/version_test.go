@@ -116,3 +116,27 @@ func TestVersionInfoNonEmpty(t *testing.T) {
 		t.Error("Server version info should not be empty")
 	}
 }
+
+func TestCompareVersions(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		want int
+	}{
+		{name: "equal", a: "1.2.3", b: "1.2.3", want: 0},
+		{name: "less_than_major", a: "1.0.0", b: "2.0.0", want: -1},
+		{name: "greater_than_major", a: "2.0.0", b: "1.0.0", want: 1},
+		{name: "less_than_minor", a: "1.2.0", b: "1.3.0", want: -1},
+		{name: "less_than_patch", a: "1.2.3", b: "1.2.4", want: -1},
+		{name: "dev_before_release", a: "dev", b: "1.0.0", want: -1},
+		{name: "v_prefix_equal", a: "v1.2.3", b: "1.2.3", want: 0},
+		{name: "two_part_equal_to_three", a: "1.2", b: "1.2.0", want: 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := CompareVersions(tt.a, tt.b); got != tt.want {
+				t.Errorf("CompareVersions(%q, %q) = %d; want %d", tt.a, tt.b, got, tt.want)
+			}
+		})
+	}
+}

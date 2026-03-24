@@ -2,10 +2,12 @@ package server
 
 import (
 	"database/sql"
+	"sort"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/Cod-e-Codes/marchat/shared"
 	_ "modernc.org/sqlite"
 )
 
@@ -434,5 +436,200 @@ func TestHubConcurrentBanOperations(t *testing.T) {
 	// The user should not be banned after the unban in the first goroutine
 	if hub.IsUserBanned(username) {
 		t.Error("User should not be banned after concurrent operations")
+	}
+}
+
+func TestChannelManagement(t *testing.T) {
+	hub := NewHub("", "", "", nil)
+
+	client := &Client{username: "testuser", send: make(chan interface{}, 10)}
+
+	t.Run("default channel is general", func(t *testing.T) {
+		if got := hub.getClientChannel(client); got != "general" {
+			t.Errorf("expected general, got %s", got)
+		}
+	})
+
+	t.Run("joinChannel puts client in specified channel", func(t *testing.T) {
+		hub.joinChannel(client, "room1")
+		if got := hub.getClientChannel(client); got != "room1" {
+			t.Errorf("expected room1, got %s", got)
+		}
+	})
+
+	t.Run("leaveChannel removes client from a channel", func(t *testing.T) {
+		hub.leaveChannel(client, "room1")
+		if got := hub.getClientChannel(client); got != "general" {
+			t.Errorf("expected general after leave, got %s", got)
+		}
+	})
+
+	t.Run("leaveChannel cleans up empty channels", func(t *testing.T) {
+		hub.joinChannel(client, "lonely")
+		hub.leaveChannel(client, "lonely")
+		hub.channelMutex.RLock()
+		_, exists := hub.channels["lonely"]
+		hub.channelMutex.RUnlock()
+		if exists {
+			t.Error("expected lonely channel to be removed when empty")
+		}
+		got := hub.listChannels()
+		sort.Strings(got)
+		want := []string{"general"}
+		if len(got) != len(want) || got[0] != want[0] {
+			t.Errorf("listChannels = %v, want %v", got, want)
+		}
+	})
+
+	t.Run("listChannels returns all active channels", func(t *testing.T) {
+		other := &Client{username: "other", send: make(chan interface{}, 10)}
+		hub.joinChannel(client, "alpha")
+		hub.joinChannel(other, "beta")
+		got := append([]string(nil), hub.listChannels()...)
+		sort.Strings(got)
+		want := []string{"alpha", "beta"}
+		if len(got) != len(want) {
+			t.Fatalf("listChannels len = %d, want %d: %v", len(got), len(want), got)
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("listChannels[%d] = %s, want %s", i, got[i], want[i])
+			}
+		}
+		hub.leaveChannel(client, "alpha")
+		hub.leaveChannel(other, "beta")
+	})
+
+	t.Run("getClientChannel returns correct channel after join", func(t *testing.T) {
+		joiner := &Client{username: "joiner", send: make(chan interface{}, 10)}
+		hub.joinChannel(joiner, "vip")
+		if got := hub.getClientChannel(joiner); got != "vip" {
+			t.Errorf("expected vip, got %s", got)
+		}
+		hub.leaveChannel(joiner, "vip")
+	})
+
+	t.Run("getChannelUsers returns correct users", func(t *testing.T) {
+		a := &Client{username: "alice", send: make(chan interface{}, 10)}
+		b := &Client{username: "bob", send: make(chan interface{}, 10)}
+		hub.joinChannel(a, "dev")
+		hub.joinChannel(b, "dev")
+		users := hub.getChannelUsers("dev")
+		if len(users) != 2 {
+			t.Fatalf("expected 2 users, got %d", len(users))
+		}
+		hub.leaveChannel(a, "dev")
+		users = hub.getChannelUsers("dev")
+		if len(users) != 1 {
+			t.Errorf("expected 1 user after leave, got %d", len(users))
+		}
+		hub.leaveChannel(b, "dev")
+	})
+
+	t.Run("getChannelUsers returns empty for nonexistent channel", func(t *testing.T) {
+		users := hub.getChannelUsers("nonexistent")
+		if len(users) != 0 {
+			t.Errorf("expected 0 users, got %d", len(users))
+		}
+	})
+}
+
+func TestBroadcastDM(t *testing.T) {
+	hub := NewHub("", "", "", nil)
+
+	sender := &Client{username: "alice", send: make(chan interface{}, 10)}
+	recipient := &Client{username: "bob", send: make(chan interface{}, 10)}
+	bystander := &Client{username: "eve", send: make(chan interface{}, 10)}
+
+	hub.clientsMutex.Lock()
+	hub.clients[sender] = true
+	hub.clients[recipient] = true
+	hub.clients[bystander] = true
+	hub.clientsMutex.Unlock()
+
+	msg := shared.Message{
+		Sender:    "alice",
+		Recipient: "bob",
+		Content:   "secret",
+		Type:      shared.DirectMessage,
+	}
+
+	hub.broadcastDM(msg)
+
+	if len(sender.send) != 1 {
+		t.Errorf("sender should receive DM echo, got %d messages", len(sender.send))
+	}
+	if len(recipient.send) != 1 {
+		t.Errorf("recipient should receive DM, got %d messages", len(recipient.send))
+	}
+	if len(bystander.send) != 0 {
+		t.Errorf("bystander should not receive DM, got %d messages", len(bystander.send))
+	}
+}
+
+func TestBroadcastDMCaseInsensitive(t *testing.T) {
+	hub := NewHub("", "", "", nil)
+
+	sender := &Client{username: "Alice", send: make(chan interface{}, 10)}
+	recipient := &Client{username: "BOB", send: make(chan interface{}, 10)}
+
+	hub.clientsMutex.Lock()
+	hub.clients[sender] = true
+	hub.clients[recipient] = true
+	hub.clientsMutex.Unlock()
+
+	msg := shared.Message{
+		Sender:    "alice",
+		Recipient: "bob",
+		Content:   "hi",
+		Type:      shared.DirectMessage,
+	}
+
+	hub.broadcastDM(msg)
+
+	if len(sender.send) != 1 {
+		t.Errorf("sender should receive DM (case insensitive), got %d", len(sender.send))
+	}
+	if len(recipient.send) != 1 {
+		t.Errorf("recipient should receive DM (case insensitive), got %d", len(recipient.send))
+	}
+}
+
+func TestConcurrentChannelOperations(t *testing.T) {
+	hub := NewHub("", "", "", nil)
+
+	done := make(chan bool, 4)
+	clients := make([]*Client, 10)
+	for i := range clients {
+		clients[i] = &Client{username: "user" + string(rune('0'+i)), send: make(chan interface{}, 10)}
+	}
+
+	go func() {
+		for i := 0; i < 50; i++ {
+			hub.joinChannel(clients[i%len(clients)], "room")
+		}
+		done <- true
+	}()
+	go func() {
+		for i := 0; i < 50; i++ {
+			hub.leaveChannel(clients[i%len(clients)], "room")
+		}
+		done <- true
+	}()
+	go func() {
+		for i := 0; i < 50; i++ {
+			hub.listChannels()
+		}
+		done <- true
+	}()
+	go func() {
+		for i := 0; i < 50; i++ {
+			hub.getChannelUsers("room")
+		}
+		done <- true
+	}()
+
+	for i := 0; i < 4; i++ {
+		<-done
 	}
 }

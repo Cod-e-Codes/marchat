@@ -1270,7 +1270,7 @@ func (ap *AdminPanel) renderSystem() string {
 		doc.WriteString(fmt.Sprintf("  TLS Status: %s\n", tlsStyle.Render(tlsStatusText)))
 	}
 
-	doc.WriteString(fmt.Sprintf("  JWT Secret: %s\n", maskSecret(ap.config.JWTSecret)))
+	doc.WriteString(fmt.Sprintf("  Session Secret: %s\n", maskSecret(ap.config.SessionSecret)))
 	doc.WriteString(fmt.Sprintf("  Admin Key: %s\n", maskSecret(ap.config.AdminKey)))
 	doc.WriteString(fmt.Sprintf("  Ban History Gaps: %t\n", ap.config.BanGapsHistory))
 	doc.WriteString(fmt.Sprintf("  Plugin Registry: %s\n", ap.config.PluginRegistryURL))

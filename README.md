@@ -7,17 +7,27 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.9.0--beta.6-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.9.0-beta.6)
+[![Version](https://img.shields.io/badge/version-v0.10.0--beta.1-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.10.0-beta.1)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
 ## Latest Updates
 
-### v0.9.0-beta.6 (Current)
-- **Security**: Rebuilt with Go 1.25.8 to address CVE-2026-25679, CVE-2026-27142, CVE-2026-27139
-- **Dependencies**: Bumped `golang.org/x/crypto` from 0.48.0 to 0.49.0, `modernc.org/sqlite` to 1.46.1
+### v0.10.0-beta.1 (Current)
+- **Message Management**: Edit, delete, pin, search messages by ID
+- **Reactions**: React to messages with emoji aliases (`:react 42 +1`, `heart`, `fire`, `party`, etc.)
+- **Direct Messages**: Private DM conversations between users
+- **Channels**: Multiple chat rooms with join/leave and per-channel messaging
+- **Typing Indicators**: See when other users are typing
+- **E2E File Transfers**: End-to-end encryption extended to file sharing
+- **UX Enhancements**: Connection status indicator, @mention tab completion, unread count, multi-line input (Alt+Enter/Ctrl+J), chat history export
+- **Security**: Rate limiting, constant-time admin key comparison, plugin download timeouts, SHA-pinned CI actions
+- **Refactoring**: Client split into hotkeys/render/websocket/commands modules, config directory unified, orphaned code removed
+- **Docker**: Added docker-compose.yml for local development
+- **Plugins**: Full plugin system wiring (message forwarding, user list updates, command responses, init handshake, store UI, license enforcement)
 
 ### Recent Releases
+- **v0.9.0-beta.6**: Rebuilt with Go 1.25.8 to address CVE-2026-25679, CVE-2026-27142, CVE-2026-27139
 - **v0.9.0-beta.5**: Automated release workflow, PBKDF2 keystore key derivation, JWT secret auto-generation, race condition fixes, Docker optimizations
 - **v0.9.0-beta.4**: Fixed admin metrics, restored plugin commands in encrypted sessions, dependency updates
 - **v0.9.0-beta.3**: Added :q quit command, improved theme handling, ESC behavior tweaks, and better database backups
@@ -35,15 +45,21 @@ Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/relea
 
 - **Terminal UI** - Beautiful TUI built with Bubble Tea
 - **Real-time Chat** - Fast WebSocket messaging with SQLite backend (PostgreSQL/MySQL planned)
+- **Message Management** - Edit, delete, pin, react to, and search messages
+- **Direct Messages** - Private DM conversations between users
+- **Channels** - Multiple chat rooms with join/leave and per-channel messaging
+- **Typing Indicators** - See when other users are typing
+- **Read Receipts** - Message read acknowledgement (broadcast-level)
 - **Plugin System** - Remote registry with text commands and Alt+key hotkeys
-- **E2E Encryption** - X25519/ChaCha20-Poly1305 with global encryption
-- **File Sharing** - Send files up to 1MB (configurable) with interactive picker
+- **E2E Encryption** - X25519/ChaCha20-Poly1305 with global encryption, including file transfers
+- **File Sharing** - Send files up to 1MB (configurable) with interactive picker and optional E2E encryption
 - **Admin Controls** - User management, bans, kick system with ban history gaps
 - **Smart Notifications** - Bell + desktop notifications with quiet hours and focus mode ([guide](NOTIFICATIONS.md))
 - **Themes** - Built-in themes + custom themes via JSON ([guide](THEMES.md))
-- **Docker Support** - Containerized deployment with security features
+- **Docker Support** - Containerized deployment with `docker-compose.yml` for local dev
 - **Health Monitoring** - `/health` and `/health/simple` endpoints with system metrics
 - **Structured Logging** - JSON logs with component separation and user tracking
+- **UX Enhancements** - Connection status indicator, tab completion for @mentions, unread message count, multi-line input, chat export
 - **Cross-Platform** - Runs on Linux, macOS, Windows, and Android/Termux
 
 ## Overview
@@ -112,12 +128,12 @@ Key tables for message tracking and moderation:
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.6/marchat-v0.9.0-beta.6-linux-amd64.zip
-unzip marchat-v0.9.0-beta.6-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.10.0-beta.1/marchat-v0.10.0-beta.1-linux-amd64.zip
+unzip marchat-v0.10.0-beta.1-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.9.0-beta.6/marchat-v0.9.0-beta.6-darwin-amd64.zip
-unzip marchat-v0.9.0-beta.6-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.10.0-beta.1/marchat-v0.10.0-beta.1-darwin-amd64.zip
+unzip marchat-v0.10.0-beta.1-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -125,11 +141,16 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.9.0-beta.6
+docker pull codecodesxyz/marchat:v0.10.0-beta.1
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.9.0-beta.6
+  codecodesxyz/marchat:v0.10.0-beta.1
+```
+
+**Docker Compose (local development):**
+```bash
+docker compose up -d
 ```
 
 **From Source:**
@@ -186,6 +207,7 @@ go build -o marchat-client ./client
 
 ## User Commands
 
+### General
 | Command | Description | Hotkey |
 |---------|-------------|--------|
 | `:theme <name>` | Switch theme (built-in or custom) | `Ctrl+T` (cycles) |
@@ -196,6 +218,29 @@ go build -o marchat-client ./client
 | `:sendfile [path]` | Send file (or open picker without path) | `Alt+F` |
 | `:savefile <name>` | Save received file | - |
 | `:code` | Open code composer with syntax highlighting | `Alt+C` |
+| `:export [file]` | Export chat history to a text file | - |
+
+### Messaging
+| Command | Description |
+|---------|-------------|
+| `:edit <id> <text>` | Edit a message by its ID |
+| `:delete <id>` | Delete a message by its ID |
+| `:dm [user] [msg]` | Send a DM or toggle DM mode (no args exits DM mode) |
+| `:search <query>` | Search message history on the server |
+| `:react <id> <emoji>` | React to a message (supports aliases: `+1`, `heart`, `fire`, `party`, `laugh`, `eyes`, `check`, `rocket`, `think`, etc.) |
+| `:pin <id>` | Toggle pin on a message |
+| `:pinned` | List all pinned messages |
+
+### Channels
+| Command | Description |
+|---------|-------------|
+| `:join <channel>` | Join a channel (clients start in `#general`) |
+| `:leave` | Leave current channel, return to `#general` |
+| `:channels` | List active channels with user counts |
+
+### Notifications
+| Command | Description | Hotkey |
+|---------|-------------|--------|
 | `:notify-mode <mode>` | Set notification mode (none/bell/desktop/both) | `Alt+N` (toggle desktop) |
 | `:bell` | Toggle bell notifications | - |
 | `:bell-mention` | Toggle mention-only notifications | - |
@@ -244,6 +289,8 @@ Navigate with arrow keys, Enter to select/open folders, ".. (Parent Directory)" 
 |-----|--------|
 | `Ctrl+H` | Toggle help overlay |
 | `Enter` | Send message |
+| `Alt+Enter` / `Ctrl+J` | Insert newline (multi-line input) |
+| `Tab` | Autocomplete @mentions |
 | `Esc` | Close menus / dialogs |
 | `:q` | Quit application (vim-style) |
 | `↑/↓` | Scroll chat |
@@ -259,6 +306,8 @@ Navigate with arrow keys, Enter to select/open folders, ".. (Parent Directory)" 
 | `Alt+T` | Toggle 12/24h time |
 | `Alt+N` | Toggle desktop notifications |
 | `Ctrl+L` | Clear chat history |
+
+> **Multi-line input**: Use `Alt+Enter` or `Ctrl+J` to insert newlines. `Shift+Enter` is not reliably supported on Windows terminals.
 
 ### Admin Interface (Client)
 | Key | Action |
@@ -565,6 +614,7 @@ Profiles stored in platform-appropriate locations:
 | Username already taken | Use admin `:forcedisconnect <user>` or wait 5min for auto-cleanup |
 | Stale connections | Server auto-cleans every 5min, or admin use `:cleanup` |
 | Client frozen at startup | Fixed in latest - `--quick-start` uses proper UI |
+| Multi-line input not working | Use `Alt+Enter` or `Ctrl+J` — `Shift+Enter` is not supported in most Windows terminals |
 
 ### Stale Connection Management
 
@@ -600,20 +650,20 @@ go test ./... -timeout 10s # With timeout (CI recommended)
 ### Coverage Summary
 | Package | Coverage | Size | Status |
 |---------|----------|------|--------|
+| `shared` | 85.9% | 283 LOC | High |
 | `plugin/license` | 83.1% | 229 LOC | High |
-| `shared` | 82.4% | 283 LOC | High |
-| `client/crypto` | 76.9% | 302 LOC | High |
-| `config` | 74.2% | 319 LOC | High |
+| `client/crypto` | 79.5% | 355 LOC | High |
+| `config` | 73.2% | 319 LOC | High |
 | `client/config` | 54.5% | 1862 LOC | Medium |
-| `plugin/store` | 46.8% | 558 LOC | Medium |
+| `plugin/store` | 47.0% | 558 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 33.2% | 6100+ LOC | Medium |
-| `client` | 25.5% | 4900+ LOC | Medium |
-| `plugin/host` | 23.7% | 566 LOC | Low |
-| `plugin/manager` | 22.5% | 652 LOC | Low |
+| `server` | 33.7% | 6100+ LOC | Medium |
+| `plugin/manager` | 23.8% | 652 LOC | Low |
+| `client` | 23.3% | 4900+ LOC | Low |
+| `plugin/host` | 21.1% | 566 LOC | Low |
 | `cmd/server` | 5.3% | 454 LOC | Low |
 
-**Overall: 34.8%** - See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 34.1%** - See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

@@ -1045,7 +1045,7 @@ func (w *WebAdminServer) getSystemData() map[string]interface{} {
 			"tls_enabled":      w.cfg.IsTLSEnabled(),
 			"tls_cert_file":    w.cfg.TLSCertFile,
 			"tls_key_file":     w.cfg.TLSKeyFile,
-			"jwt_secret":       w.maskSecret(w.cfg.JWTSecret),
+			"session_secret":   w.maskSecret(w.cfg.SessionSecret),
 			"admin_key":        w.maskSecret(w.cfg.AdminKey),
 			"ban_history_gaps": w.cfg.BanGapsHistory,
 			"plugin_registry":  w.cfg.PluginRegistryURL,
