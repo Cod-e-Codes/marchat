@@ -89,7 +89,7 @@ Only notify when someone @mentions you:
 
 ## Configuration
 
-Notification settings are automatically saved to your config file:
+Notification settings are automatically saved to your client `config.json` (same directory as profiles and themes: per-user app data, or `MARCHAT_CONFIG_DIR` — see [README.md](README.md) and [ARCHITECTURE.md](ARCHITECTURE.md)). Run `marchat-client -doctor` to confirm the resolved path. Example shape:
 
 ```json
 {

@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/config"
+	"github.com/Cod-e-Codes/marchat/internal/doctor"
 	"github.com/Cod-e-Codes/marchat/server"
 	"github.com/Cod-e-Codes/marchat/shared"
 	tea "github.com/charmbracelet/bubbletea"
@@ -39,6 +40,8 @@ var configDir = flag.String("config-dir", "", "Configuration directory (default:
 var enableAdminPanel = flag.Bool("admin-panel", false, "Enable the built-in admin panel TUI")
 var enableWebPanel = flag.Bool("web-panel", false, "Enable the built-in web admin panel (served at /admin)")
 var interactiveFlag = flag.Bool("interactive", false, "Enable interactive setup when required configuration is missing")
+var runDoctor = flag.Bool("doctor", false, "Print environment and configuration diagnostics, then exit")
+var runDoctorJSON = flag.Bool("doctor-json", false, "Same as -doctor with JSON output (if both are set, JSON is used)")
 
 func printBanner(addr string, admins []string, scheme string, tlsEnabled bool) {
 	fmt.Println(`
@@ -84,25 +87,22 @@ func main() {
 	flag.Var(&adminUsers, "admin", "[DEPRECATED] Admin username (use MARCHAT_USERS env var instead)")
 	flag.Parse()
 
-	// Determine config directory using same logic as config package
-	var actualConfigDir string
-	if envConfigDir := os.Getenv("MARCHAT_CONFIG_DIR"); envConfigDir != "" {
-		actualConfigDir = envConfigDir
-	} else if *configDir != "" {
-		actualConfigDir = *configDir
-	} else {
-		// Use same logic as config package for default directory
-		if _, err := os.Stat("go.mod"); err == nil {
-			actualConfigDir = "./config" // Development mode
-		} else {
-			homeDir, err := os.UserHomeDir()
-			if err != nil {
-				actualConfigDir = "./config"
-			} else {
-				actualConfigDir = filepath.Join(homeDir, ".config", "marchat")
-			}
+	if *runDoctorJSON {
+		if err := doctor.RunServer(doctor.Options{JSON: true, ServerConfigDirFlag: *configDir}); err != nil {
+			fmt.Fprintf(os.Stderr, "doctor: %v\n", err)
+			os.Exit(1)
 		}
+		return
 	}
+	if *runDoctor {
+		if err := doctor.RunServer(doctor.Options{ServerConfigDirFlag: *configDir}); err != nil {
+			fmt.Fprintf(os.Stderr, "doctor: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	actualConfigDir := doctor.ResolveServerConfigDir(*configDir)
 
 	// Redirect runtime logs to debug file (but keep startup logs on stdout)
 	debugLogPath := filepath.Join(actualConfigDir, "marchat-debug.log")

@@ -245,9 +245,8 @@ func TestMigrateKeystoreToNewLocation(t *testing.T) {
 		t.Fatalf("Failed to change to temp directory: %v", err)
 	}
 
-	// Clean up any existing keystore in the config directory
-	configDir, _ := GetConfigDir()
-	newPath := filepath.Join(configDir, "keystore.dat")
+	// Clean up any existing keystore in the resolved config directory
+	newPath := filepath.Join(ResolveClientConfigDir(), "keystore.dat")
 	os.Remove(newPath) // Ignore error if file doesn't exist
 
 	// Test with no legacy keystore
@@ -305,9 +304,8 @@ func TestMigrateKeystoreAlreadyExists(t *testing.T) {
 		t.Fatalf("Failed to create legacy keystore: %v", err)
 	}
 
-	// Create new keystore first
-	configDir, _ := GetConfigDir()
-	newPath := filepath.Join(configDir, "keystore.dat")
+	// Create new keystore first (same target as ResolveClientConfigDir in this cwd)
+	newPath := filepath.Join(ResolveClientConfigDir(), "keystore.dat")
 	err = os.WriteFile(newPath, []byte("existing new keystore"), 0644)
 	if err != nil {
 		t.Fatalf("Failed to create existing new keystore: %v", err)

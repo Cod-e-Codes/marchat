@@ -4,10 +4,7 @@ Marchat supports custom color schemes through JSON configuration files. This all
 
 ## Quick Start
 
-1. Copy `themes.example.json` to `themes.json` in one of these locations:
-   - Current directory (where you run the client)
-   - `~/.config/marchat/themes.json` (Linux/macOS)
-   - `%APPDATA%\marchat\themes.json` (Windows)
+1. Copy `themes.example.json` to `themes.json`. The client loads, in order: `./themes.json` in the **current working directory**, then `themes.json` in the **client configuration directory** (same folder as `config.json` and profiles: per-user app data on your OS, or `MARCHAT_CONFIG_DIR`). Run `marchat-client -doctor` to see the resolved path. Typical per-user paths: `~/.config/marchat/themes.json` (Linux), `~/Library/Application Support/marchat/themes.json` (macOS), `%APPDATA%\marchat\themes.json` (Windows).
 
 2. Edit `themes.json` to define your custom themes
 

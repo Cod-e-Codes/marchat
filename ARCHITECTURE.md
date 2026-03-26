@@ -69,6 +69,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - Connection status indicator
 - Unread message count
 - Multi-line input via Alt+Enter / Ctrl+J
+- **Diagnostics**: `-doctor` and `-doctor-json` for environment, paths, and config checks (`internal/doctor`)
 
 ### Server Application (`cmd/server/main.go`)
 
@@ -98,6 +99,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - Web-based admin panel with CSRF protection
 - Health check endpoints for monitoring systems
 - WebSocket message rate limiting
+- **Diagnostics**: `-doctor` and `-doctor-json` without binding ports (`internal/doctor`)
 
 ### Server Library (`server/`)
 
@@ -177,18 +179,26 @@ Plugins communicate with the host through JSON messages over stdin/stdout:
 - **Response Format**: `{"type": "message|log", "success": true, "data": {}, "error": "message"}`
 - **Message Types**: Initialization, message processing, command execution, graceful shutdown
 
-### Configuration System (`config/`)
+### Configuration System
 
 Flexible configuration management supporting multiple sources and interactive setup.
 
-#### Configuration Sources
+#### Server (`config/` Go package + runtime directory)
+
+The **Go package** at repository path `config/` loads server settings from the process environment and from a `.env` file inside the **server configuration directory**. When `go.mod` is present in the process working directory, that directory defaults to `./config` in the repo (alongside the server’s `.env` and SQLite database). Otherwise it follows `MARCHAT_CONFIG_DIR` or the XDG-style user config path (see server `main` and `config` package). This `./config` folder is **not** where the TUI client stores `config.json` or profiles.
+
+#### Client (`client/config/`)
+
+The **client** stores `config.json`, `profiles.json`, keystore (unless legacy `keystore.dat` in cwd), themes, and debug logs under the **per-user application data directory** (e.g. `%APPDATA%\marchat` on Windows, `~/.config/marchat` on Linux), or under `MARCHAT_CONFIG_DIR` when set. This applies both when developing from a clone and when using release binaries.
+
+#### Configuration Sources (server)
 
 1. **Environment Variables**: Primary configuration method for production deployments
-2. **`.env` Files**: Local development and testing configuration
+2. **`.env` Files**: Local development and testing configuration (in the server config directory)
 3. **Interactive TUI**: User-friendly setup for initial configuration
-4. **Profile System**: Multiple server configurations for different environments
+4. **Profile System** (client): Multiple server connection profiles in the client config directory
 
-#### Key Settings
+#### Key Settings (server-oriented)
 
 - **Server Configuration**: Port, TLS certificates, admin authentication
 - **Database Settings**: SQLite file path and connection parameters
@@ -196,6 +206,10 @@ Flexible configuration management supporting multiple sources and interactive se
 - **Security Settings**: Admin keys, encryption keys, and authentication
 - **File Transfer**: Size limits and allowed file types
 - **Logging**: Log levels and output destinations
+
+### Diagnostics (`internal/doctor`)
+
+Shared package invoked by **`marchat-client`** and **`marchat-server`** when passed **`-doctor`** (human-readable report) or **`-doctor-json`** (JSON on stdout). It summarizes Go/OS, resolved config directories, known `MARCHAT_*` variables with secrets masked, role-specific checks (client: profiles, clipboard, TTY; server: `.env`, validation, DB/TLS/sqlite ping), and optionally compares the embedded version to the latest GitHub release. Set **`MARCHAT_DOCTOR_NO_NETWORK=1`** to skip the release check (e.g. air-gapped environments).
 
 ### Command Line Tools (`cmd/`)
 
@@ -205,6 +219,8 @@ Additional command-line utilities for system management and plugin licensing.
 
 - **`cmd/server/main.go`**: Main server application with interactive configuration
 - **`cmd/license/main.go`**: Plugin license management and validation tool
+
+Both **`marchat-client`** and **`marchat-server`** embed diagnostics via **`internal/doctor`** (`-doctor`, `-doctor-json`); there is no separate doctor binary in release archives.
 
 #### License Tool Features
 
@@ -412,8 +428,9 @@ marchat produces two main executables:
 
 - **Environment Variables**: Primary configuration method for containers
 - **Interactive Setup**: User-friendly initial configuration through TUI
-- **Profile Management**: Multiple server configurations for different environments
+- **Profile Management**: Multiple server connection profiles on the client
 - **Backward Compatibility**: Support for deprecated command-line flags
+- **Diagnostics**: `-doctor` / `-doctor-json` on each binary for env/config verification (see `internal/doctor`)
 
 ### Container Support
 

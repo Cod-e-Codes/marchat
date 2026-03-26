@@ -73,10 +73,10 @@ type InteractiveConfigLoader struct {
 }
 
 func NewInteractiveConfigLoader() (*InteractiveConfigLoader, error) {
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return nil, err
+	if err := EnsureClientConfigDir(); err != nil {
+		return nil, fmt.Errorf("create config directory: %w", err)
 	}
+	configDir := ResolveClientConfigDir()
 
 	return &InteractiveConfigLoader{
 		ConfigPath:   filepath.Join(configDir, "config.json"),
@@ -562,6 +562,27 @@ func (icl *InteractiveConfigLoader) PromptSensitiveData(isAdmin, useE2E bool) (a
 	return icl.promptSensitiveData(isAdmin, useE2E)
 }
 
+// ResolveClientConfigDir returns the client configuration directory using the same
+// rules as the marchat client binary: MARCHAT_CONFIG_DIR if set, otherwise the
+// per-user application data directory from GetConfigDir (same when developing from
+// a git clone or using a release binary). The server uses ./config in-repo for .env
+// and the database; the client does not use that path unless you set MARCHAT_CONFIG_DIR.
+func ResolveClientConfigDir() string {
+	if envConfigDir := os.Getenv("MARCHAT_CONFIG_DIR"); envConfigDir != "" {
+		return envConfigDir
+	}
+	dir, err := GetConfigDir()
+	if err != nil {
+		return "./config"
+	}
+	return dir
+}
+
+// EnsureClientConfigDir creates the resolved client config directory if needed.
+func EnsureClientConfigDir() error {
+	return os.MkdirAll(ResolveClientConfigDir(), 0755)
+}
+
 // GetConfigDir returns the platform-appropriate configuration directory
 func GetConfigDir() (string, error) {
 	var configDir string
@@ -628,12 +649,23 @@ func GetKeystorePath() (string, error) {
 		return abs, nil
 	}
 
-	// Use new platform-appropriate location
-	configDir, err := GetConfigDir()
-	if err != nil {
-		return "", err
+	// Prefer keystore next to config.json (same rules as ResolveClientConfigDir).
+	primary := filepath.Join(ResolveClientConfigDir(), "keystore.dat")
+	if _, err := os.Stat(primary); err == nil {
+		return filepath.Abs(primary)
 	}
-	return filepath.Join(configDir, "keystore.dat"), nil
+
+	// Older builds stored the keystore under GetConfigDir() even when running from a repo.
+	userDir, err := GetConfigDir()
+	if err != nil {
+		return filepath.Abs(primary)
+	}
+	fallback := filepath.Join(userDir, "keystore.dat")
+	if _, err := os.Stat(fallback); err == nil {
+		return filepath.Abs(fallback)
+	}
+
+	return filepath.Abs(primary)
 }
 
 // MigrateKeystoreToNewLocation migrates keystore from legacy location to new platform-appropriate location
@@ -645,12 +677,10 @@ func MigrateKeystoreToNewLocation() error {
 		return nil // No legacy keystore to migrate
 	}
 
-	// Get new keystore path
-	configDir, err := GetConfigDir()
-	if err != nil {
+	newPath := filepath.Join(ResolveClientConfigDir(), "keystore.dat")
+	if err := os.MkdirAll(filepath.Dir(newPath), 0755); err != nil {
 		return err
 	}
-	newPath := filepath.Join(configDir, "keystore.dat")
 
 	// Check if new keystore already exists
 	if _, err := os.Stat(newPath); err == nil {

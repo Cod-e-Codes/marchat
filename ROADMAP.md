@@ -1,6 +1,7 @@
 ## Roadmap
 
 ### Recently Completed
+- CLI diagnostics (`-doctor`, `-doctor-json`) on client and server binaries for env/config/update checks
 - Message editing, deletion, and pinning
 - Message reactions (client-session scoped)
 - Direct messages between users

@@ -291,6 +291,8 @@ marchat-license -action validate \
 - Data directory: `./plugin-data/` (configurable)
 - Cache directory: `./plugin-cache/` (configurable)
 
+Server-side paths are relative to the **server** process configuration (see [ARCHITECTURE.md](ARCHITECTURE.md)). For a quick server env check, run `marchat-server -doctor`.
+
 ### Environment Variables
 ```bash
 MARCHAT_PLUGIN_DIR=./plugins

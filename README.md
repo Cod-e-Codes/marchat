@@ -23,6 +23,7 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **UX Enhancements**: Connection status indicator, @mention tab completion, unread count, multi-line input (Alt+Enter/Ctrl+J), chat history export
 - **Security**: Rate limiting, constant-time admin key comparison, plugin download timeouts, SHA-pinned CI actions
 - **Refactoring**: Client split into hotkeys/render/websocket/commands modules, config directory unified, orphaned code removed
+- **Diagnostics**: `-doctor` / `-doctor-json` on client and server binaries for env, config paths, and optional release check (`MARCHAT_DOCTOR_NO_NETWORK=1` to disable network)
 - **Docker**: Added docker-compose.yml for local development
 - **Plugins**: Full plugin system wiring (message forwarding, user list updates, command responses, init handshake, store UI, license enforcement)
 
@@ -61,6 +62,7 @@ Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/relea
 - **Structured Logging** - JSON logs with component separation and user tracking
 - **UX Enhancements** - Connection status indicator, tab completion for @mentions, unread message count, multi-line input, chat export
 - **Cross-Platform** - Runs on Linux, macOS, Windows, and Android/Termux
+- **Diagnostics** - `marchat-client -doctor` and `marchat-server -doctor` (or `-doctor-json`) summarize environment, resolved paths, and configuration health
 
 ## Overview
 
@@ -184,9 +186,24 @@ go build -o marchat-client ./client
 
 **Additional variables:** `MARCHAT_LOG_LEVEL`, `MARCHAT_CONFIG_DIR`, `MARCHAT_BAN_HISTORY_GAPS`, `MARCHAT_PLUGIN_REGISTRY_URL`
 
+**Doctor / diagnostics:** `MARCHAT_DOCTOR_NO_NETWORK` — set to `1` to skip the GitHub latest-release check in `-doctor` / `-doctor-json`.
+
 **File Size Configuration:** Use either `MARCHAT_MAX_FILE_BYTES` (exact bytes) or `MARCHAT_MAX_FILE_MB` (megabytes). If both are set, `MARCHAT_MAX_FILE_BYTES` takes priority.
 
 **Interactive Setup:** Use `--interactive` flag for guided server configuration when environment variables are missing.
+
+### Client vs server config locations
+
+| Role | Default location | Override |
+|------|------------------|----------|
+| **Server** (`.env`, SQLite DB, debug log) | In development from a repo clone: `./config` next to `go.mod`. Otherwise `MARCHAT_CONFIG_DIR` or the user config path (see [ARCHITECTURE.md](ARCHITECTURE.md)). | `MARCHAT_CONFIG_DIR`, `--config-dir` |
+| **Client** (`config.json`, `profiles.json`, keystore, `themes.json`) | Per-user app data (e.g. Windows `%APPDATA%\marchat`, Linux/macOS `~/.config/marchat`). Same when developing from source. | `MARCHAT_CONFIG_DIR` |
+
+The repository’s `config/` directory holds **server** runtime files and the **Go package** `github.com/Cod-e-Codes/marchat/config`; it is not the client’s profile folder.
+
+### Diagnostics (`-doctor`)
+
+Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, masked `MARCHAT_*` env, sanity checks). Use **`-doctor-json`** for machine-readable output. If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 ## Admin Commands
 
@@ -599,6 +616,7 @@ Profiles stored in platform-appropriate locations:
 
 | Issue | Solution |
 |-------|----------|
+| Wrong config folder / paths | Run `marchat-client -doctor` or `marchat-server -doctor`; see **Client vs server config locations** |
 | Connection failed | Verify `ws://` or `wss://` protocol in URL |
 | Admin commands not working | Check `--admin` flag and correct `--admin-key` |
 | Clipboard issues (Linux) | Install xclip: `sudo apt install xclip` |

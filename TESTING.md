@@ -20,6 +20,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 
 | File | Description | Coverage |
 |------|-------------|----------|
+| `internal/doctor/doctor_test.go` | CLI diagnostics | Env masking, GitHub release JSON parsing, update check with fake HTTP transport |
 | `config/config_test.go` | Configuration loading and validation | Environment variables, validation rules |
 | `shared/crypto_test.go` | Cryptographic operations | Key generation, encryption, decryption, session keys |
 | `shared/types_test.go` | Data structures and serialization | Message types, JSON marshaling/unmarshaling |
@@ -384,6 +385,6 @@ When adding new functionality to Marchat:
 - **Overall Coverage**: 34.1% across all packages
 - **Execution Time**: <3 seconds for full suite
 - **Reliability**: 100% deterministic, no flaky tests, no hanging tests
-- **Test Files**: 26 test files covering core functionality, client components, plugin system, server operations, and admin interfaces
+- **Test Files**: 30 `_test.go` files covering core functionality, client components, plugin system, server operations, admin interfaces, and CLI diagnostics (`internal/doctor`)
 
 This foundational test suite provides a solid base for testing core functionality, with room for significant expansion in the main application components.

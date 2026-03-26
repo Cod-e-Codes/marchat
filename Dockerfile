@@ -44,8 +44,10 @@ RUN mkdir -p /marchat/config && \
 USER marchat
 WORKDIR /marchat
 
-# Copy the binary from builder stage
+# Copy the binary from builder stage (server only; release zips ship a separate client binary).
 COPY --from=builder /marchat/marchat-server .
+
+# Diagnostics: override the entrypoint to run `-doctor` or `-doctor-json` for an env/config summary without starting the HTTP server.
 
 # Copy entrypoint script
 COPY --chown=marchat:marchat entrypoint.sh /marchat/entrypoint.sh

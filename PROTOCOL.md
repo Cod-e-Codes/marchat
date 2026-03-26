@@ -206,7 +206,9 @@ If `admin` is not requested, `admin_key` is not required.
 
 ## Configuration
 
-Client configuration is typically provided via a config file:
+Client settings are usually stored in **`config.json`** under the **client configuration directory** (per-user application data, or `MARCHAT_CONFIG_DIR`). That directory is separate from the **server** directory (`.env`, SQLite DB). Use **`marchat-client -doctor`** / **`marchat-server -doctor`** to print resolved paths.
+
+Example `config.json` shape:
 
 ```json
 {

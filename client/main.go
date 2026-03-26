@@ -13,6 +13,7 @@ import (
 
 	"github.com/Cod-e-Codes/marchat/client/config"
 	"github.com/Cod-e-Codes/marchat/client/crypto"
+	"github.com/Cod-e-Codes/marchat/internal/doctor"
 	"github.com/Cod-e-Codes/marchat/shared"
 
 	"os/signal"
@@ -51,6 +52,9 @@ func init() {
 	urlRegex = regexp.MustCompile(`(https?://[^\s<>"{}|\\^` + "`" + `\[\]]+|www\.[^\s<>"{}|\\^` + "`" + `\[\]]+\.[a-zA-Z]{2,})`)
 
 	// Set up client debug logging to config directory
+	if err := config.EnsureClientConfigDir(); err != nil {
+		log.Printf("Warning: could not create client config directory: %v", err)
+	}
 	configDir := getClientConfigDir()
 	debugLogPath := filepath.Join(configDir, "marchat-client-debug.log")
 	f, err := os.OpenFile(debugLogPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
@@ -65,22 +69,10 @@ func init() {
 	}
 }
 
-// getClientConfigDir returns the client config directory, delegating to
-// config.GetConfigDir for the canonical platform-aware path. Environment
-// variable MARCHAT_CONFIG_DIR and dev-mode (go.mod present) overrides are
-// checked first for backward compatibility.
+// getClientConfigDir returns the client config directory (same rules as
+// config.ResolveClientConfigDir).
 func getClientConfigDir() string {
-	if envConfigDir := os.Getenv("MARCHAT_CONFIG_DIR"); envConfigDir != "" {
-		return envConfigDir
-	}
-	if _, err := os.Stat("go.mod"); err == nil {
-		return "./config"
-	}
-	dir, err := config.GetConfigDir()
-	if err != nil {
-		return "./config"
-	}
-	return dir
+	return config.ResolveClientConfigDir()
 }
 
 var (
@@ -96,6 +88,8 @@ var (
 	quickStart         = flag.Bool("quick-start", false, "Use last connection or select from saved profiles")
 	autoConnect        = flag.Bool("auto", false, "Automatically connect using most recent profile")
 	nonInteractive     = flag.Bool("non-interactive", false, "Skip interactive prompts (require all flags)")
+	runDoctor          = flag.Bool("doctor", false, "Print environment and configuration diagnostics, then exit")
+	runDoctorJSON      = flag.Bool("doctor-json", false, "Same as -doctor with JSON output (if both are set, JSON is used)")
 )
 
 // isTermux detects if the client is running in Termux environment
@@ -2165,6 +2159,21 @@ func (m *model) View() string {
 
 func main() {
 	flag.Parse()
+
+	if *runDoctorJSON {
+		if err := doctor.RunClient(doctor.Options{JSON: true}); err != nil {
+			fmt.Fprintf(os.Stderr, "doctor: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+	if *runDoctor {
+		if err := doctor.RunClient(doctor.Options{}); err != nil {
+			fmt.Fprintf(os.Stderr, "doctor: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
 
 	// Auto-connect to most recent profile
 	if *autoConnect {

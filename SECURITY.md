@@ -54,6 +54,10 @@ It **does not cover**:
 - Issues caused by modified forks or downstream packaging  
 - General UX/UI feedback or feature requests
 
+### Diagnostics output
+
+The `-doctor` / `-doctor-json` commands print masked values for sensitive `MARCHAT_*` variables; avoid sharing raw process environment dumps alongside doctor output. For air-gapped hosts, set `MARCHAT_DOCTOR_NO_NETWORK=1` so doctor does not call the GitHub API.
+
 ---
 
 ## Questions?
