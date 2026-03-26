@@ -23,7 +23,6 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **UX Enhancements**: Connection status indicator, @mention tab completion, unread count, multi-line input (Alt+Enter/Ctrl+J), chat history export
 - **Security**: Rate limiting, constant-time admin key comparison, plugin download timeouts, SHA-pinned CI actions
 - **Refactoring**: Client split into hotkeys/render/websocket/commands modules, config directory unified, orphaned code removed
-- **Diagnostics**: `-doctor` / `-doctor-json` on client and server binaries for env, config paths, and optional release check (`MARCHAT_DOCTOR_NO_NETWORK=1` to disable network)
 - **Docker**: Added docker-compose.yml for local development
 - **Plugins**: Full plugin system wiring (message forwarding, user list updates, command responses, init handshake, store UI, license enforcement)
 
