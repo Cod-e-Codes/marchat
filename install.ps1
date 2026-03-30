@@ -4,7 +4,7 @@
 # Supports Windows, Linux, macOS, and Android (via PowerShell Core)
 
 param(
-    [string]$Version = "v0.10.0-beta.1"
+    [string]$Version = "v0.10.0-beta.2"
 )
 
 $ErrorActionPreference = "Stop"

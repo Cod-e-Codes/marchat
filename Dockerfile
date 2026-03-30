@@ -29,29 +29,20 @@ RUN apk update && apk upgrade --no-cache
 ARG USER_ID=1000
 ARG GROUP_ID=1000
 
-# Install necessary packages for user management
-RUN apk add --no-cache shadow
+# shadow: marchat user; su-exec: drop root after fixing volume permissions in entrypoint
+RUN apk add --no-cache shadow su-exec
 
 # Create marchat user with specified UID/GID
 RUN groupadd -g ${GROUP_ID} marchat && \
     useradd -u ${USER_ID} -g marchat -s /bin/sh -m marchat
 
-# Create config directory with proper ownership
-RUN mkdir -p /marchat/config && \
-    chown -R marchat:marchat /marchat
-
-# Switch to marchat user
-USER marchat
 WORKDIR /marchat
 
 # Copy the binary from builder stage (server only; release zips ship a separate client binary).
 COPY --from=builder /marchat/marchat-server .
-
-# Diagnostics: override the entrypoint to run `-doctor` or `-doctor-json` for an env/config summary without starting the HTTP server.
-
-# Copy entrypoint script
-COPY --chown=marchat:marchat entrypoint.sh /marchat/entrypoint.sh
-RUN chmod +x /marchat/entrypoint.sh
+COPY entrypoint.sh /marchat/entrypoint.sh
+RUN chmod +x /marchat/entrypoint.sh && \
+    chown marchat:marchat /marchat/marchat-server /marchat/entrypoint.sh
 
 # Expose port 8080
 EXPOSE 8080

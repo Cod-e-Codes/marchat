@@ -7,13 +7,20 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.10.0--beta.1-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.10.0-beta.1)
+[![Version](https://img.shields.io/badge/version-v0.10.0--beta.2-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.10.0-beta.2)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
 ## Latest Updates
 
-### v0.10.0-beta.1 (Current)
+### v0.10.0-beta.2 (Current)
+- **CLI diagnostics**: `marchat-client` and `marchat-server` support `-doctor` and `-doctor-json` for environment, paths, and config health
+- **Build**: `build-release.ps1` sets `CGO_ENABLED=0` for consistent cross-compilation
+- **Dependencies**: `modernc.org/sqlite` 1.47.0 → 1.48.0 (via Dependabot)
+- **Docs**: Updated LOC and test coverage figures; streamlined beta.1 feature list in README
+- **Docker**: image entrypoint fixes `/data` volume permissions and drops to non-root via `su-exec`; Unix line endings on `entrypoint.sh` for reliable Windows-built images
+
+### v0.10.0-beta.1
 - **Message Management**: Edit, delete, pin, search messages by ID
 - **Reactions**: React to messages with emoji aliases (`:react 42 +1`, `heart`, `fire`, `party`, etc.)
 - **Direct Messages**: Private DM conversations between users
@@ -27,6 +34,7 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **Plugins**: Full plugin system wiring (message forwarding, user list updates, command responses, init handshake, store UI, license enforcement)
 
 ### Recent Releases
+- **v0.10.0-beta.2**: Doctor CLI, build-release cross-compile fix, sqlite bump, doc metrics refresh, Docker image entrypoint/volume permission fixes
 - **v0.9.0-beta.6**: Rebuilt with Go 1.25.8 to address CVE-2026-25679, CVE-2026-27142, CVE-2026-27139
 - **v0.9.0-beta.5**: Automated release workflow, PBKDF2 keystore key derivation, JWT secret auto-generation, race condition fixes, Docker optimizations
 - **v0.9.0-beta.4**: Fixed admin metrics, restored plugin commands in encrypted sessions, dependency updates
@@ -129,12 +137,12 @@ Key tables for message tracking and moderation:
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.10.0-beta.1/marchat-v0.10.0-beta.1-linux-amd64.zip
-unzip marchat-v0.10.0-beta.1-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.10.0-beta.2/marchat-v0.10.0-beta.2-linux-amd64.zip
+unzip marchat-v0.10.0-beta.2-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.10.0-beta.1/marchat-v0.10.0-beta.1-darwin-amd64.zip
-unzip marchat-v0.10.0-beta.1-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.10.0-beta.2/marchat-v0.10.0-beta.2-darwin-amd64.zip
+unzip marchat-v0.10.0-beta.2-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -142,14 +150,31 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.10.0-beta.1
+docker pull codecodesxyz/marchat:v0.10.0-beta.2
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.10.0-beta.1
+  codecodesxyz/marchat:v0.10.0-beta.2
 ```
 
 **Docker Compose (local development):**
+
+The sample `docker-compose.yml` only sets port and database path. You must still provide **`MARCHAT_ADMIN_KEY`** and **`MARCHAT_USERS`** (see [Essential Environment Variables](#essential-environment-variables)). Typical approach: add the two lines below under `server.environment` and keep values in a gitignored `.env` file next to the compose file (Compose substitutes `${VAR}` from that `.env` automatically):
+
+```yaml
+      - MARCHAT_ADMIN_KEY=${MARCHAT_ADMIN_KEY}
+      - MARCHAT_USERS=${MARCHAT_USERS}
+```
+
+Example `.env` (generate a strong key for anything reachable from a network):
+
+```bash
+MARCHAT_ADMIN_KEY=your-secret-here
+MARCHAT_USERS=admin1,admin2
+```
+
+Then:
+
 ```bash
 docker compose up -d
 ```

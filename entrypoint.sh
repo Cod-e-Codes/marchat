@@ -1,25 +1,19 @@
 #!/bin/sh
 set -e
 
-# Ensure base server directory exists
-mkdir -p /marchat/server
-
-# Ensure config directory exists inside server directory
-mkdir -p /marchat/server/config
-
-# Ensure db directory exists inside server directory
-mkdir -p /marchat/server/db
-
-# Ensure data directory exists inside server directory
-mkdir -p /marchat/server/data
-
-# Ensure plugins directory exists inside server directory
-mkdir -p /marchat/server/plugins
-
-# Fix ownership if we have write access
-if [ -w "/marchat/server" ]; then
-    chown -R marchat:marchat /marchat/server 2>/dev/null || true
+# When running as root (default), fix ownership of app dirs and common volume
+# mount points so the marchat user can write SQLite and config, then drop privileges.
+if [ "$(id -u)" = 0 ]; then
+	mkdir -p /marchat/server /marchat/server/config /marchat/server/db \
+		/marchat/server/data /marchat/server/plugins /data
+	chown -R marchat:marchat /marchat /data 2>/dev/null || true
+	exec su-exec marchat "$0" "$@"
 fi
 
-# Execute the main application
+mkdir -p /marchat/server
+mkdir -p /marchat/server/config
+mkdir -p /marchat/server/db
+mkdir -p /marchat/server/data
+mkdir -p /marchat/server/plugins
+
 exec ./marchat-server "$@"
