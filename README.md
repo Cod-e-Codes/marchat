@@ -11,6 +11,8 @@
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
+**Quick start:** [QUICKSTART.md](QUICKSTART.md) for a single-page walkthrough (install → server → client → next docs).
+
 ## Latest Updates
 
 ### v0.10.0-beta.2 (Current)
@@ -64,7 +66,7 @@ Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/relea
 - **Admin Controls** - User management, bans, kick system with ban history gaps
 - **Smart Notifications** - Bell + desktop notifications with quiet hours and focus mode ([guide](NOTIFICATIONS.md))
 - **Themes** - Built-in themes + custom themes via JSON ([guide](THEMES.md))
-- **Docker Support** - Containerized deployment with `docker-compose.yml` for local dev
+- **Docker Support** - Containerized deployment with `docker-compose.yml` for local dev; optional **TLS reverse proxy** via Caddy ([guide](deploy/CADDY-REVERSE-PROXY.md))
 - **Health Monitoring** - `/health` and `/health/simple` endpoints with system metrics
 - **Structured Logging** - JSON logs with component separation and user tracking
 - **UX Enhancements** - Connection status indicator, tab completion for @mentions, unread message count, multi-line input, chat export
@@ -108,10 +110,11 @@ export MARCHAT_USERS="admin1,admin2"
 ./marchat-server --web-panel
 ```
 
-**Option B: Interactive Setup**
+**Option B: Interactive setup (first run, missing required config)**
 ```bash
 ./marchat-server --interactive
 ```
+Runs a guided wizard **only when** `MARCHAT_ADMIN_KEY` or `MARCHAT_USERS` is not set. If they are already in the environment or `config/.env`, the server starts normally and `--interactive` does nothing extra.
 
 ### 3. Connect Client
 ```bash
@@ -179,6 +182,8 @@ Then:
 docker compose up -d
 ```
 
+**TLS reverse proxy (Caddy, optional):** To terminate TLS in front of a **host-native** `marchat-server` (plain HTTP on port 8080), use `docker-compose.proxy.yml`, `deploy/caddy/Caddyfile`, and `deploy/caddy/proxy.env.example` plus optional gitignored `deploy/caddy/proxy.env` for **`MARCHAT_CADDY_EXTRA_HOSTS`** (public IP/DNS on `tls internal`). Published port **8443** maps to HTTPS/WebSocket inside the container; clients use `wss://localhost:8443/ws` (with `--skip-tls-verify` while using Caddy’s internal CA). The proxy stack must be running whenever you use that URL. Full steps, helper scripts (`scripts/build-windows.ps1` / `scripts/build-linux.sh`, `scripts/connect-local-wss.ps1` / `scripts/connect-local-wss.sh`), source changes, and breaking notes: **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md)**.
+
 **From Source:**
 ```bash
 git clone https://github.com/Cod-e-Codes/marchat.git && cd marchat
@@ -210,11 +215,27 @@ go build -o marchat-client ./client
 
 **Additional variables:** `MARCHAT_LOG_LEVEL`, `MARCHAT_CONFIG_DIR`, `MARCHAT_BAN_HISTORY_GAPS`, `MARCHAT_PLUGIN_REGISTRY_URL`
 
-**Doctor / diagnostics:** `MARCHAT_DOCTOR_NO_NETWORK` — set to `1` to skip the GitHub latest-release check in `-doctor` / `-doctor-json`.
+**Doctor / diagnostics:** Set `MARCHAT_DOCTOR_NO_NETWORK` to `1` to skip the GitHub latest-release check in `-doctor` / `-doctor-json`.
 
 **File Size Configuration:** Use either `MARCHAT_MAX_FILE_BYTES` (exact bytes) or `MARCHAT_MAX_FILE_MB` (megabytes). If both are set, `MARCHAT_MAX_FILE_BYTES` takes priority.
 
 **Interactive Setup:** Use `--interactive` flag for guided server configuration when environment variables are missing.
+
+### Server: `config/.env` vs process environment
+
+The server loads **`{config directory}/.env`** (for a repo clone, usually **`config/.env`**) if the file exists, using **`godotenv.Overload`**.
+
+| Situation | Effect |
+|-----------|--------|
+| A variable appears **in `.env`** | That value **replaces** the same name already in the process environment when the server starts. |
+| A variable is set **only** in the environment (not in `.env`) | It is **unchanged** by `.env` loading. |
+| No `.env` file | Configuration comes only from the environment, flags, and defaults. |
+
+**Why:** Older `godotenv.Load` behavior skipped keys already set in the environment, so a stale shell `MARCHAT_ADMIN_KEY` could override an updated `config/.env`. `Overload` makes the file authoritative for any key it defines.
+
+**Operational notes:** Restart the server after editing `.env`. If you deploy with both injected secrets and a mounted `.env`, any **overlapping** key in the file wins at startup. See **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md#breaking-changes)** for migration and edge cases.
+
+**Not the same as Docker Compose’s `.env`:** Compose’s file next to `docker-compose.yml` is for **substituting** `${VAR}` into YAML; the table above is about **marchat-server** reading **`config/.env`** at runtime.
 
 ### Client vs server config locations
 
@@ -407,7 +428,20 @@ curl -H "Cookie: admin_session=YOUR_SESSION" http://localhost:8080/admin/api/ove
 - **Public deployments**: Server accessible from internet
 - **Production environments**: Enhanced security required
 - **Corporate networks**: Security policy compliance
-- **HTTPS reverse proxies**: Behind nginx, traefik, etc.
+- **HTTPS reverse proxies**: Behind nginx, traefik, **Caddy**, etc.
+
+### Reverse proxy (Caddy)
+
+The repo includes a **Docker Compose**-based Caddy setup for local or LAN use: **`docker-compose.proxy.yml`**, **`deploy/caddy/Caddyfile`**, **`deploy/caddy/proxy.env.example`** (and optional local **`deploy/caddy/proxy.env`**), and the walkthrough **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md)** (build flags, `config/.env`, firewall, `wss://` client flags, E2E, and **breaking change**: `config/.env` is applied with `godotenv.Overload` so file values override pre-set `MARCHAT_*` in the process environment).
+
+**Quick reference:**
+
+| Item | Role |
+|------|------|
+| `marchat-server` on the host | Listens on **8080** (`ws://`), reads **`config/.env`** |
+| `docker compose -f docker-compose.proxy.yml up -d` | Runs Caddy; host **8443** → container **443** |
+| Client | `wss://localhost:8443/ws` + `--skip-tls-verify` until you use a public CA cert on Caddy |
+| If 8443 is refused | Caddy is not running; start the compose stack or use `ws://127.0.0.1:8080/ws` |
 
 ### Configuration Examples
 
@@ -614,7 +648,7 @@ Profiles stored in platform-appropriate locations:
 
 3. **Production Deployment**
    - Use TLS (`wss://`) with valid CA-signed certificates
-   - Deploy behind reverse proxy (nginx/traefik)
+   - Deploy behind reverse proxy (nginx, traefik, or Caddy; see [deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md) for the bundled Caddy example)
    - Restrict server access to trusted networks
    - Use Docker secrets for sensitive environment variables
    - Enable rate limiting and brute force protection
@@ -642,6 +676,7 @@ Profiles stored in platform-appropriate locations:
 |-------|----------|
 | Wrong config folder / paths | Run `marchat-client -doctor` or `marchat-server -doctor`; see **Client vs server config locations** |
 | Connection failed | Verify `ws://` or `wss://` protocol in URL |
+| `wss://localhost:8443` reconnect loop / connection refused | Ensure Caddy is up: `docker compose -f docker-compose.proxy.yml up -d`, or use `ws://127.0.0.1:8080/ws` without the proxy ([reverse proxy guide](deploy/CADDY-REVERSE-PROXY.md)) |
 | Admin commands not working | Check `--admin` flag and correct `--admin-key` |
 | Clipboard issues (Linux) | Install xclip: `sudo apt install xclip` |
 | Port in use | Change port: `export MARCHAT_PORT=8081` |
@@ -656,7 +691,7 @@ Profiles stored in platform-appropriate locations:
 | Username already taken | Use admin `:forcedisconnect <user>` or wait 5min for auto-cleanup |
 | Stale connections | Server auto-cleans every 5min, or admin use `:cleanup` |
 | Client frozen at startup | Fixed in latest - `--quick-start` uses proper UI |
-| Multi-line input not working | Use `Alt+Enter` or `Ctrl+J` — `Shift+Enter` is not supported in most Windows terminals |
+| Multi-line input not working | Use `Alt+Enter` or `Ctrl+J`; `Shift+Enter` is not supported in most Windows terminals |
 
 ### Stale Connection Management
 

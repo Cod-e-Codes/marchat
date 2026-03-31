@@ -23,7 +23,7 @@ import (
 )
 
 // Multi-admin support
-// Usage: --admin Cody --admin Alice --admin-key changeme
+// Usage: --admin alice --admin bob --admin-key changeme
 //
 // Remove old --admin-username logic
 

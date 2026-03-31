@@ -1,0 +1,22 @@
+# TLS reverse proxy for marchat (WebSocket-aware).
+# Run marchat-server on the host at MARCHAT_PORT (default 8080), then start the proxy:
+#   docker compose -f docker-compose.proxy.yml up -d
+#
+# Use hostnames that match TLS SNI (not a bare :443 site - that breaks tls internal
+# and clients see "remote error: tls: internal error").
+#
+# Extra TLS names (public IP, DNS): MARCHAT_CADDY_EXTRA_HOSTS in deploy/caddy/proxy.env.example
+# and/or optional deploy/caddy/proxy.env (see docker-compose.proxy.yml)
+# (see that file). Example value: , 203.0.113.5, chat.example.com
+# After changing proxy.env: docker compose -f docker-compose.proxy.yml up -d --force-recreate
+#
+# Client (local): wss://localhost:8443/ws --skip-tls-verify
+# Client (remote): wss://<host-you-added-to-MARCHAT_CADDY_EXTRA_HOSTS>:8443/ws --skip-tls-verify
+
+localhost, 127.0.0.1{$MARCHAT_CADDY_EXTRA_HOSTS} {
+	tls internal
+	reverse_proxy host.docker.internal:8080 {
+		flush_interval -1
+		header_up X-Forwarded-Proto https
+	}
+}

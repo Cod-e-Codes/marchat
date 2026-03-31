@@ -273,7 +273,7 @@ func (c *Client) readPump() {
 				if ch == current {
 					marker = " (current)"
 				}
-				lines = append(lines, fmt.Sprintf("  #%s — %d user(s)%s", ch, n, marker))
+				lines = append(lines, fmt.Sprintf("  #%s - %d user(s)%s", ch, n, marker))
 			}
 			c.send <- shared.Message{
 				Sender:    "System",

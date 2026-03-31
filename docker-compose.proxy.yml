@@ -1,0 +1,28 @@
+# TLS reverse proxy in front of marchat-server running on the host (port 8080).
+# Usage:
+#   1. Build: .\scripts\build-windows.ps1 or ./scripts/build-linux.sh (or build-release / manual go build + ldflags)
+#   2. Set MARCHAT_ADMIN_KEY, MARCHAT_USERS, and optional MARCHAT_GLOBAL_E2E_KEY in config/.env; run .\marchat-server.exe
+#   3. Optional: copy deploy/caddy/proxy.env.example to deploy/caddy/proxy.env and set
+#      MARCHAT_CADDY_EXTRA_HOSTS for public IP / DNS on tls internal (proxy.env is gitignored)
+#   4. docker compose -f docker-compose.proxy.yml up -d
+# Client: wss://localhost:8443/ws --e2e --keystore-passphrase <pass> [--skip-tls-verify]
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    env_file:
+      - deploy/caddy/proxy.env.example
+      - path: deploy/caddy/proxy.env
+        required: false
+    ports:
+      - "8443:443"
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  caddy_data:
+  caddy_config:

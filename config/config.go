@@ -272,8 +272,11 @@ func loadEnvFile(envPath string) error {
 		return nil
 	}
 
-	// Load .env file
-	if err := godotenv.Load(envPath); err != nil {
+	// Apply .env with Overload so values in config/.env win over pre-set MARCHAT_*
+	// environment variables. godotenv.Load would skip keys already in the process
+	// environment, which breaks local dev when the shell has a stale MARCHAT_ADMIN_KEY
+	// but config/.env was updated (client reads the file; server would keep the old env).
+	if err := godotenv.Overload(envPath); err != nil {
 		return fmt.Errorf("failed to load .env file %s: %w", envPath, err)
 	}
 

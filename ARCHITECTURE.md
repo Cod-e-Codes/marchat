@@ -120,7 +120,7 @@ Common types and utilities used across client and server components.
 #### Core Types
 
 - **`Message`**: Standard chat message structure with encryption support, message IDs, recipient, channel, edited flag, and reaction metadata
-- **`MessageType`**: Type discriminator — `text`, `file`, `admin_command`, `edit`, `delete`, `typing`, `reaction`, `dm`, `search`, `pin`, `read_receipt`, `join_channel`, `leave_channel`, `list_channels`
+- **`MessageType`**: Type discriminator (`text`, `file`, `admin_command`, `edit`, `delete`, `typing`, `reaction`, `dm`, `search`, `pin`, `read_receipt`, `join_channel`, `leave_channel`, `list_channels`)
 - **`ReactionMeta`**: Emoji, target message ID, and removal flag
 - **`EncryptedMessage`**: End-to-end encrypted message format
 - **`Handshake`**: WebSocket connection authentication structure
@@ -185,7 +185,7 @@ Flexible configuration management supporting multiple sources and interactive se
 
 #### Server (`config/` Go package + runtime directory)
 
-The **Go package** at repository path `config/` loads server settings from the process environment and from a `.env` file inside the **server configuration directory**. When `go.mod` is present in the process working directory, that directory defaults to `./config` in the repo (alongside the server’s `.env` and SQLite database). Otherwise it follows `MARCHAT_CONFIG_DIR` or the XDG-style user config path (see server `main` and `config` package). This `./config` folder is **not** where the TUI client stores `config.json` or profiles.
+The **Go package** at repository path `config/` loads server settings from the process environment and from a `.env` file inside the **server configuration directory**. If `.env` exists, it is applied with **`godotenv.Overload`**: each `KEY=value` in the file **overwrites** that key in the process environment at startup (so the file is authoritative for keys it defines; keys set only in the environment and omitted from `.env` are unchanged). When `go.mod` is present in the process working directory, that directory defaults to `./config` in the repo (alongside the server’s `.env` and SQLite database). Otherwise it follows `MARCHAT_CONFIG_DIR` or the XDG-style user config path (see server `main` and `config` package). This `./config` folder is **not** where the TUI client stores `config.json` or profiles. See **README.md** (Configuration → Server `config/.env` vs process environment) and **deploy/CADDY-REVERSE-PROXY.md** (Breaking changes) for precedence details.
 
 #### Client (`client/config/`)
 
@@ -193,9 +193,9 @@ The **client** stores `config.json`, `profiles.json`, keystore (unless legacy `k
 
 #### Configuration Sources (server)
 
-1. **Environment Variables**: Primary configuration method for production deployments
-2. **`.env` Files**: Local development and testing configuration (in the server config directory)
-3. **Interactive TUI**: User-friendly setup for initial configuration
+1. **Process environment**: Inherited `MARCHAT_*` and other variables before `.env` is read
+2. **`.env` in server config directory**: Merged with **`godotenv.Overload`**; file entries override the same variable names already in the environment
+3. **Interactive TUI**: User-friendly setup for initial configuration when required settings are missing
 4. **Profile System** (client): Multiple server connection profiles in the client config directory
 
 #### Key Settings (server-oriented)

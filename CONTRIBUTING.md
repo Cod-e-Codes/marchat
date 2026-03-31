@@ -61,7 +61,7 @@ Thank you for your interest in contributing! This guide explains how to contribu
 
 - Be respectful and constructive
 - Follow the [Code of Conduct](CODE_OF_CONDUCT.md)
-- All contributions are welcome—no idea is too small!
+- All contributions are welcome; no idea is too small!
 
 ---
 

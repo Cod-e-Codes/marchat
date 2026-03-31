@@ -158,7 +158,7 @@ MARCHAT_SESSION_SECRET=custom-jwt-secret`
 	}
 }
 
-func TestEnvironmentVariablePrecedence(t *testing.T) {
+func TestDotenvFileOverridesProcessEnv(t *testing.T) {
 	tempDir := t.TempDir()
 	envPath := filepath.Join(tempDir, ".env")
 
@@ -171,8 +171,8 @@ func TestEnvironmentVariablePrecedence(t *testing.T) {
 		}
 	}()
 
-	// Create a .env file with one value
-	envContent := `MARCHAT_PORT=8080
+	// .env says 9090; process env says 8080 - file must win (godotenv.Overload).
+	envContent := `MARCHAT_PORT=9090
 MARCHAT_ADMIN_KEY=env-file-key
 MARCHAT_USERS=envuser1`
 
@@ -181,7 +181,6 @@ MARCHAT_USERS=envuser1`
 		t.Fatalf("Failed to write .env file: %v", err)
 	}
 
-	// Set environment variable to override .env file
 	os.Setenv("MARCHAT_PORT", "8080")
 	defer os.Unsetenv("MARCHAT_PORT")
 
@@ -190,9 +189,8 @@ MARCHAT_USERS=envuser1`
 		t.Fatalf("LoadConfig failed: %v", err)
 	}
 
-	// Environment variable should take precedence
-	if cfg.Port != 8080 {
-		t.Errorf("Expected port 8080 (from env var), got %d", cfg.Port)
+	if cfg.Port != 9090 {
+		t.Errorf("Expected port 9090 from .env (overrides process env), got %d", cfg.Port)
 	}
 }
 

@@ -73,7 +73,7 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 		if msg.Type == shared.DeleteMessage {
 			content = styles.Timestamp.Render("[deleted]")
 		} else if msg.Type == shared.FileMessageType && msg.File != nil {
-			content = fmt.Sprintf("📎 File: %s (%d bytes) — use :savefile %s to save", msg.File.Filename, msg.File.Size, msg.File.Filename)
+			content = fmt.Sprintf("📎 File: %s (%d bytes); use :savefile %s to save", msg.File.Filename, msg.File.Size, msg.File.Filename)
 		} else {
 			content = renderEmojis(content)
 			content = renderCodeBlocks(content)

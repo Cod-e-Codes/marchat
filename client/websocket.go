@@ -211,9 +211,26 @@ func (m *model) connectWebSocket(serverURL string) error {
 	log.Printf("Attempting to connect to: %s", fullURL)
 	log.Printf("Username: %s, Admin: %v", m.cfg.Username, *isAdmin)
 
-	dialer := websocket.DefaultDialer
-	if *skipTLSVerify {
-		dialer.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	u, parseErr := url.Parse(serverURL)
+	if parseErr != nil {
+		return fmt.Errorf("invalid server URL: %w", parseErr)
+	}
+	dialer := *websocket.DefaultDialer
+	// Gorilla sends an HTTP/1.1 Upgrade on the TLS connection; if ALPN negotiates
+	// h2/h3 (common behind Caddy), reads/writes can fail after connect. Force HTTP/1.1.
+	if u.Scheme == "wss" {
+		tlsCfg := &tls.Config{NextProtos: []string{"http/1.1"}}
+		if *skipTLSVerify {
+			tlsCfg.InsecureSkipVerify = true
+		}
+		// TLS SNI must match a name on the cert. Caddy "tls internal" for localhost
+		// fails when the URL uses 127.0.0.1 / ::1 (SNI = IP). Dial IP but SNI localhost.
+		sni := u.Hostname()
+		if sni == "127.0.0.1" || sni == "::1" {
+			sni = "localhost"
+		}
+		tlsCfg.ServerName = sni
+		dialer.TLSClientConfig = tlsCfg
 	}
 
 	log.Printf("Attempting WebSocket connection to: %s", fullURL)
@@ -274,9 +291,10 @@ func (m *model) connectWebSocket(serverURL string) error {
 					log.Printf("WebSocket closed normally")
 					return
 				}
-				if strings.Contains(readErr.Error(), "username is already taken") ||
-					strings.Contains(readErr.Error(), "duplicate username") ||
-					strings.Contains(readErr.Error(), "Username") {
+				re := readErr.Error()
+				if strings.Contains(strings.ToLower(re), "username already taken") ||
+					strings.Contains(strings.ToLower(re), "username is already taken") ||
+					strings.Contains(strings.ToLower(re), "duplicate username") {
 					m.deliverWSMsg(wsUsernameError{message: readErr.Error()})
 					return
 				}

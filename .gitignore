@@ -64,3 +64,9 @@ plugin/examples/*/*.dylib
 
 # Build release
 build-release.sh
+
+# Local scratch / generated invites (may contain secrets)
+tmp/
+
+# Caddy proxy overrides (public IP / DNS); tracked template is deploy/caddy/proxy.env.example
+deploy/caddy/proxy.env
