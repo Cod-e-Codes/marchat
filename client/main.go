@@ -34,6 +34,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gorilla/websocket"
+	"golang.org/x/term"
 )
 
 const maxMessages = 100
@@ -87,7 +88,7 @@ var (
 	skipTLSVerify      = flag.Bool("skip-tls-verify", false, "Skip TLS certificate verification")
 	quickStart         = flag.Bool("quick-start", false, "Use last connection or select from saved profiles")
 	autoConnect        = flag.Bool("auto", false, "Automatically connect using most recent profile")
-	nonInteractive     = flag.Bool("non-interactive", false, "Skip interactive prompts (require all flags)")
+	nonInteractive     = flag.Bool("non-interactive", false, "Skip interactive prompts (with --e2e, require --keystore-passphrase on the command line)")
 	runDoctor          = flag.Bool("doctor", false, "Print environment and configuration diagnostics, then exit")
 	runDoctorJSON      = flag.Bool("doctor-json", false, "Same as -doctor with JSON output (if both are set, JSON is used)")
 )
@@ -2228,8 +2229,9 @@ func main() {
 	var cfg *config.Config
 	var err error
 
-	// Check if all required flags are provided for non-interactive mode
-	if *nonInteractive || (allFlagsProvided(*serverURL, *username, *isAdmin, *adminKey, *useE2E, *keystorePassphrase)) {
+	// Skip profile picker when CLI gives enough to connect: server, username, and admin key if --admin.
+	// If --e2e without --keystore-passphrase, prompt once on the terminal (unless --non-interactive).
+	if *nonInteractive || directConnectFromFlags(*serverURL, *username, *isAdmin, *adminKey) {
 		// Use traditional flag-based configuration
 		cfg, err = loadConfigFromFlags(*configPath, *serverURL, *username, *theme, *isAdmin, *useE2E, *skipTLSVerify)
 		if err != nil {
@@ -2237,15 +2239,27 @@ func main() {
 			os.Exit(1)
 		}
 
-		// Validate required flags for non-interactive mode
-		if err := validateFlags(*isAdmin, *adminKey, *useE2E, *keystorePassphrase); err != nil {
+		keystorePass := *keystorePassphrase
+		if cfg.UseE2E && keystorePass == "" {
+			if *nonInteractive {
+				fmt.Fprintln(os.Stderr, "Error: --e2e requires --keystore-passphrase when using --non-interactive")
+				os.Exit(1)
+			}
+			var readErr error
+			keystorePass, readErr = readKeystorePassphraseFromTerminal()
+			if readErr != nil {
+				fmt.Fprintf(os.Stderr, "Error reading keystore passphrase: %v\n", readErr)
+				os.Exit(1)
+			}
+		}
+
+		if err := validateFlags(*isAdmin, *adminKey, cfg.UseE2E, keystorePass); err != nil {
 			fmt.Printf("Error: %v\n", err)
 			flag.Usage()
 			os.Exit(1)
 		}
 
-		// Continue with existing client initialization using flag values
-		initializeClient(cfg, *adminKey, *keystorePassphrase)
+		initializeClient(cfg, *adminKey, keystorePass)
 
 	} else {
 		// Check if this is a first-time user (no profiles exist)
@@ -2395,20 +2409,26 @@ func main() {
 	}
 }
 
-func allFlagsProvided(serverURL, username string, isAdmin bool, adminKey string, useE2E bool, keystorePassphrase string) bool {
+// directConnectFromFlags is true when the user supplied enough CLI args to skip the profile menu.
+// Keystore passphrase may still be prompted when --e2e is set (see main).
+func directConnectFromFlags(serverURL, username string, isAdmin bool, adminKey string) bool {
 	if serverURL == "" || username == "" {
 		return false
 	}
-
 	if isAdmin && adminKey == "" {
 		return false
 	}
-
-	if useE2E && keystorePassphrase == "" {
-		return false
-	}
-
 	return true
+}
+
+func readKeystorePassphraseFromTerminal() (string, error) {
+	fmt.Fprint(os.Stderr, "Keystore passphrase: ")
+	b, err := term.ReadPassword(int(syscall.Stdin))
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
 }
 
 func loadConfigFromFlags(configPath, serverURL, username, theme string, isAdmin, useE2E, skipTLSVerify bool) (*config.Config, error) {

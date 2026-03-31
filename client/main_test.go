@@ -179,26 +179,20 @@ func TestMainPackageStructure(t *testing.T) {
 
 func TestErrorHandling(t *testing.T) {
 	// Test error handling functions
-	if allFlagsProvided("", "", false, "", false, "") {
-		t.Error("allFlagsProvided should return false for empty required flags")
+	if directConnectFromFlags("", "", false, "") {
+		t.Error("directConnectFromFlags should return false for empty required flags")
 	}
-	if allFlagsProvided("ws://localhost", "", false, "", false, "") {
-		t.Error("allFlagsProvided should return false for missing username")
+	if directConnectFromFlags("ws://localhost", "", false, "") {
+		t.Error("directConnectFromFlags should return false for missing username")
 	}
-	if allFlagsProvided("ws://localhost", "user", true, "", false, "") {
-		t.Error("allFlagsProvided should return false for admin without admin key")
+	if directConnectFromFlags("ws://localhost", "user", true, "") {
+		t.Error("directConnectFromFlags should return false for admin without admin key")
 	}
-	if allFlagsProvided("ws://localhost", "user", false, "", true, "") {
-		t.Error("allFlagsProvided should return false for e2e without passphrase")
+	if !directConnectFromFlags("ws://localhost", "user", false, "") {
+		t.Error("directConnectFromFlags should return true for valid basic flags (e2e passphrase is prompted separately)")
 	}
-	if !allFlagsProvided("ws://localhost", "user", false, "", false, "") {
-		t.Error("allFlagsProvided should return true for valid basic flags")
-	}
-	if !allFlagsProvided("ws://localhost", "user", true, "key", false, "") {
-		t.Error("allFlagsProvided should return true for valid admin flags")
-	}
-	if !allFlagsProvided("ws://localhost", "user", false, "", true, "pass") {
-		t.Error("allFlagsProvided should return true for valid e2e flags")
+	if !directConnectFromFlags("ws://localhost", "user", true, "key") {
+		t.Error("directConnectFromFlags should return true for valid admin flags")
 	}
 }
 
@@ -589,102 +583,59 @@ func TestLogOutputHandling(t *testing.T) {
 	// We can't easily test this without file system manipulation
 }
 
-func TestAllFlagsProvided(t *testing.T) {
-	// Test allFlagsProvided function thoroughly
+func TestDirectConnectFromFlags(t *testing.T) {
 	testCases := []struct {
 		name                string
 		serverURL, username string
 		isAdmin             bool
 		adminKey            string
-		useE2E              bool
-		keystorePassphrase  string
 		expected            bool
 	}{
 		{
-			name:               "all provided",
-			serverURL:          "ws://localhost:8080",
-			username:           "user",
-			isAdmin:            false,
-			adminKey:           "",
-			useE2E:             false,
-			keystorePassphrase: "",
-			expected:           true,
+			name:      "basic",
+			serverURL: "ws://localhost:8080",
+			username:  "user",
+			isAdmin:   false,
+			adminKey:  "",
+			expected:  true,
 		},
 		{
-			name:               "missing serverURL",
-			serverURL:          "",
-			username:           "user",
-			isAdmin:            false,
-			adminKey:           "",
-			useE2E:             false,
-			keystorePassphrase: "",
-			expected:           false,
+			name:      "missing serverURL",
+			serverURL: "",
+			username:  "user",
+			isAdmin:   false,
+			adminKey:  "",
+			expected:  false,
 		},
 		{
-			name:               "missing username",
-			serverURL:          "ws://localhost:8080",
-			username:           "",
-			isAdmin:            false,
-			adminKey:           "",
-			useE2E:             false,
-			keystorePassphrase: "",
-			expected:           false,
+			name:      "missing username",
+			serverURL: "ws://localhost:8080",
+			username:  "",
+			isAdmin:   false,
+			adminKey:  "",
+			expected:  false,
 		},
 		{
-			name:               "admin without key",
-			serverURL:          "ws://localhost:8080",
-			username:           "user",
-			isAdmin:            true,
-			adminKey:           "",
-			useE2E:             false,
-			keystorePassphrase: "",
-			expected:           false,
+			name:      "admin without key",
+			serverURL: "ws://localhost:8080",
+			username:  "user",
+			isAdmin:   true,
+			adminKey:  "",
+			expected:  false,
 		},
 		{
-			name:               "admin with key",
-			serverURL:          "ws://localhost:8080",
-			username:           "user",
-			isAdmin:            true,
-			adminKey:           "secret",
-			useE2E:             false,
-			keystorePassphrase: "",
-			expected:           true,
-		},
-		{
-			name:               "e2e without passphrase",
-			serverURL:          "ws://localhost:8080",
-			username:           "user",
-			isAdmin:            false,
-			adminKey:           "",
-			useE2E:             true,
-			keystorePassphrase: "",
-			expected:           false,
-		},
-		{
-			name:               "e2e with passphrase",
-			serverURL:          "ws://localhost:8080",
-			username:           "user",
-			isAdmin:            false,
-			adminKey:           "",
-			useE2E:             true,
-			keystorePassphrase: "pass",
-			expected:           true,
-		},
-		{
-			name:               "both admin and e2e",
-			serverURL:          "ws://localhost:8080",
-			username:           "user",
-			isAdmin:            true,
-			adminKey:           "secret",
-			useE2E:             true,
-			keystorePassphrase: "pass",
-			expected:           true,
+			name:      "admin with key",
+			serverURL: "ws://localhost:8080",
+			username:  "user",
+			isAdmin:   true,
+			adminKey:  "secret",
+			expected:  true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			result := allFlagsProvided(tc.serverURL, tc.username, tc.isAdmin, tc.adminKey, tc.useE2E, tc.keystorePassphrase)
+			result := directConnectFromFlags(tc.serverURL, tc.username, tc.isAdmin, tc.adminKey)
 			if result != tc.expected {
 				t.Errorf("Expected %v for %s, got %v", tc.expected, tc.name, result)
 			}

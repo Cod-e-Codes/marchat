@@ -204,7 +204,26 @@ func (m *model) abortPartialWebSocketConnect() {
 	m.connected = false
 }
 
+// sanitizeServerURL trims whitespace and matching quotes often pasted from docs or PowerShell.
+func sanitizeServerURL(raw string) string {
+	s := strings.TrimSpace(raw)
+	s = strings.Trim(s, `"'`+"`")
+	// Unicode curly quotes (copy-paste from word processors)
+	for {
+		trimmed := strings.TrimPrefix(s, "\u2018")      // ‘
+		trimmed = strings.TrimPrefix(trimmed, "\u201c") // “
+		trimmed = strings.TrimSuffix(trimmed, "\u2019") // ’
+		trimmed = strings.TrimSuffix(trimmed, "\u201d") // ”
+		if trimmed == s {
+			break
+		}
+		s = strings.TrimSpace(trimmed)
+	}
+	return strings.TrimSpace(s)
+}
+
 func (m *model) connectWebSocket(serverURL string) error {
+	serverURL = sanitizeServerURL(serverURL)
 	escapedUsername := url.QueryEscape(m.cfg.Username)
 	fullURL := serverURL + "?username=" + escapedUsername
 

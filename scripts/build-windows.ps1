@@ -3,7 +3,7 @@
 $ErrorActionPreference = "Stop"
 Set-Location (Split-Path -Parent $PSScriptRoot)
 
-$VERSION = "v0.10.0-beta.2"
+$VERSION = "v0.10.0-beta.3"
 $BUILD_TIME = (Get-Date).ToUniversalTime().ToString("o")
 $GIT_COMMIT = git rev-parse --short HEAD 2>$null
 if (-not $GIT_COMMIT) { $GIT_COMMIT = "unknown" }
