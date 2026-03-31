@@ -760,6 +760,10 @@ go test ./...
 
 ## Documentation
 
+- **[QUICKSTART.md](QUICKSTART.md)** - Short path from install to first client connection
+- **[ARCHITECTURE.md](ARCHITECTURE.md)** - Components, data flow, config paths, diagnostics
+- **[PROTOCOL.md](PROTOCOL.md)** - WebSocket message types and payloads
+- **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md)** - Optional TLS reverse proxy (Caddy) for local or LAN `wss://`
 - **[NOTIFICATIONS.md](NOTIFICATIONS.md)** - Notification system guide (desktop, quiet hours, focus mode)
 - **[THEMES.md](THEMES.md)** - Custom theme creation guide
 - **[PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md)** - Plugin development guide
