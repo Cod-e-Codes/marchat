@@ -39,12 +39,6 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **v0.10.0-beta.2**: Doctor CLI, build-release cross-compile fix, sqlite bump, doc metrics refresh, Docker image entrypoint/volume permission fixes
 - **v0.9.0-beta.6**: Rebuilt with Go 1.25.8 to address CVE-2026-25679, CVE-2026-27142, CVE-2026-27139
 - **v0.9.0-beta.5**: Automated release workflow, PBKDF2 keystore key derivation, JWT secret auto-generation, race condition fixes, Docker optimizations
-- **v0.9.0-beta.4**: Fixed admin metrics, restored plugin commands in encrypted sessions, dependency updates
-- **v0.9.0-beta.3**: Added :q quit command, improved theme handling, ESC behavior tweaks, and better database backups
-- **v0.9.0-beta.2**: Database performance improvements, documentation enhancements, dependency updates
-- **v0.9.0-beta.1**: Enhanced notifications, custom themes, plugin ecosystem, test coverage improvements
-- **v0.8.0-beta.11**: Encryption UI, hotkey alternatives, command encryption fix, username validation
-- **v0.8.0-beta.10**: Plugin persistence, state management, auto-discovery, deadlock fixes
 
 Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
