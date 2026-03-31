@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/shared"
@@ -23,6 +24,7 @@ const (
 type Client struct {
 	hub                  *Hub
 	conn                 *websocket.Conn
+	writeMu              sync.Mutex // serializes all writes; gorilla/websocket allows one writer
 	send                 chan interface{}
 	db                   *sql.DB
 	username             string
@@ -307,6 +309,14 @@ func (c *Client) readPump() {
 		}
 		c.hub.broadcast <- msg
 	}
+}
+
+// PingConn sends a WebSocket ping control frame. Safe from goroutines other than writePump;
+// serializes with writePump's pings and JSON writes.
+func (c *Client) PingConn() error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
+	return c.conn.WriteMessage(websocket.PingMessage, nil)
 }
 
 // validateUsername ensures usernames are safe and cannot cause injection attacks
@@ -696,7 +706,10 @@ func (c *Client) writePump() {
 		select {
 		case msg, ok := <-c.send:
 			if !ok {
-				if err := c.conn.WriteMessage(websocket.CloseMessage, []byte{}); err != nil {
+				c.writeMu.Lock()
+				err := c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				c.writeMu.Unlock()
+				if err != nil {
 					if !strings.Contains(err.Error(), "use of closed network connection") {
 						log.Printf("WriteMessage error: %v", err)
 					}
@@ -705,7 +718,9 @@ func (c *Client) writePump() {
 			}
 			switch v := msg.(type) {
 			case shared.Message:
+				c.writeMu.Lock()
 				err := c.conn.WriteJSON(v)
+				c.writeMu.Unlock()
 				if err != nil {
 					if !strings.Contains(err.Error(), "use of closed network connection") {
 						log.Printf("Failed to send message to %s: %v", c.username, err)
@@ -713,7 +728,9 @@ func (c *Client) writePump() {
 					return
 				}
 			case WSMessage:
+				c.writeMu.Lock()
 				err := c.conn.WriteJSON(v)
+				c.writeMu.Unlock()
 				if err != nil {
 					if !strings.Contains(err.Error(), "use of closed network connection") {
 						log.Printf("Failed to send system message to %s: %v", c.username, err)
@@ -724,7 +741,10 @@ func (c *Client) writePump() {
 				log.Printf("Unknown message type for client %s", c.username)
 			}
 		case <-ticker.C:
-			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+			c.writeMu.Lock()
+			err := c.conn.WriteMessage(websocket.PingMessage, nil)
+			c.writeMu.Unlock()
+			if err != nil {
 				if !strings.Contains(err.Error(), "use of closed network connection") {
 					log.Printf("Failed to send ping to %s: %v", c.username, err)
 				}

@@ -9,7 +9,6 @@ import (
 
 	"github.com/Cod-e-Codes/marchat/plugin/manager"
 	"github.com/Cod-e-Codes/marchat/shared"
-	"github.com/gorilla/websocket"
 )
 
 type Hub struct {
@@ -287,8 +286,8 @@ func (h *Hub) CleanupStaleConnections() {
 
 	// Check all clients for broken connections
 	for client := range h.clients {
-		// Try to ping the client to check if connection is alive
-		if err := client.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+		// Try to ping the client to check if connection is alive (serialized with writePump)
+		if err := client.PingConn(); err != nil {
 			log.Printf("[CLEANUP] Found stale connection for user '%s' (IP: %s): %v", client.username, client.ipAddr, err)
 			staleClients = append(staleClients, client)
 		}
