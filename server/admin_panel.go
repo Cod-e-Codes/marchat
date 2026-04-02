@@ -448,6 +448,8 @@ func NewAdminPanel(hub *Hub, db *sql.DB, pluginManager *manager.PluginManager, l
 		selectedPlugin: -1,
 	}
 
+	panel.applyLayout(120, 40)
+
 	// Load initial data
 	panel.refreshData()
 
@@ -788,16 +790,7 @@ func (ap *AdminPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		ap.width = msg.Width
-		ap.height = msg.Height
-
-		availableWidth := msg.Width - 12
-		if availableWidth < 30 {
-			availableWidth = 30
-		}
-
-		ap.help.Width = availableWidth
-		ap.userTable.SetWidth(availableWidth)
+		ap.applyLayout(msg.Width, msg.Height)
 
 	case tea.KeyMsg:
 		switch {
@@ -1055,15 +1048,40 @@ func (ap *AdminPanel) renderScrollableContent(content string, scrollOffset int) 
 	return strings.Join(visibleLines, "\n")
 }
 
+func (ap *AdminPanel) contentWidth() int {
+	width := ap.width - 12
+	if width < 30 {
+		return 30
+	}
+	return width
+}
+
+func (ap *AdminPanel) applyLayout(width, height int) {
+	ap.width = width
+	ap.height = height
+
+	contentWidth := ap.contentWidth()
+	ap.help.Width = contentWidth
+	ap.userTable.SetWidth(contentWidth)
+	ap.pluginTable.SetWidth(contentWidth)
+
+	usableHeight := height - 16
+	if usableHeight < 6 {
+		usableHeight = 6
+	}
+	if usableHeight > 18 {
+		usableHeight = 18
+	}
+	ap.userTable.SetHeight(usableHeight)
+	ap.pluginTable.SetHeight(usableHeight)
+}
+
 func (ap *AdminPanel) View() string {
 	if ap.quitting {
 		return "Admin panel closed. Server continues running.\n"
 	}
 
-	availableWidth := ap.width - 12
-	if availableWidth < 30 {
-		availableWidth = 30
-	}
+	availableWidth := ap.contentWidth()
 
 	doc := strings.Builder{}
 
@@ -1094,15 +1112,6 @@ func (ap *AdminPanel) View() string {
 func (ap *AdminPanel) renderTabs() string {
 	var renderedTabs []string
 
-	availableWidth := ap.width - 12
-	if availableWidth < 30 {
-		availableWidth = 30
-	}
-	tabWidth := availableWidth / len(ap.tabs)
-	if tabWidth < 8 {
-		tabWidth = 8
-	}
-
 	for i, tab := range ap.tabs {
 		var style lipgloss.Style
 		if i == int(ap.activeTab) {
@@ -1111,11 +1120,11 @@ func (ap *AdminPanel) renderTabs() string {
 			style = tabStyle
 		}
 
-		renderedTab := style.Width(tabWidth).Align(lipgloss.Center).Render(tab)
+		renderedTab := style.Render(tab)
 		renderedTabs = append(renderedTabs, renderedTab)
 	}
 
-	return lipgloss.JoinHorizontal(lipgloss.Top, renderedTabs...)
+	return strings.Join(renderedTabs, "  ")
 }
 
 func (ap *AdminPanel) renderContent() string {
@@ -1140,13 +1149,11 @@ func (ap *AdminPanel) renderContent() string {
 func (ap *AdminPanel) renderOverview() string {
 	doc := strings.Builder{}
 
-	contentWidth := ap.width - 12
-	if contentWidth < 30 {
-		contentWidth = 30
-	}
+	contentWidth := ap.contentWidth()
 
 	// System status
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Status\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Status"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 
 	statusText := "🟢 " + ap.systemInfo.ServerStatus
@@ -1162,7 +1169,8 @@ func (ap *AdminPanel) renderOverview() string {
 	doc.WriteString("\n")
 
 	// Live Configuration Summary
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Live Configuration\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Live Configuration"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 	doc.WriteString(fmt.Sprintf("Port: %d\n", ap.config.Port))
 
@@ -1181,7 +1189,8 @@ func (ap *AdminPanel) renderOverview() string {
 	doc.WriteString("\n")
 
 	// Database info
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Database Information\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Database Information"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 	doc.WriteString(fmt.Sprintf("Database Path: %s\n", ap.config.DBPath))
 	doc.WriteString(fmt.Sprintf("Config Directory: %s\n", ap.config.ConfigDir))
@@ -1192,12 +1201,10 @@ func (ap *AdminPanel) renderOverview() string {
 func (ap *AdminPanel) renderUsers() string {
 	doc := strings.Builder{}
 
-	contentWidth := ap.width - 12
-	if contentWidth < 30 {
-		contentWidth = 30
-	}
+	contentWidth := ap.contentWidth()
 
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("User Management\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("User Management"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 
 	// Show selected user info
@@ -1237,18 +1244,18 @@ func (ap *AdminPanel) renderUsers() string {
 func (ap *AdminPanel) renderSystem() string {
 	doc := strings.Builder{}
 
-	contentWidth := ap.width - 12
-	if contentWidth < 30 {
-		contentWidth = 30
-	}
+	contentWidth := ap.contentWidth()
 
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Management\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Management"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 
-	doc.WriteString(infoStylePanel.Render("Use [c] Clear Database, [b] Backup Database, [s] Show Stats\n\n"))
+	doc.WriteString(infoStylePanel.Render("Use [c] Clear Database, [b] Backup Database, [s] Show Stats"))
+	doc.WriteString("\n\n")
 
 	// Live Configuration Details
-	doc.WriteString(subtitleStyle.Render("Live Configuration:\n"))
+	doc.WriteString(subtitleStyle.Render("Live Configuration:"))
+	doc.WriteString("\n")
 	doc.WriteString(fmt.Sprintf("  Server Port: %d\n", ap.config.Port))
 	doc.WriteString(fmt.Sprintf("  Database: %s\n", ap.config.DBPath))
 	doc.WriteString(fmt.Sprintf("  Config Directory: %s\n", ap.config.ConfigDir))
@@ -1276,7 +1283,8 @@ func (ap *AdminPanel) renderSystem() string {
 	doc.WriteString(fmt.Sprintf("  Plugin Registry: %s\n", ap.config.PluginRegistryURL))
 
 	doc.WriteString("\n")
-	doc.WriteString(subtitleStyle.Render("Database Statistics:\n"))
+	doc.WriteString(subtitleStyle.Render("Database Statistics:"))
+	doc.WriteString("\n")
 	doc.WriteString(fmt.Sprintf("  Total Messages: %d\n", ap.systemInfo.MessagesSent))
 	doc.WriteString(fmt.Sprintf("  Total Users: %d\n", ap.systemInfo.TotalUsers))
 	doc.WriteString(fmt.Sprintf("  Active Connections: %d\n", ap.systemInfo.ActiveUsers))
@@ -1288,16 +1296,15 @@ func (ap *AdminPanel) renderSystem() string {
 func (ap *AdminPanel) renderLogs() string {
 	doc := strings.Builder{}
 
-	contentWidth := ap.width - 12
-	if contentWidth < 30 {
-		contentWidth = 30
-	}
+	contentWidth := ap.contentWidth()
 
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Logs\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Logs"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 
-	// Add logs content
-	for _, logEntry := range ap.logs {
+	// Add logs content (oldest first so newest appear at the bottom)
+	for i := len(ap.logs) - 1; i >= 0; i-- {
+		logEntry := ap.logs[i]
 		var levelStyle lipgloss.Style
 		switch logEntry.Level {
 		case "ERROR":
@@ -1313,19 +1320,30 @@ func (ap *AdminPanel) renderLogs() string {
 			logEntry.Component,
 			logEntry.Message))
 	}
+	content := doc.String()
+	lines := strings.Split(content, "\n")
+	availableHeight := ap.height - 8
+	if availableHeight < 10 {
+		availableHeight = 10
+	}
+	maxLines := availableHeight - 2
+	if maxLines < 1 {
+		maxLines = 1
+	}
+	if ap.logsScroll == 0 && len(lines) > maxLines {
+		ap.logsScroll = len(lines) - maxLines
+	}
 
-	return ap.renderScrollableContent(doc.String(), ap.logsScroll)
+	return ap.renderScrollableContent(content, ap.logsScroll)
 }
 
 func (ap *AdminPanel) renderPlugins() string {
 	doc := strings.Builder{}
 
-	contentWidth := ap.width - 12
-	if contentWidth < 30 {
-		contentWidth = 30
-	}
+	contentWidth := ap.contentWidth()
 
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Plugin Management\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Plugin Management"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 
 	// Show selected plugin info
@@ -1400,18 +1418,18 @@ func (ap *AdminPanel) renderPlugins() string {
 func (ap *AdminPanel) renderMetrics() string {
 	doc := strings.Builder{}
 
-	contentWidth := ap.width - 12
-	if contentWidth < 30 {
-		contentWidth = 30
-	}
+	contentWidth := ap.contentWidth()
 
-	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Performance Metrics\n"))
+	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Performance Metrics"))
+	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 
-	doc.WriteString(infoStylePanel.Render("Use [G] Force GC, [R] Reset Metrics, [E] Export Logs\n\n"))
+	doc.WriteString(infoStylePanel.Render("Use [G] Force GC, [R] Reset Metrics, [E] Export Logs"))
+	doc.WriteString("\n\n")
 
 	// System Performance - more compact layout
-	doc.WriteString(metricLabelStyle.Render("System Performance:\n"))
+	doc.WriteString(metricLabelStyle.Render("System Performance:"))
+	doc.WriteString("\n")
 	doc.WriteString(fmt.Sprintf("Memory: %s | Goroutines: %s | Heap: %s\n",
 		metricValueStyle.Render(fmt.Sprintf("%.1f MB", ap.systemInfo.MemoryUsage)),
 		metricValueStyle.Render(fmt.Sprintf("%d", ap.systemInfo.GoroutineCount)),
@@ -1423,7 +1441,8 @@ func (ap *AdminPanel) renderMetrics() string {
 	doc.WriteString("\n")
 
 	// Connection Metrics - more compact layout
-	doc.WriteString(metricLabelStyle.Render("Connection Metrics:\n"))
+	doc.WriteString(metricLabelStyle.Render("Connection Metrics:"))
+	doc.WriteString("\n")
 	doc.WriteString(fmt.Sprintf("Active: %s | Peak: %s | Total: %s | Disconnects: %s\n",
 		metricValueStyle.Render(fmt.Sprintf("%d", ap.systemInfo.ActiveUsers)),
 		metricValueStyle.Render(fmt.Sprintf("%d", ap.metrics.PeakUsers)),
@@ -1433,7 +1452,8 @@ func (ap *AdminPanel) renderMetrics() string {
 	doc.WriteString("\n")
 
 	// Message Metrics - more compact layout
-	doc.WriteString(metricLabelStyle.Render("Message Metrics:\n"))
+	doc.WriteString(metricLabelStyle.Render("Message Metrics:"))
+	doc.WriteString("\n")
 	doc.WriteString(fmt.Sprintf("Total: %s | Rate: %s | Conn Rate: %s\n",
 		metricValueStyle.Render(fmt.Sprintf("%d", ap.systemInfo.MessagesSent)),
 		metricValueStyle.Render(fmt.Sprintf("%.2f msg/s", ap.messageRate)),
@@ -1443,7 +1463,8 @@ func (ap *AdminPanel) renderMetrics() string {
 
 	// Memory History Chart (simplified)
 	if len(ap.metrics.MemoryHistory) > 0 {
-		doc.WriteString(metricLabelStyle.Render("Memory History (last 5):\n"))
+		doc.WriteString(metricLabelStyle.Render("Memory History (last 5):"))
+		doc.WriteString("\n")
 		recent := ap.metrics.MemoryHistory
 		if len(recent) > 5 {
 			recent = recent[len(recent)-5:]
@@ -1459,7 +1480,8 @@ func (ap *AdminPanel) renderMetrics() string {
 
 	// Connection History Chart (simplified)
 	if len(ap.metrics.ConnectionHistory) > 0 {
-		doc.WriteString(metricLabelStyle.Render("Connection History (last 5):\n"))
+		doc.WriteString(metricLabelStyle.Render("Connection History (last 5):"))
+		doc.WriteString("\n")
 		recent := ap.metrics.ConnectionHistory
 		if len(recent) > 5 {
 			recent = recent[len(recent)-5:]

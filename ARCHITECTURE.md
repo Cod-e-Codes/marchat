@@ -325,6 +325,13 @@ The TUI-based admin panel provides real-time server management:
 - **Database Operations**: Backup, restore, and maintenance functions
 - **System Controls**: Force garbage collection and metrics reset
 
+Implementation notes (`server/admin_panel.go`):
+
+- **Resize and layout**: Window size updates apply width and height through a single layout path so the help bar, user table, and plugin table stay in sync; content width is derived consistently for bordered panels.
+- **Tabs**: Tab labels render at natural width with spacing instead of fixed equal-width cells, which reads better on narrow terminals.
+- **Logs tab**: Log lines are ordered oldest-first so the newest entries appear at the bottom; when output exceeds the visible area, the view initially anchors to the bottom of the buffer.
+- **Headings**: Section titles and info lines avoid embedding trailing newlines inside styled strings (newlines are written separately) so System and Metrics panels stay left-aligned.
+
 ### Web Admin Panel
 
 The web-based interface provides the same functionality through a browser:
