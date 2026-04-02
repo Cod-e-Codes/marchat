@@ -233,6 +233,8 @@ export MARCHAT_DB_PATH='mysql:marchat:marchat@tcp(127.0.0.1:3306)/marchat?parseT
 Notes:
 - PostgreSQL requires a reachable database and credentials with schema/table create permissions.
 - MySQL DSNs should include `parseTime=true` so timestamp fields decode correctly.
+- **MariaDB** generally works with the same `mysql:` DSN shape and `parseTime=true` as MySQL.
+- The server creates **dialect-specific DDL** (for example, MySQL/MariaDB use fixed-width strings where indexes, primary keys, or unique constraints apply, because full `TEXT` keys are rejected). Long message bodies still use a large text type.
 - SQLite remains the easiest local development option.
 
 **Doctor / diagnostics:** Set `MARCHAT_DOCTOR_NO_NETWORK` to `1` to skip the GitHub latest-release check in `-doctor` / `-doctor-json`.

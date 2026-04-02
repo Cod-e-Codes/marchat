@@ -14,7 +14,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 
 **Note**: This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. Overall coverage is 33.9% across all packages.
 
-**Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL are supported at runtime via `MARCHAT_DB_PATH`; validating those backends is done manually or with your own CI job against real servers, not by the default `go test ./...` run.
+**Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. The default `go test ./...` run does not start Postgres or MySQL; exercise those with manual smoke tests or your own CI against real servers. Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
 
 ## Test Structure
 

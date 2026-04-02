@@ -127,6 +127,8 @@ func CreateSchema(db *sql.DB) {
 	boolDefault := "BOOLEAN DEFAULT 0"
 	dateTimeType := "DATETIME"
 	blobType := "BLOB"
+	textType := "TEXT"
+	keyedTextType := "TEXT"
 	switch dialect {
 	case DialectPostgres:
 		idColumn = "id BIGSERIAL PRIMARY KEY"
@@ -138,20 +140,26 @@ func CreateSchema(db *sql.DB) {
 		boolDefault = "BOOLEAN DEFAULT FALSE"
 		dateTimeType = "DATETIME"
 		blobType = "LONGBLOB"
+		textType = "LONGTEXT"
+		keyedTextType = "VARCHAR(191)"
 	}
 
 	// First, create the basic messages table if it doesn't exist
 	basicSchema := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS messages (
 		%s,
-		sender TEXT,
-		content TEXT,
+		sender %s,
+		content %s,
 		created_at %s,
 		is_encrypted %s,
+		message_id INTEGER NOT NULL DEFAULT 0,
+		edited %s,
+		deleted %s,
+		pinned %s,
 		encrypted_data %s,
 		nonce %s,
-		recipient TEXT
-	);`, idColumn, dateTimeType, boolDefault, blobType, blobType)
+		recipient %s
+	);`, idColumn, textType, textType, dateTimeType, boolDefault, boolDefault, boolDefault, boolDefault, blobType, blobType, textType)
 
 	_, err := dbExec(db, basicSchema)
 	if err != nil {
@@ -169,21 +177,26 @@ func CreateSchema(db *sql.DB) {
 		{"pinned", `ALTER TABLE messages ADD COLUMN pinned BOOLEAN DEFAULT 0`},
 	}
 
-	if dialect == DialectSQLite {
-		for _, m := range migrations {
-			var exists int
+	for _, m := range migrations {
+		var exists int
+		switch dialect {
+		case DialectPostgres:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'messages' AND column_name = ?`, m.column).Scan(&exists)
+		case DialectMySQL:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = ?`, m.column).Scan(&exists)
+		default:
 			err = dbQueryRow(db, `SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name=?`, m.column).Scan(&exists)
+		}
+		if err != nil {
+			log.Printf("Warning: failed to check for %s column: %v", m.column, err)
+			continue
+		}
+		if exists == 0 {
+			_, err = dbExec(db, m.ddl)
 			if err != nil {
-				log.Printf("Warning: failed to check for %s column: %v", m.column, err)
-				continue
-			}
-			if exists == 0 {
-				_, err = dbExec(db, m.ddl)
-				if err != nil {
-					log.Printf("Warning: failed to add %s column: %v", m.column, err)
-				} else {
-					log.Printf("Added %s column to messages table", m.column)
-				}
+				log.Printf("Warning: failed to add %s column: %v", m.column, err)
+			} else {
+				log.Printf("Added %s column to messages table", m.column)
 			}
 		}
 	}
@@ -191,7 +204,7 @@ func CreateSchema(db *sql.DB) {
 	// Create user_message_state table
 	userStateSchema := `
 	CREATE TABLE IF NOT EXISTS user_message_state (
-		username TEXT PRIMARY KEY,
+		username ` + keyedTextType + ` PRIMARY KEY,
 		last_message_id INTEGER NOT NULL DEFAULT 0,
 		last_seen ` + dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
@@ -212,10 +225,10 @@ func CreateSchema(db *sql.DB) {
 	banHistorySchema := `
 	CREATE TABLE IF NOT EXISTS ban_history (
 		` + banHistoryID + `,
-		username TEXT NOT NULL,
+		username ` + keyedTextType + ` NOT NULL,
 		banned_at ` + dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		unbanned_at ` + dateTimeType + `,
-		banned_by TEXT NOT NULL
+		banned_by ` + keyedTextType + ` NOT NULL
 	);`
 
 	_, err = dbExec(db, banHistorySchema)
@@ -223,11 +236,15 @@ func CreateSchema(db *sql.DB) {
 		log.Printf("Warning: failed to create ban_history table: %v", err)
 	}
 
-	// Create indexes for performance
+	// Create indexes for performance (MySQL needs a prefix length when indexing LONGTEXT)
+	recipientIdx := `CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient)`
+	if dialect == DialectMySQL {
+		recipientIdx = `CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient(191))`
+	}
 	indexes := []string{
 		`CREATE INDEX IF NOT EXISTS idx_messages_message_id ON messages(message_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient)`,
+		recipientIdx,
 		`CREATE INDEX IF NOT EXISTS idx_messages_deleted_created_at ON messages(deleted, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_message_state_username ON user_message_state(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_ban_history_username ON ban_history(username)`,
@@ -255,8 +272,8 @@ func CreateSchema(db *sql.DB) {
 	CREATE TABLE IF NOT EXISTS message_reactions (
 		`+idColumn+`,
 		message_id INTEGER NOT NULL,
-		username TEXT NOT NULL,
-		emoji TEXT NOT NULL,
+		username `+keyedTextType+` NOT NULL,
+		emoji `+keyedTextType+` NOT NULL,
 		created_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(message_id, username, emoji)
 	);`)
@@ -267,8 +284,8 @@ func CreateSchema(db *sql.DB) {
 	// Channel memberships table (durable memberships across reconnects)
 	_, err = dbExec(db, `
 	CREATE TABLE IF NOT EXISTS user_channels (
-		username TEXT NOT NULL,
-		channel TEXT NOT NULL,
+		username `+keyedTextType+` NOT NULL,
+		channel `+keyedTextType+` NOT NULL,
 		updated_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (username)
 	);`)
@@ -279,7 +296,7 @@ func CreateSchema(db *sql.DB) {
 	// Read receipt state tracking
 	_, err = dbExec(db, `
 	CREATE TABLE IF NOT EXISTS read_receipts (
-		username TEXT NOT NULL,
+		username `+keyedTextType+` NOT NULL,
 		message_id INTEGER NOT NULL,
 		read_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (username, message_id)
