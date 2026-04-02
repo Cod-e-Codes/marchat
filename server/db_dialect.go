@@ -15,6 +15,11 @@ const (
 	DialectMySQL    DBDialect = "mysql"
 )
 
+// dbDialects stores a per-handle SQL dialect.
+//
+// Lifecycle note: entries are keyed by *sql.DB and are not explicitly deleted.
+// Marchat keeps a single process-lifetime DB handle, so this map grows only if
+// callers repeatedly create/close new handles in one process.
 var dbDialects sync.Map // map[*sql.DB]DBDialect
 
 func setDBDialect(db *sql.DB, dialect DBDialect) {
