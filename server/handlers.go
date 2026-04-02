@@ -253,8 +253,16 @@ func CreateSchema(db *sql.DB) {
 	}
 
 	for _, index := range indexes {
-		_, err = dbExec(db, index)
+		q := index
+		if dialect == DialectMySQL {
+			// MySQL does not support "CREATE INDEX IF NOT EXISTS ..." (syntax error).
+			q = strings.Replace(index, "IF NOT EXISTS ", "", 1)
+		}
+		_, err = dbExec(db, q)
 		if err != nil {
+			if dialect == DialectMySQL && isMySQLDuplicateKeyName(err) {
+				continue
+			}
 			log.Printf("Warning: failed to create index: %v", err)
 		}
 	}
@@ -429,8 +437,11 @@ func enforceMessageRetention(db *sql.DB) {
 
 	if ttl > 0 {
 		for {
+			// Nested subquery keeps MySQL happy (LIMIT inside IN/NOT IN is invalid otherwise).
 			result, err := dbExec(db, `DELETE FROM messages WHERE id IN (
-				SELECT id FROM messages WHERE created_at < ? ORDER BY id ASC LIMIT 500
+				SELECT id FROM (
+					SELECT id FROM messages WHERE created_at < ? ORDER BY id ASC LIMIT 500
+				) AS ttl_batch
 			)`, time.Now().Add(-ttl))
 			if err != nil {
 				log.Printf("Error enforcing TTL retention: %v", err)
@@ -443,7 +454,11 @@ func enforceMessageRetention(db *sql.DB) {
 		}
 	}
 
-	_, err := dbExec(db, `DELETE FROM messages WHERE id NOT IN (SELECT id FROM messages ORDER BY id DESC LIMIT ?)`, maxMessages)
+	_, err := dbExec(db, `DELETE FROM messages WHERE id NOT IN (
+		SELECT id FROM (
+			SELECT id FROM messages ORDER BY id DESC LIMIT ?
+		) AS keep_batch
+	)`, maxMessages)
 	if err != nil {
 		log.Printf("Error enforcing message cap: %v", err)
 	}

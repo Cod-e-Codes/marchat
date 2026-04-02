@@ -2,9 +2,12 @@ package server
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
+
+	mysqlerr "github.com/go-sql-driver/mysql"
 )
 
 type DBDialect string
@@ -119,4 +122,10 @@ func insertIgnoreReadReceiptSQL(db *sql.DB) string {
 
 func supportsLastInsertID(db *sql.DB) bool {
 	return getDBDialect(db) != DialectPostgres
+}
+
+// isMySQLDuplicateKeyName reports whether err is MySQL errno 1061 (index already exists).
+func isMySQLDuplicateKeyName(err error) bool {
+	var me *mysqlerr.MySQLError
+	return errors.As(err, &me) && me.Number == 1061
 }
