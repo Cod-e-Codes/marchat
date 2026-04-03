@@ -988,8 +988,30 @@ func TestRenderMessagesWithMessageID(t *testing.T) {
 	}
 	styles := baseThemeStyles()
 	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
-	if !strings.Contains(result, "#42") {
-		t.Error("message should show #42 ID")
+	if !strings.Contains(result, "[id:42]") {
+		t.Error("message should show message metadata with id:42")
+	}
+}
+
+func TestRenderMessagesWithEncryptedMetadata(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "secret",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+			Encrypted: true,
+			MessageID: 7,
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	if strings.Contains(result, "🔒") {
+		t.Error("message should not show lock emoji in content")
+	}
+	if !strings.Contains(result, "[id:7, encrypted]") {
+		t.Error("message should show encrypted metadata suffix")
 	}
 }
 

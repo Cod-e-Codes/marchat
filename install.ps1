@@ -9,7 +9,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "🔧 marchat installer (PowerShell)" -ForegroundColor Green
+Write-Host "marchat installer (PowerShell)" -ForegroundColor Green
 Write-Host ""
 
 # Detect OS and architecture
@@ -26,7 +26,7 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
         "linux" { $OS = "linux" }
         "darwin" { $OS = "darwin" }
         default { 
-            Write-Host "❌ Error: Unsupported OS: $unameOutput" -ForegroundColor Red
+            Write-Host "[ERROR] Error: Unsupported OS: $unameOutput" -ForegroundColor Red
             exit 1
         }
     }
@@ -63,10 +63,10 @@ $TEMP_DIR = [System.IO.Path]::GetTempPath() + [System.Guid]::NewGuid().ToString(
 $ZIP_FILE = Join-Path $TEMP_DIR "marchat.zip"
 $EXTRACT_DIR = Join-Path $TEMP_DIR "extracted"
 
-Write-Host "🔍 Detected OS: $OS" -ForegroundColor Cyan
-Write-Host "🔍 Detected ARCH: $ARCH" -ForegroundColor Cyan
-Write-Host "📥 Download URL: $URL" -ForegroundColor Cyan
-Write-Host "📁 Temp directory: $TEMP_DIR" -ForegroundColor Cyan
+Write-Host "[INFO] Detected OS: $OS" -ForegroundColor Cyan
+Write-Host "[INFO] Detected ARCH: $ARCH" -ForegroundColor Cyan
+Write-Host "[INFO] Download URL: $URL" -ForegroundColor Cyan
+Write-Host "[INFO] Temp directory: $TEMP_DIR" -ForegroundColor Cyan
 Write-Host ""
 
 # Create temp directories
@@ -74,21 +74,21 @@ New-Item -ItemType Directory -Path $TEMP_DIR -Force | Out-Null
 New-Item -ItemType Directory -Path $EXTRACT_DIR -Force | Out-Null
 
 # Download the zip
-Write-Host "📥 Downloading marchat $Version..." -ForegroundColor Green
+Write-Host "[INFO] Downloading marchat $Version..." -ForegroundColor Green
 try {
     Invoke-WebRequest -Uri $URL -OutFile $ZIP_FILE -UseBasicParsing
 } catch {
-    Write-Host "❌ Download failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[ERROR] Download failed: $($_.Exception.Message)" -ForegroundColor Red
     Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
     exit 1
 }
 
 # Extract zip
-Write-Host "📦 Extracting..." -ForegroundColor Green
+Write-Host "[INFO] Extracting..." -ForegroundColor Green
 try {
     Expand-Archive -Path $ZIP_FILE -DestinationPath $EXTRACT_DIR -Force
 } catch {
-    Write-Host "❌ Extraction failed: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[ERROR] Extraction failed: $($_.Exception.Message)" -ForegroundColor Red
     Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
     exit 1
 }
@@ -130,20 +130,20 @@ switch ($OS) {
         $USE_SUDO = $false
     }
     default {
-        Write-Host "❌ Unsupported OS: $OS" -ForegroundColor Red
+        Write-Host "[ERROR] Unsupported OS: $OS" -ForegroundColor Red
         Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
         exit 1
     }
 }
 
-Write-Host "📁 Installing to: $INSTALL_DIR" -ForegroundColor Yellow
-Write-Host "⚙️  Config directory: $CONFIG_DIR" -ForegroundColor Yellow
+Write-Host "[INFO] Installing to: $INSTALL_DIR" -ForegroundColor Yellow
+Write-Host "[INFO] Config directory: $CONFIG_DIR" -ForegroundColor Yellow
 Write-Host ""
 
 # Create install directory
 if (!(Test-Path $INSTALL_DIR)) {
     if ($USE_SUDO -and !$IsWindows) {
-        Write-Host "🔐 Creating install directory (requires sudo)..." -ForegroundColor Yellow
+        Write-Host "[INFO] Creating install directory (requires sudo)..." -ForegroundColor Yellow
         & sudo mkdir -p $INSTALL_DIR
     } else {
         New-Item -ItemType Directory -Path $INSTALL_DIR -Force | Out-Null
@@ -155,15 +155,15 @@ $SERVER_BINARY = Get-ChildItem -Path $EXTRACT_DIR | Where-Object { $_.Name -like
 $CLIENT_BINARY = Get-ChildItem -Path $EXTRACT_DIR | Where-Object { $_.Name -like "*marchat-client*" } | Select-Object -First 1 -ExpandProperty FullName
 
 if ([string]::IsNullOrEmpty($SERVER_BINARY) -or [string]::IsNullOrEmpty($CLIENT_BINARY)) {
-    Write-Host "❌ Error: Could not find marchat binaries in the downloaded archive" -ForegroundColor Red
-    Write-Host "📁 Contents of extract directory:" -ForegroundColor Yellow
+    Write-Host "[ERROR] Could not find marchat binaries in the downloaded archive" -ForegroundColor Red
+    Write-Host "[INFO] Contents of extract directory:" -ForegroundColor Yellow
     Get-ChildItem -Path $EXTRACT_DIR | Format-Table Name, Length, LastWriteTime
     Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
     exit 1
 }
 
 # Copy binaries
-Write-Host "📋 Copying binaries..." -ForegroundColor Green
+Write-Host "[INFO] Copying binaries..." -ForegroundColor Green
 
 $serverDest = Join-Path $INSTALL_DIR "marchat-server"
 $clientDest = Join-Path $INSTALL_DIR "marchat-client"
@@ -189,7 +189,7 @@ try {
         }
     }
 } catch {
-    Write-Host "❌ Error copying binaries: $($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "[ERROR] Error copying binaries: $($_.Exception.Message)" -ForegroundColor Red
     Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
     exit 1
 }
@@ -203,36 +203,36 @@ if (!(Test-Path $CONFIG_DIR)) {
 if ($OS -eq "windows") {
     $currentPath = [Environment]::GetEnvironmentVariable("PATH", "User")
     if ($currentPath -notlike "*$INSTALL_DIR*") {
-        Write-Host "📍 Adding $INSTALL_DIR to user PATH..." -ForegroundColor Yellow
+        Write-Host "[INFO] Adding $INSTALL_DIR to user PATH..." -ForegroundColor Yellow
         [Environment]::SetEnvironmentVariable("PATH", "$currentPath;$INSTALL_DIR", "User")
-        Write-Host "⚠️  Note: You may need to restart your terminal for PATH changes to take effect" -ForegroundColor Yellow
+        Write-Host "[WARN] You may need to restart your terminal for PATH changes to take effect" -ForegroundColor Yellow
     }
 }
 
 # Clean up temp directory
-Write-Host "🧹 Cleaning up..." -ForegroundColor Green
+Write-Host "[INFO] Cleaning up..." -ForegroundColor Green
 Remove-Item -Path $TEMP_DIR -Recurse -Force -ErrorAction SilentlyContinue
 
 Write-Host ""
-Write-Host "✅ Installation complete!" -ForegroundColor Green
+Write-Host "[OK] Installation complete!" -ForegroundColor Green
 Write-Host ""
-Write-Host "📁 Binaries installed to: $INSTALL_DIR" -ForegroundColor Cyan
-Write-Host "⚙️  Config directory: $CONFIG_DIR" -ForegroundColor Cyan
+Write-Host "[INFO] Binaries installed to: $INSTALL_DIR" -ForegroundColor Cyan
+Write-Host "[INFO] Config directory: $CONFIG_DIR" -ForegroundColor Cyan
 
 if ($OS -eq "windows") {
     Write-Host ""
-    Write-Host "🚀 Quick start:" -ForegroundColor Yellow
+    Write-Host "Quick start:" -ForegroundColor Yellow
     Write-Host "  1. Start server: marchat-server" -ForegroundColor White
     Write-Host "  2. Connect client: marchat-client --username yourname" -ForegroundColor White
     Write-Host ""
-    Write-Host "💡 If commands are not found, restart your terminal or run:" -ForegroundColor Yellow
+    Write-Host "[TIP] If commands are not found, restart your terminal or run:" -ForegroundColor Yellow
     Write-Host "   refreshenv" -ForegroundColor White
 } else {
     Write-Host ""
-    Write-Host "🚀 Quick start:" -ForegroundColor Yellow
+    Write-Host "Quick start:" -ForegroundColor Yellow
     Write-Host "  1. Start server: marchat-server" -ForegroundColor White
     Write-Host "  2. Connect client: marchat-client --username yourname" -ForegroundColor White
 }
 
 Write-Host ""
-Write-Host "📖 For more information, visit: https://github.com/Cod-e-Codes/marchat" -ForegroundColor Blue
+Write-Host "For more information, visit: https://github.com/Cod-e-Codes/marchat" -ForegroundColor Blue

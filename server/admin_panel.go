@@ -833,7 +833,7 @@ func (ap *AdminPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return ap, ap.refreshPluginStore()
 			}
 			ap.refreshData()
-			ap.message = "🔄 Data refreshed"
+			ap.message = "Data refreshed"
 			ap.messageTimer = 3
 		case key.Matches(msg, ap.keys.ClearDB):
 			if ap.activeTab == tabSystem {
@@ -901,11 +901,11 @@ func (ap *AdminPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		case key.Matches(msg, ap.keys.ForceGC):
 			runtime.GC()
-			ap.message = "🗑️ Garbage collection forced"
+			ap.message = "Garbage collection forced"
 			ap.messageTimer = 3
 		case key.Matches(msg, ap.keys.ResetMetrics):
 			ap.resetMetrics()
-			ap.message = "📊 Metrics reset"
+			ap.message = "Metrics reset"
 			ap.messageTimer = 3
 		case key.Matches(msg, ap.keys.ExportLogs):
 			return ap, ap.exportLogs()
@@ -932,26 +932,26 @@ func (ap *AdminPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case clearDBMsg:
 		if msg.success {
-			ap.message = "🗑️ Database cleared successfully!"
+			ap.message = "Database cleared successfully!"
 			ap.refreshData()
 		} else {
-			ap.message = "❌ Failed to clear database: " + msg.error
+			ap.message = "ERROR: Failed to clear database: " + msg.error
 		}
 		ap.messageTimer = 5
 
 	case backupDBMsg:
 		if msg.success {
-			ap.message = "💾 Database backed up to: " + msg.filename
+			ap.message = "Database backed up to: " + msg.filename
 		} else {
-			ap.message = "❌ Failed to backup database: " + msg.error
+			ap.message = "ERROR: Failed to backup database: " + msg.error
 		}
 		ap.messageTimer = 5
 
 	case statsMsg:
 		if msg.success {
-			ap.message = "📊 " + msg.stats
+			ap.message = msg.stats
 		} else {
-			ap.message = "❌ Failed to get stats: " + msg.error
+			ap.message = "ERROR: Failed to get stats: " + msg.error
 		}
 		ap.messageTimer = 10
 
@@ -1156,7 +1156,7 @@ func (ap *AdminPanel) renderOverview() string {
 	doc.WriteString("\n")
 	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
 
-	statusText := "🟢 " + ap.systemInfo.ServerStatus
+	statusText := ap.systemInfo.ServerStatus
 	doc.WriteString(fmt.Sprintf("Status: %s\n", statusStyle.Render(statusText)))
 	doc.WriteString(fmt.Sprintf("Uptime: %s\n", formatDuration(ap.systemInfo.Uptime)))
 	doc.WriteString(fmt.Sprintf("Active Users: %d\n", ap.systemInfo.ActiveUsers))
@@ -1175,9 +1175,9 @@ func (ap *AdminPanel) renderOverview() string {
 	doc.WriteString(fmt.Sprintf("Port: %d\n", ap.config.Port))
 
 	// Show TLS status with live detection
-	tlsStatus := "❌ Disabled"
+	tlsStatus := "Disabled"
 	if ap.config.IsTLSEnabled() {
-		tlsStatus = "✅ Enabled"
+		tlsStatus = "Enabled"
 	}
 	doc.WriteString(fmt.Sprintf("TLS: %s\n", tlsStatus))
 
@@ -1384,7 +1384,7 @@ func (ap *AdminPanel) renderPlugins() string {
 		// Add arrow indicator for selected plugin
 		name := plugin.Name
 		if i == ap.selectedPlugin {
-			name = "▶ " + name
+			name = "> " + name
 		} else {
 			name = "  " + name
 		}
@@ -1561,7 +1561,7 @@ func (ap *AdminPanel) banUser(username string) tea.Cmd {
 		ap.hub.BanUser(username, ap.adminUsername())
 		return actionMsg{
 			success: true,
-			message: fmt.Sprintf("🚫 User '%s' has been banned", username),
+			message: fmt.Sprintf("User '%s' has been banned", username),
 		}
 	}
 }
@@ -1572,12 +1572,12 @@ func (ap *AdminPanel) unbanUser(username string) tea.Cmd {
 		if success {
 			return actionMsg{
 				success: true,
-				message: fmt.Sprintf("✅ User '%s' has been unbanned", username),
+				message: fmt.Sprintf("User '%s' has been unbanned", username),
 			}
 		}
 		return actionMsg{
 			success: false,
-			message: fmt.Sprintf("❌ User '%s' was not found in ban list", username),
+			message: fmt.Sprintf("ERROR: User '%s' was not found in ban list", username),
 		}
 	}
 }
@@ -1587,7 +1587,7 @@ func (ap *AdminPanel) kickUser(username string) tea.Cmd {
 		ap.hub.KickUser(username, ap.adminUsername())
 		return actionMsg{
 			success: true,
-			message: fmt.Sprintf("👢 User '%s' has been kicked (24h)", username),
+			message: fmt.Sprintf("User '%s' has been kicked (24h)", username),
 		}
 	}
 }
@@ -1598,12 +1598,12 @@ func (ap *AdminPanel) allowUser(username string) tea.Cmd {
 		if success {
 			return actionMsg{
 				success: true,
-				message: fmt.Sprintf("✅ User '%s' has been allowed back", username),
+				message: fmt.Sprintf("User '%s' has been allowed back", username),
 			}
 		}
 		return actionMsg{
 			success: false,
-			message: fmt.Sprintf("❌ User '%s' was not found in kick list", username),
+			message: fmt.Sprintf("ERROR: User '%s' was not found in kick list", username),
 		}
 	}
 }
@@ -1613,13 +1613,13 @@ func (ap *AdminPanel) enablePlugin(pluginName string) tea.Cmd {
 		if err := ap.pluginManager.EnablePlugin(pluginName); err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to enable plugin '%s': %v", pluginName, err),
+				message: fmt.Sprintf("ERROR: Failed to enable plugin '%s': %v", pluginName, err),
 			}
 		}
 		ap.loadPlugins() // Refresh plugin list
 		return actionMsg{
 			success: true,
-			message: fmt.Sprintf("✅ Plugin '%s' has been enabled", pluginName),
+			message: fmt.Sprintf("Plugin '%s' has been enabled", pluginName),
 		}
 	}
 }
@@ -1629,7 +1629,7 @@ func (ap *AdminPanel) disablePlugin(pluginName string) tea.Cmd {
 		if err := ap.pluginManager.DisablePlugin(pluginName); err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to disable plugin '%s': %v", pluginName, err),
+				message: fmt.Sprintf("ERROR: Failed to disable plugin '%s': %v", pluginName, err),
 			}
 		}
 		ap.loadPlugins() // Refresh plugin list
@@ -1645,13 +1645,13 @@ func (ap *AdminPanel) uninstallPlugin(pluginName string) tea.Cmd {
 		if err := ap.pluginManager.UninstallPlugin(pluginName); err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to uninstall plugin '%s': %v", pluginName, err),
+				message: fmt.Sprintf("ERROR: Failed to uninstall plugin '%s': %v", pluginName, err),
 			}
 		}
 		ap.loadPlugins() // Refresh plugin list
 		return actionMsg{
 			success: true,
-			message: fmt.Sprintf("🗑️ Plugin '%s' has been uninstalled", pluginName),
+			message: fmt.Sprintf("Plugin '%s' has been uninstalled", pluginName),
 		}
 	}
 }
@@ -1661,13 +1661,13 @@ func (ap *AdminPanel) installPlugin(pluginName string) tea.Cmd {
 		if err := ap.pluginManager.InstallPlugin(pluginName); err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to install plugin '%s': %v", pluginName, err),
+				message: fmt.Sprintf("ERROR: Failed to install plugin '%s': %v", pluginName, err),
 			}
 		}
 		ap.loadPlugins() // Refresh plugin list
 		return actionMsg{
 			success: true,
-			message: fmt.Sprintf("📦 Plugin '%s' installed successfully", pluginName),
+			message: fmt.Sprintf("Plugin '%s' installed successfully", pluginName),
 		}
 	}
 }
@@ -1677,13 +1677,13 @@ func (ap *AdminPanel) refreshPluginStore() tea.Cmd {
 		if err := ap.pluginManager.RefreshStore(); err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to refresh plugin store: %v", err),
+				message: fmt.Sprintf("ERROR: Failed to refresh plugin store: %v", err),
 			}
 		}
 		ap.loadPlugins() // Refresh plugin list
 		return actionMsg{
 			success: true,
-			message: "🔄 Plugin store refreshed successfully",
+			message: "Plugin store refreshed successfully",
 		}
 	}
 }
@@ -1725,7 +1725,7 @@ func (ap *AdminPanel) exportLogs() tea.Cmd {
 		if err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to get log directory: %v", err),
+				message: fmt.Sprintf("ERROR: Failed to get log directory: %v", err),
 			}
 		}
 
@@ -1733,7 +1733,7 @@ func (ap *AdminPanel) exportLogs() tea.Cmd {
 		if err := os.MkdirAll(logDir, 0755); err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to create log directory: %v", err),
+				message: fmt.Sprintf("ERROR: Failed to create log directory: %v", err),
 			}
 		}
 
@@ -1745,13 +1745,13 @@ func (ap *AdminPanel) exportLogs() tea.Cmd {
 		if err := os.WriteFile(filename, []byte(logText.String()), 0644); err != nil {
 			return actionMsg{
 				success: false,
-				message: fmt.Sprintf("❌ Failed to write log file: %v", err),
+				message: fmt.Sprintf("ERROR: Failed to write log file: %v", err),
 			}
 		}
 
 		return actionMsg{
 			success: true,
-			message: fmt.Sprintf("📄 Logs exported to: %s", filename),
+			message: fmt.Sprintf("Logs exported to: %s", filename),
 		}
 	}
 }

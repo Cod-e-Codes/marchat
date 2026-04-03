@@ -59,9 +59,6 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 		timestamp := styles.Timestamp.Render("[" + timeStr + "]")
 
 		var prefix string
-		if msg.MessageID > 0 {
-			prefix = styles.Timestamp.Render(fmt.Sprintf("#%d ", msg.MessageID))
-		}
 		if msg.Type == shared.DirectMessage {
 			prefix += lipgloss.NewStyle().Foreground(lipgloss.Color("#FF69B4")).Render("[DM] ")
 		}
@@ -73,7 +70,7 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 		if msg.Type == shared.DeleteMessage {
 			content = styles.Timestamp.Render("[deleted]")
 		} else if msg.Type == shared.FileMessageType && msg.File != nil {
-			content = fmt.Sprintf("📎 File: %s (%d bytes); use :savefile %s to save", msg.File.Filename, msg.File.Size, msg.File.Filename)
+			content = fmt.Sprintf("File: %s (%d bytes); use :savefile %s to save", msg.File.Filename, msg.File.Size, msg.File.Filename)
 		} else {
 			content = renderEmojis(content)
 			content = renderCodeBlocks(content)
@@ -91,17 +88,25 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 			}
 		}
 
+		var metadata []string
+		if msg.MessageID > 0 {
+			metadata = append(metadata, fmt.Sprintf("id:%d", msg.MessageID))
+		}
 		if msg.Encrypted {
-			content = "🔒 " + content
+			metadata = append(metadata, "encrypted")
+		}
+		metaSuffix := ""
+		if len(metadata) > 0 {
+			metaSuffix = " " + styles.Timestamp.Render("["+strings.Join(metadata, ", ")+"]")
 		}
 
 		switch msg.Sender {
 		case "System":
-			b.WriteString(timestamp + " " + prefix + styles.Info.Render(content) + "\n")
+			b.WriteString(timestamp + " " + prefix + styles.Info.Render(content) + metaSuffix + "\n")
 		case username:
-			b.WriteString(timestamp + " " + prefix + styles.Me.Render(msg.Sender) + ": " + content + "\n")
+			b.WriteString(timestamp + " " + prefix + styles.Me.Render(msg.Sender) + ": " + content + metaSuffix + "\n")
 		default:
-			b.WriteString(timestamp + " " + prefix + styles.Other.Render(msg.Sender) + ": " + content + "\n")
+			b.WriteString(timestamp + " " + prefix + styles.Other.Render(msg.Sender) + ": " + content + metaSuffix + "\n")
 		}
 
 		if reactionMap != nil && msg.MessageID > 0 {

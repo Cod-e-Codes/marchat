@@ -367,7 +367,7 @@ func (i pluginItem) Title() string {
 	status := ""
 	if i.plugin.Installed {
 		if i.plugin.Enabled {
-			status = " [✓]"
+			status = " [installed]"
 		} else {
 			status = " [⊘]"
 		}

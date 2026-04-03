@@ -112,7 +112,7 @@ func createFileListItems(dir string) []list.Item {
 	for _, file := range files {
 		if file.IsDir() && !strings.HasPrefix(file.Name(), ".") {
 			items = append(items, fileItem{
-				title:       "📁 " + file.Name(),
+				title:       "[DIR] " + file.Name(),
 				description: "Directory",
 				path:        filepath.Join(dir, file.Name()),
 				isDir:       true,
@@ -130,7 +130,7 @@ func createFileListItems(dir string) []list.Item {
 			}
 
 			items = append(items, fileItem{
-				title:       "📄 " + file.Name(),
+				title:       "[FILE] " + file.Name(),
 				description: formatFileSize(size),
 				path:        filepath.Join(dir, file.Name()),
 				isDir:       false,
@@ -258,7 +258,7 @@ func (m filePickerModel) View() string {
 		s.WriteString(m.styles.HelpTitle.Render("Select File to Send") + "\n\n")
 
 		if m.err != nil {
-			s.WriteString(m.styles.Banner.Render("❌ "+m.err.Error()) + "\n\n")
+			s.WriteString(m.styles.Banner.Render("[ERROR] "+m.err.Error()) + "\n\n")
 		} else {
 			s.WriteString(m.styles.Time.Render("Navigate with arrow keys, Enter to select, Esc to cancel") + "\n\n")
 		}

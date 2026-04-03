@@ -3,8 +3,16 @@ services:
     build: .
     ports:
       - "8080:8080"
+    # Load secrets from the same gitignored files used for local dev (see README).
+    # Optional paths avoid compose errors when a file is absent (server still validates at runtime).
+    env_file:
+      - path: config/.env
+        required: false
+      - path: .env
+        required: false
     environment:
       - MARCHAT_PORT=8080
+      # Use the named volume path in containers even if config/.env sets a host path
       - MARCHAT_DB_PATH=/data/marchat.db
     volumes:
       - marchat-data:/data

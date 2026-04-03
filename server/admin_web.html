@@ -822,7 +822,7 @@
         </div>
     </div>
     
-    <button class="refresh-btn" onclick="refreshData()" id="refresh-btn">🔄</button>
+    <button class="refresh-btn" onclick="refreshData()" id="refresh-btn">Refresh</button>
     
     <div id="message" class="message"></div>
     
@@ -1084,7 +1084,7 @@
                     <div class="config-item">
                         <span class="config-label">TLS:</span>
                         <span class="config-value ${config.tls_enabled ? 'status-online' : 'status-offline'}">
-                            ${config.tls_enabled ? '✅ Enabled' : '❌ Disabled'}
+                            ${config.tls_enabled ? 'Enabled' : 'Disabled'}
                         </span>
                     </div>
                     <div class="config-item">
@@ -1204,7 +1204,7 @@
                     <div class="config-item">
                         <span class="config-label">TLS Status:</span>
                         <span class="config-value ${config.tls_enabled ? 'status-online' : 'status-offline'}">
-                            ${config.tls_enabled ? '✅ Enabled' : '❌ Disabled'}
+                            ${config.tls_enabled ? 'Enabled' : 'Disabled'}
                         </span>
                     </div>
                     ${config.tls_enabled ? `

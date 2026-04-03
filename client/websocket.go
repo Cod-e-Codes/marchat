@@ -276,7 +276,7 @@ func (m *model) connectWebSocket(serverURL string) error {
 
 	m.conn = conn
 	m.connected = true
-	m.banner = "✅ Connected to server!"
+	m.banner = "[OK] Connected to server."
 	m.ctx, m.cancel = context.WithCancel(context.Background())
 	m.msgChan = make(chan tea.Msg, 256)
 

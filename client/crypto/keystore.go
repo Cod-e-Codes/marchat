@@ -100,7 +100,7 @@ func (ks *KeyStore) initializeGlobalKey() error {
 			KeyID:     base64.StdEncoding.EncodeToString(keyID[:]),
 		}
 
-		fmt.Printf("🔐 Using global E2E key from environment variable\n")
+		fmt.Printf("[INFO] Using global E2E key from environment variable\n")
 		return nil
 	}
 
@@ -118,8 +118,8 @@ func (ks *KeyStore) initializeGlobalKey() error {
 			KeyID:     base64.StdEncoding.EncodeToString(keyID[:]),
 		}
 
-		fmt.Printf("🔐 Generated new global E2E key (ID: %s)\n", ks.globalKey.KeyID)
-		fmt.Printf("💡 Set MARCHAT_GLOBAL_E2E_KEY=%s to share this key across clients\n",
+		fmt.Printf("[INFO] Generated new global E2E key (ID: %s)\n", ks.globalKey.KeyID)
+		fmt.Printf("[TIP] Set MARCHAT_GLOBAL_E2E_KEY=%s to share this key across clients\n",
 			base64.StdEncoding.EncodeToString(ks.globalKey.Key))
 
 		// Save the newly generated key to disk

@@ -171,14 +171,9 @@ docker run -d -p 8080:8080 \
 
 **Docker Compose (local development):**
 
-The sample `docker-compose.yml` only sets port and database path. You must still provide **`MARCHAT_ADMIN_KEY`** and **`MARCHAT_USERS`** (see [Essential Environment Variables](#essential-environment-variables)). Typical approach: add the two lines below under `server.environment` and keep values in a gitignored `.env` file next to the compose file (Compose substitutes `${VAR}` from that `.env` automatically):
+The `server` service loads **`config/.env` first, then a project-root `.env`** (both optional and gitignored). Put **`MARCHAT_ADMIN_KEY`** and **`MARCHAT_USERS`** in either file (see [Essential Environment Variables](#essential-environment-variables)). Compose also sets **`MARCHAT_DB_PATH=/data/marchat.db`** so SQLite uses the attached volume.
 
-```yaml
-      - MARCHAT_ADMIN_KEY=${MARCHAT_ADMIN_KEY}
-      - MARCHAT_USERS=${MARCHAT_USERS}
-```
-
-Example `.env` (generate a strong key for anything reachable from a network):
+Example snippet for `config/.env` or `.env` (generate a strong key for anything reachable from a network):
 
 ```bash
 MARCHAT_ADMIN_KEY=your-secret-here
@@ -537,16 +532,18 @@ export MARCHAT_GLOBAL_E2E_KEY="your-generated-key"
 ./marchat-client --e2e --keystore-passphrase your-pass --username alice --server ws://localhost:8080/ws
 
 # Output shows:
-# 🔐 Generated new global E2E key (ID: RsLi9ON0...)
-# 💡 Set MARCHAT_GLOBAL_E2E_KEY=fF+HkmGArkPNsdb+... to share this key
+# [INFO] Generated new global E2E key (ID: RsLi9ON0...)
+# [TIP] Set MARCHAT_GLOBAL_E2E_KEY=fF+HkmGArkPNsdb+... to share this key across clients
 ```
 
 ### Expected Output
 ```
-🔐 Using global E2E key from environment variable
-🌐 Global chat encryption: ENABLED (Key ID: RsLi9ON0...)
-✅ Encryption validation passed
-🔐 E2E encryption enabled with keystore: config/keystore.dat
+[INFO] Using global E2E key from environment variable
+E2E encryption enabled
+Using global E2E key from environment variable
+Global chat encryption: ENABLED (Key ID: RsLi9ON0...)
+Encryption validation passed
+E2E encryption enabled with keystore: config/keystore.dat
 ```
 
 ### Security Features

@@ -455,7 +455,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch v := msg.(type) {
 	case wsConnected:
 		m.connected = true
-		m.banner = "✅ Connected to server!"
+		m.banner = "[OK] Connected to server."
 		m.reconnectDelay = time.Second // reset on success
 		return m, m.listenWebSocket()
 	case wsReaderClosed:
@@ -476,7 +476,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if err := json.Unmarshal(v.Data, &authFail); err == nil {
 				log.Printf("Auth failure reason: %s", authFail["reason"])
 			}
-			fmt.Printf("❌ Authentication failed: %s\n", authFail["reason"])
+			fmt.Printf("[ERROR] Authentication failed: %s\n", authFail["reason"])
 			fmt.Printf("Check your --admin-key matches the server's MARCHAT_ADMIN_KEY\n")
 			os.Exit(1)
 		}
@@ -493,14 +493,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				if err := debugEncryptAndSend(recipients, v.content, m.conn, m.keystore, m.cfg.Username); err != nil {
 					log.Printf("Failed to send code snippet: %v", err)
-					m.banner = "❌ Failed to send code snippet"
+					m.banner = "[ERROR] Failed to send code snippet"
 				}
 			} else {
 				// Send plain text message
 				msg := shared.Message{Sender: m.cfg.Username, Content: v.content}
 				if err := debugWebSocketWrite(m.conn, msg); err != nil {
 					log.Printf("Failed to send code snippet: %v", err)
-					m.banner = "❌ Failed to send code snippet"
+					m.banner = "[ERROR] Failed to send code snippet"
 				}
 			}
 		}
@@ -514,7 +514,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			// Read the file
 			data, err := os.ReadFile(v.filePath)
 			if err != nil {
-				m.banner = "❌ Failed to read file: " + err.Error()
+				m.banner = "[ERROR] Failed to read file: " + err.Error()
 				m.sending = false
 				m.showFilePicker = false
 				return m, nil
@@ -537,7 +537,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if maxBytes%(1024*1024) == 0 {
 					limitMsg = fmt.Sprintf("%dMB", maxBytes/(1024*1024))
 				}
-				m.banner = "❌ File too large (max " + limitMsg + ")"
+				m.banner = "[ERROR] File too large (max " + limitMsg + ")"
 				m.sending = false
 				m.showFilePicker = false
 				return m, nil
@@ -560,7 +560,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if globalKey != nil {
 					encData, encErr := m.keystore.EncryptRaw(data, "global")
 					if encErr != nil {
-						m.banner = "❌ Failed to encrypt file: " + encErr.Error()
+						m.banner = "[ERROR] Failed to encrypt file: " + encErr.Error()
 						m.sending = false
 						m.showFilePicker = false
 						return m, nil
@@ -572,7 +572,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			err = m.conn.WriteJSON(msg)
 			if err != nil {
-				m.banner = "❌ Failed to send file (connection lost)"
+				m.banner = "[ERROR] Failed to send file (connection lost)"
 				m.sending = false
 				m.showFilePicker = false
 				return m, m.listenWebSocket()
@@ -657,13 +657,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case wsUsernameError:
 		log.Printf("Handling wsUsernameError: %s", v.message)
 		m.connected = false
-		m.banner = "❌ " + v.message + " - Please restart with a different username"
+		m.banner = "[ERROR] " + v.message + " - Please restart with a different username"
 		m.closeWebSocket()
 		// Don't attempt to reconnect for username errors
 		return m, nil
 	case wsErr:
 		m.connected = false
-		m.banner = "🚫 Connection lost. Reconnecting..."
+		m.banner = "[WARN] Connection lost. Reconnecting..."
 		m.closeWebSocket()
 		delay := m.reconnectDelay
 		if delay < reconnectMaxDelay {
@@ -975,14 +975,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					if err != nil {
 						if isTermux() {
-							m.banner = fmt.Sprintf("⚠️ Clipboard unavailable in Termux. Text: %s", text)
+							m.banner = fmt.Sprintf("[WARN] Clipboard unavailable in Termux. Text: %s", text)
 						} else if err == context.DeadlineExceeded {
-							m.banner = "⚠️ Clipboard operation timed out"
+							m.banner = "[WARN] Clipboard operation timed out"
 						} else {
-							m.banner = "❌ Failed to copy to clipboard: " + err.Error()
+							m.banner = "[ERROR] Failed to copy to clipboard: " + err.Error()
 						}
 					} else {
-						m.banner = "✅ Copied to clipboard"
+						m.banner = "[OK] Copied to clipboard"
 					}
 				}
 				return m, nil
@@ -999,15 +999,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 				if err != nil {
 					if isTermux() {
-						m.banner = "⚠️ Clipboard unavailable in Termux. Paste manually or use other methods."
+						m.banner = "[WARN] Clipboard unavailable in Termux. Paste manually or use other methods."
 					} else if err == context.DeadlineExceeded {
-						m.banner = "⚠️ Clipboard operation timed out"
+						m.banner = "[WARN] Clipboard operation timed out"
 					} else {
-						m.banner = "❌ Failed to paste from clipboard: " + err.Error()
+						m.banner = "[ERROR] Failed to paste from clipboard: " + err.Error()
 					}
 				} else {
 					m.textarea.SetValue(m.textarea.Value() + text)
-					m.banner = "✅ Pasted from clipboard"
+					m.banner = "[OK] Pasted from clipboard"
 				}
 				return m, nil
 			}
@@ -1022,14 +1022,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					if err != nil {
 						if isTermux() {
-							m.banner = fmt.Sprintf("⚠️ Clipboard unavailable in Termux. Text cleared: %s", text)
+							m.banner = fmt.Sprintf("[WARN] Clipboard unavailable in Termux. Text cleared: %s", text)
 						} else if err == context.DeadlineExceeded {
-							m.banner = "⚠️ Clipboard operation timed out"
+							m.banner = "[WARN] Clipboard operation timed out"
 						} else {
-							m.banner = "❌ Failed to cut to clipboard: " + err.Error()
+							m.banner = "[ERROR] Failed to cut to clipboard: " + err.Error()
 						}
 					} else {
-						m.banner = "✅ Cut to clipboard"
+						m.banner = "[OK] Cut to clipboard"
 					}
 					m.textarea.SetValue("")
 				}
@@ -1046,14 +1046,14 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 					if err != nil {
 						if isTermux() {
-							m.banner = fmt.Sprintf("⚠️ Clipboard unavailable in Termux. Full text: %s", text)
+							m.banner = fmt.Sprintf("[WARN] Clipboard unavailable in Termux. Full text: %s", text)
 						} else if err == context.DeadlineExceeded {
-							m.banner = "⚠️ Clipboard operation timed out"
+							m.banner = "[WARN] Clipboard operation timed out"
 						} else {
-							m.banner = "❌ Failed to select all: " + err.Error()
+							m.banner = "[ERROR] Failed to select all: " + err.Error()
 						}
 					} else {
-						m.banner = "✅ Selected all and copied to clipboard"
+						m.banner = "[OK] Selected all and copied to clipboard"
 					}
 				}
 				return m, nil
@@ -1066,7 +1066,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.pendingPluginAction != "" {
 				pluginName := strings.TrimSpace(text)
 				if pluginName == "" {
-					m.banner = "❌ Plugin name cannot be empty"
+					m.banner = "[ERROR] Plugin name cannot be empty"
 					m.textarea.SetValue("")
 					m.pendingPluginAction = ""
 					return m, nil
@@ -1121,7 +1121,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// Send file with provided path (existing functionality)
 						data, err := os.ReadFile(path)
 						if err != nil {
-							m.banner = "❌ Failed to read file: " + err.Error()
+							m.banner = "[ERROR] Failed to read file: " + err.Error()
 							m.textarea.SetValue("")
 							return m, nil
 						}
@@ -1141,7 +1141,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							if maxBytes%(1024*1024) == 0 {
 								limitMsg = fmt.Sprintf("%dMB", maxBytes/(1024*1024))
 							}
-							m.banner = "❌ File too large (max " + limitMsg + ")"
+							m.banner = "[ERROR] File too large (max " + limitMsg + ")"
 							m.textarea.SetValue("")
 							return m, nil
 						}
@@ -1161,7 +1161,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							if globalKey != nil {
 								encData, encErr := m.keystore.EncryptRaw(data, "global")
 								if encErr != nil {
-									m.banner = "❌ Failed to encrypt file: " + encErr.Error()
+									m.banner = "[ERROR] Failed to encrypt file: " + encErr.Error()
 									m.textarea.SetValue("")
 									return m, nil
 								}
@@ -1172,7 +1172,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						if m.conn != nil {
 							err := m.conn.WriteJSON(msg)
 							if err != nil {
-								m.banner = "❌ Failed to send file (connection lost)"
+								m.banner = "[ERROR] Failed to send file (connection lost)"
 								m.textarea.SetValue("")
 								return m, m.listenWebSocket()
 							}
@@ -1187,7 +1187,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(text, ":savefile ") {
 				filename := strings.TrimSpace(strings.TrimPrefix(text, ":savefile "))
 				if m.receivedFiles == nil || m.receivedFiles[filename] == nil {
-					m.banner = "❌ No files received yet."
+					m.banner = "[ERROR] No files received yet."
 					m.textarea.SetValue("")
 					return m, nil
 				}
@@ -1210,9 +1210,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				err := os.WriteFile(saveName, file.Data, 0644)
 				if err != nil {
-					m.banner = "❌ Failed to save file: " + err.Error()
+					m.banner = "[ERROR] Failed to save file: " + err.Error()
 				} else {
-					m.banner = "✅ File saved as: " + saveName
+					m.banner = "[OK] File saved as: " + saveName
 				}
 				m.textarea.SetValue("")
 				return m, nil
@@ -1221,12 +1221,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				// List all available themes as a system message
 				themes := ListAllThemes()
 				var themeList strings.Builder
-				themeList.WriteString("📋 Available themes:\n\n")
+				themeList.WriteString("Available themes:\n\n")
 				for _, themeName := range themes {
 					themeList.WriteString("  • ")
 					themeList.WriteString(GetThemeInfo(themeName))
 					if themeName == m.cfg.Theme {
-						themeList.WriteString(" ⭐ [current]")
+						themeList.WriteString(" [current]")
 					}
 					themeList.WriteString("\n")
 				}
@@ -1754,7 +1754,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						err := m.conn.WriteJSON(msg)
 						if err != nil {
-							m.banner = "❌ Failed to send command (connection lost)"
+							m.banner = "[ERROR] Failed to send command (connection lost)"
 							m.sending = false
 							return m, m.listenWebSocket()
 						}
@@ -1767,7 +1767,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							Content:   text,
 						}
 						if err := m.conn.WriteJSON(dmMsg); err != nil {
-							m.banner = "❌ Failed to send DM (connection lost)"
+							m.banner = "[ERROR] Failed to send DM (connection lost)"
 							m.sending = false
 							return m, m.listenWebSocket()
 						}
@@ -1777,7 +1777,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 						// Validate keystore is unlocked
 						if err := verifyKeystoreUnlocked(m.keystore); err != nil {
-							m.banner = fmt.Sprintf("❌ Keystore not unlocked: %v", err)
+							m.banner = fmt.Sprintf("[ERROR] Keystore not unlocked: %v", err)
 							m.sending = false
 							m.textarea.SetValue("")
 							return m, nil
@@ -1792,7 +1792,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 						// Use the debug encryption function for global chat
 						if err := debugEncryptAndSend(recipients, text, m.conn, m.keystore, m.cfg.Username); err != nil {
-							m.banner = fmt.Sprintf("❌ Global encryption failed: %v", err)
+							m.banner = fmt.Sprintf("[ERROR] Global encryption failed: %v", err)
 							m.sending = false
 							m.textarea.SetValue("")
 							return m, nil
@@ -1804,7 +1804,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						// Send plain text message
 						msg := shared.Message{Sender: m.cfg.Username, Content: text}
 						if err := debugWebSocketWrite(m.conn, msg); err != nil {
-							m.banner = "❌ Failed to send (connection lost)"
+							m.banner = "[ERROR] Failed to send (connection lost)"
 							m.sending = false
 							return m, m.listenWebSocket()
 						}
@@ -1915,9 +1915,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					clickedURL := m.findURLAtClickPosition(v.X, v.Y)
 					if clickedURL != "" {
 						if err := openURL(clickedURL); err != nil {
-							m.banner = "❌ Failed to open URL: " + err.Error()
+							m.banner = "[ERROR] Failed to open URL: " + err.Error()
 						} else {
-							m.banner = "✅ Opening URL: " + clickedURL
+							m.banner = "[OK] Opening URL: " + clickedURL
 						}
 					}
 				}
@@ -1936,21 +1936,21 @@ func (m *model) View() string {
 	headerText := fmt.Sprintf(" marchat %s ", shared.ClientVersion)
 	header := m.styles.Header.Width(m.viewport.Width + userListWidth + 4).Render(headerText)
 
-	connStatus := "🔴 Disconnected"
+	connStatus := "Disconnected"
 	if m.connected {
-		connStatus = "🟢 Connected"
+		connStatus = "Connected"
 	}
 	footerText := connStatus + " | Press Ctrl+H for help"
 	if m.showHelp {
 		footerText = connStatus + " | Press Ctrl+H to close help"
 	}
 	if m.useE2E {
-		footerText += " | 🔒 E2E Encrypted"
+		footerText += " | E2E Encrypted"
 	} else {
-		footerText += " | 🔓 Unencrypted"
+		footerText += " | Unencrypted"
 	}
 	if m.unreadCount > 0 {
-		footerText += fmt.Sprintf(" | 📬 %d unread", m.unreadCount)
+		footerText += fmt.Sprintf(" | %d unread", m.unreadCount)
 	}
 	footer := m.styles.Footer.Width(m.viewport.Width + userListWidth + 4).Render(footerText)
 
@@ -1960,9 +1960,9 @@ func (m *model) View() string {
 		bannerText := m.banner
 		if m.sending {
 			if bannerText != "" {
-				bannerText += " ⏳ Sending..."
+				bannerText += " [Sending...]"
 			} else {
-				bannerText = "⏳ Sending..."
+				bannerText = "[Sending...]"
 			}
 		}
 		bannerBox = m.styles.Banner.
@@ -2277,7 +2277,7 @@ func main() {
 
 		if isFirstTime {
 			// First time user - show welcome and go straight to config creation
-			fmt.Println("🎉 Welcome to marchat! Let's get you set up...")
+			fmt.Println("Welcome to marchat! Let's get you set up...")
 
 			configResult, keystorePass, err := config.RunInteractiveConfig()
 			if err != nil {
@@ -2302,11 +2302,11 @@ func main() {
 			if err := loader.SaveProfiles(profiles); err != nil {
 				fmt.Printf("Warning: Could not save profile: %v\n", err)
 			}
-			fmt.Println("✅ Configuration saved! Next time you can use --auto or --quick-start for faster connections.")
+			fmt.Println("[OK] Configuration saved! Next time you can use --auto or --quick-start for faster connections.")
 
 		} else {
 			// Existing user - show profile selection with option to create new
-			fmt.Println("📝 Select a connection profile or create a new one...")
+			fmt.Println("Select a connection profile or create a new one...")
 
 			// Sort profiles by last used (most recent first)
 			sort.Slice(profiles.Profiles, func(i, j int) bool {
@@ -2347,7 +2347,7 @@ func main() {
 				if err := loader.SaveProfiles(profiles); err != nil {
 					fmt.Printf("Warning: Could not save profile: %v\n", err)
 				}
-				fmt.Printf("✅ Configuration saved as '%s'! You can use --auto or --quick-start for faster connections.\n", profileName)
+				fmt.Printf("[OK] Configuration saved as '%s'! You can use --auto or --quick-start for faster connections.\n", profileName)
 
 			} else {
 				// We now have the actual profile object, not just an index!
@@ -2493,9 +2493,9 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 
 	// Termux clipboard availability notice
 	if isTermux() {
-		fmt.Println("⚠️  Termux environment detected")
+		fmt.Println("[WARN]  Termux environment detected")
 		if !checkClipboardSupport() {
-			fmt.Println("⚠️  Clipboard operations may be unavailable - text will be shown in banner")
+			fmt.Println("[WARN]  Clipboard operations may be unavailable - text will be shown in banner")
 		}
 	}
 

@@ -32,34 +32,34 @@ TEMP_DIR=$(mktemp -d)
 ZIP_FILE="$TEMP_DIR/marchat.zip"
 EXTRACT_DIR="$TEMP_DIR/extracted"
 
-echo "🔍 Detected OS: $OS"
-echo "🔍 Detected ARCH: $ARCH"
-echo "📥 Download URL: $URL"
-echo "📁 Temp directory: $TEMP_DIR"
+echo "[INFO] Detected OS: $OS"
+echo "[INFO] Detected ARCH: $ARCH"
+echo "[INFO] Download URL: $URL"
+echo "[INFO] Temp directory: $TEMP_DIR"
 
 # Check if curl is available
 if ! command -v curl &> /dev/null; then
-  echo "❌ Error: curl is required but not installed"
+  echo "[ERROR] Error: curl is required but not installed"
   exit 1
 fi
 
 # Check if unzip is available
 if ! command -v unzip &> /dev/null; then
-  echo "❌ Error: unzip is required but not installed"
+  echo "[ERROR] Error: unzip is required but not installed"
   exit 1
 fi
 
 # Download the zip
-echo "📥 Downloading marchat $VERSION..."
+echo "[INFO] Downloading marchat $VERSION..."
 curl -L -o "$ZIP_FILE" "$URL"
 if [ $? -ne 0 ]; then
-  echo "❌ Download failed!"
+  echo "[ERROR] Download failed!"
   exit 1
 fi
 
 # Extract zip
 mkdir -p "$EXTRACT_DIR"
-echo "📦 Extracting..."
+echo "[INFO] Extracting..."
 unzip -q "$ZIP_FILE" -d "$EXTRACT_DIR"
 
 # Determine install directory based on OS
@@ -93,13 +93,13 @@ case "$OS" in
     USE_SUDO=""
     ;;
   *)
-    echo "❌ Unsupported OS: $OS"
+    echo "[ERROR] Unsupported OS: $OS"
     exit 1
     ;;
 esac
 
-echo "📁 Installing to: $INSTALL_DIR"
-echo "⚙️  Config directory: $CONFIG_DIR"
+echo "[INFO] Installing to: $INSTALL_DIR"
+echo "[INFO] Config directory: $CONFIG_DIR"
 
 # Create install directory
 if [[ -n "$USE_SUDO" ]]; then
@@ -121,14 +121,14 @@ for file in "$EXTRACT_DIR"/*; do
 done
 
 if [[ -z "$SERVER_BINARY" ]] || [[ -z "$CLIENT_BINARY" ]]; then
-  echo "❌ Error: Could not find marchat binaries in the downloaded archive"
-  echo "📁 Contents of extract directory:"
+  echo "[ERROR] Error: Could not find marchat binaries in the downloaded archive"
+  echo "[INFO] Contents of extract directory:"
   ls -la "$EXTRACT_DIR"
   exit 1
 fi
 
 # Copy binaries
-echo "📋 Copying binaries..."
+echo "[INFO] Copying binaries..."
 if [[ -n "$USE_SUDO" ]]; then
   $USE_SUDO cp "$SERVER_BINARY" "$INSTALL_DIR/marchat-server"
   $USE_SUDO cp "$CLIENT_BINARY" "$INSTALL_DIR/marchat-client"
@@ -143,17 +143,17 @@ fi
 mkdir -p "$CONFIG_DIR"
 
 # Clean up temp directory
-echo "🧹 Cleaning up..."
+echo "[INFO] Cleaning up..."
 rm -rf "$TEMP_DIR"
 
 echo ""
-echo "✅ Installation complete!"
+echo "[OK] Installation complete!"
 echo ""
-echo "📁 Binaries installed to: $INSTALL_DIR"
-echo "⚙️  Config directory: $CONFIG_DIR"
+echo "[INFO] Binaries installed to: $INSTALL_DIR"
+echo "[INFO] Config directory: $CONFIG_DIR"
 echo ""
-echo "🚀 Quick start:"
+echo "Quick start:"
 echo "  1. Start server: marchat-server"
 echo "  2. Connect client: marchat-client --username yourname"
 echo ""
-echo "📖 For more information, visit: https://github.com/Cod-e-Codes/marchat"
+echo "For more information, visit: https://github.com/Cod-e-Codes/marchat"

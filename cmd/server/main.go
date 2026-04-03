@@ -72,15 +72,15 @@ func printBanner(addr string, admins []string, scheme string, tlsEnabled bool) {
 ░██       ░██ ░██   ░██  ░██      ░██    ░██ ░██    ░██ ░██   ░██     ░██    
 ░██       ░██  ░█████░██ ░██       ░███████  ░██    ░██  ░█████░██     ░████ `)
 	fmt.Println()
-	fmt.Printf("\U0001F310 WebSocket: %s://%s/ws\n", scheme, addr)
-	fmt.Printf("\U0001F511 Admins: %s\n", strings.Join(admins, ", "))
-	fmt.Printf("\U0001F4E6 Version: %s\n", shared.GetServerVersionInfo())
+	fmt.Printf("WebSocket: %s://%s/ws\n", scheme, addr)
+	fmt.Printf("Admins: %s\n", strings.Join(admins, ", "))
+	fmt.Printf("Version: %s\n", shared.GetServerVersionInfo())
 	if tlsEnabled {
-		fmt.Println("\U0001F512 TLS: Enabled")
+		fmt.Println("TLS: Enabled")
 	} else {
-		fmt.Println("\U0001F513 TLS: Disabled")
+		fmt.Println("TLS: Disabled")
 	}
-	fmt.Println("\U0001F4A1 Tip: Use --username <admin> --admin --admin-key <key> to connect as admin")
+	fmt.Println("Tip: Use --username <admin> --admin --admin-key <key> to connect as admin")
 }
 
 func main() {
@@ -154,7 +154,7 @@ func main() {
 			os.Exit(2)
 		}
 
-		fmt.Println("🚀 Welcome to marchat server setup!")
+		fmt.Println("[INFO] Welcome to marchat server setup!")
 		fmt.Println("Some required configuration is missing. Let's set it up interactively.")
 		fmt.Println()
 
@@ -182,8 +182,8 @@ func main() {
 		}
 
 		fmt.Println()
-		fmt.Println("✅ Configuration saved! You can now start the server.")
-		fmt.Println("💡 Tip: Set environment variables to avoid this setup next time.")
+		fmt.Println("[OK] Configuration saved. You can now start the server.")
+		fmt.Println("[TIP] Set environment variables to avoid this setup next time.")
 		fmt.Println()
 	}
 
@@ -323,7 +323,7 @@ func main() {
 	// Print banner
 	printBanner(serverAddr, admins, scheme, cfg.IsTLSEnabled())
 	if adminPanelReady {
-		fmt.Println("\U0001F4BB Admin Panel: Press Ctrl+A to open admin panel, Ctrl+C to shutdown")
+		fmt.Println("Admin panel: Press Ctrl+A to open admin panel, Ctrl+C to shutdown")
 	}
 
 	// Create a custom server instance

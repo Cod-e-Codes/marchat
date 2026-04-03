@@ -316,12 +316,12 @@ func (m ServerConfigModel) View() string {
 	var b strings.Builder
 
 	// Title
-	b.WriteString(serverTitleStyle.Render("🚀 marchat Server Configuration"))
+	b.WriteString(serverTitleStyle.Render("marchat Server Configuration"))
 	b.WriteString("\n\n")
 
 	// Show message if any
 	if m.errorMessage != "" {
-		b.WriteString(serverErrorStyle.Render("✗ " + m.errorMessage))
+		b.WriteString(serverErrorStyle.Render("ERROR: " + m.errorMessage))
 		b.WriteString("\n\n")
 	}
 

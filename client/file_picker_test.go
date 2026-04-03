@@ -303,7 +303,7 @@ func TestFilePickerModelViewWithError(t *testing.T) {
 	view := model.View()
 
 	// Check for error message
-	if !contains(view, "❌ test error") {
+	if !contains(view, "[ERROR] test error") {
 		t.Error("Expected view to contain error message")
 	}
 }
@@ -411,7 +411,7 @@ func TestCreateFileListItemsCurrentDir(t *testing.T) {
 	foundSubdir := false
 	for _, item := range items {
 		if fileItem, ok := item.(fileItem); ok {
-			if fileItem.title == "📁 subdir" {
+			if fileItem.title == "[DIR] subdir" {
 				foundSubdir = true
 				break
 			}
@@ -480,7 +480,7 @@ func TestFilePickerModelEnterOnDirectory(t *testing.T) {
 	var subdirItem fileItem
 	for _, item := range items {
 		if fileItem, ok := item.(fileItem); ok {
-			if fileItem.title == "📁 subdir" {
+			if fileItem.title == "[DIR] subdir" {
 				subdirItem = fileItem
 				break
 			}
@@ -517,7 +517,7 @@ func TestFilePickerModelEnterOnDirectory(t *testing.T) {
 	foundTestFile := false
 	for _, item := range listItems {
 		if fileItem, ok := item.(fileItem); ok {
-			if fileItem.title == "📄 test.txt" {
+			if fileItem.title == "[FILE] test.txt" {
 				foundTestFile = true
 				break
 			}
@@ -600,7 +600,7 @@ func TestFilePickerModelEnterOnNonExistentFile(t *testing.T) {
 
 	// Create a fake file item
 	fakeItem := fileItem{
-		title: "📄 nonexistent.txt",
+		title: "[FILE] nonexistent.txt",
 		path:  "/nonexistent/path/file.txt",
 		isDir: false,
 	}
