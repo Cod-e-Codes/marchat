@@ -13,9 +13,9 @@ func (m *model) generateHelpContent() string {
 
 	var sessionInfo string
 	if m.useE2E {
-		sessionInfo = "Session: 🔒 E2E Encrypted (messages are encrypted for privacy)\n"
+		sessionInfo = "Session: E2E Encrypted (messages are encrypted for privacy)\n"
 	} else {
-		sessionInfo = "Session: 🔓 Unencrypted (messages are sent in plain text)\n"
+		sessionInfo = "Session: Unencrypted (messages are sent in plain text)\n"
 	}
 
 	shortcuts := "\nKeyboard Shortcuts:\n"
