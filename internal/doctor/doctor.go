@@ -18,6 +18,8 @@ import (
 	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/atotto/clipboard"
 	"github.com/charmbracelet/x/term"
+	_ "github.com/go-sql-driver/mysql"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
 
@@ -144,19 +146,31 @@ func RunServer(o Options) error {
 
 		dbPath := cfg.DBPath
 		appendCheck(&checks, "db_path", "ok", fmt.Sprintf("database path: %s", dbPath))
-		parent := filepath.Dir(dbPath)
-		if fi, err := os.Stat(parent); err != nil {
-			appendCheck(&checks, "db_parent", "warn", fmt.Sprintf("database parent dir: %v", err))
-		} else if !fi.IsDir() {
-			appendCheck(&checks, "db_parent", "error", "database parent path is not a directory")
+
+		target := detectDBTarget(dbPath)
+		appendCheck(&checks, "db_dialect", "ok", fmt.Sprintf("detected DB dialect: %s (driver: %s)", target.dialect, target.driver))
+
+		if err := validateConnectionString(target); err != nil {
+			appendCheck(&checks, "db_connection_string", "error", err.Error())
 		} else {
-			f, err := os.CreateTemp(parent, "marchat-doctor-*.tmp")
-			if err != nil {
-				appendCheck(&checks, "db_parent_writable", "warn", fmt.Sprintf("cannot create temp file in DB parent: %v", err))
+			appendCheck(&checks, "db_connection_string", "ok", "connection string format is valid")
+		}
+
+		if target.dialect == "sqlite" {
+			parent := filepath.Dir(dbPath)
+			if fi, err := os.Stat(parent); err != nil {
+				appendCheck(&checks, "db_parent", "warn", fmt.Sprintf("database parent dir: %v", err))
+			} else if !fi.IsDir() {
+				appendCheck(&checks, "db_parent", "error", "database parent path is not a directory")
 			} else {
-				_ = f.Close()
-				_ = os.Remove(f.Name())
-				appendCheck(&checks, "db_parent_writable", "ok", "database parent directory is writable")
+				f, err := os.CreateTemp(parent, "marchat-doctor-*.tmp")
+				if err != nil {
+					appendCheck(&checks, "db_parent_writable", "warn", fmt.Sprintf("cannot create temp file in DB parent: %v", err))
+				} else {
+					_ = f.Close()
+					_ = os.Remove(f.Name())
+					appendCheck(&checks, "db_parent_writable", "ok", "database parent directory is writable")
+				}
 			}
 		}
 
@@ -181,15 +195,15 @@ func RunServer(o Options) error {
 
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer cancel()
-		db, err := sql.Open("sqlite", dbPath)
+		db, err := sql.Open(target.driver, target.dsn)
 		if err != nil {
-			appendCheck(&checks, "sqlite_ping", "warn", fmt.Sprintf("open sqlite: %v", err))
+			appendCheck(&checks, "db_ping", "warn", fmt.Sprintf("open %s: %v", target.dialect, err))
 		} else {
 			defer db.Close()
 			if err := db.PingContext(ctx); err != nil {
-				appendCheck(&checks, "sqlite_ping", "warn", fmt.Sprintf("sqlite ping: %v", err))
+				appendCheck(&checks, "db_ping", "warn", fmt.Sprintf("%s ping: %v", target.dialect, err))
 			} else {
-				appendCheck(&checks, "sqlite_ping", "ok", "sqlite database reachable")
+				appendCheck(&checks, "db_ping", "ok", fmt.Sprintf("%s database reachable", target.dialect))
 			}
 		}
 	}

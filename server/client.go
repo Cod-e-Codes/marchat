@@ -148,6 +148,7 @@ func (c *Client) readPump() {
 		if msg.Type == shared.ReactionMessage && msg.Reaction != nil {
 			msg.Sender = c.username
 			msg.CreatedAt = time.Now()
+			PersistReaction(c.db, msg)
 			c.hub.broadcast <- msg
 			continue
 		}
@@ -233,16 +234,24 @@ func (c *Client) readPump() {
 
 		if msg.Type == shared.ReadReceiptType {
 			msg.Sender = c.username
+			if msg.MessageID > 0 {
+				PersistReadReceipt(c.db, c.username, msg.MessageID)
+			}
 			c.hub.broadcast <- msg
 			continue
 		}
 
 		if msg.Type == shared.JoinChannelType && msg.Channel != "" {
+			msg.Channel = strings.ToLower(strings.TrimSpace(msg.Channel))
+			if msg.Channel == "" {
+				continue
+			}
 			old := c.hub.getClientChannel(c)
 			if old != msg.Channel {
 				c.hub.leaveChannel(c, old)
 			}
 			c.hub.joinChannel(c, msg.Channel)
+			PersistUserChannel(c.db, c.username, msg.Channel)
 			c.send <- shared.Message{
 				Sender:    "System",
 				Content:   "Joined channel #" + msg.Channel,
@@ -256,6 +265,7 @@ func (c *Client) readPump() {
 			if current != "general" {
 				c.hub.leaveChannel(c, current)
 				c.hub.joinChannel(c, "general")
+				PersistUserChannel(c.db, c.username, "general")
 				c.send <- shared.Message{
 					Sender:    "System",
 					Content:   "Left #" + current + ", back to #general",

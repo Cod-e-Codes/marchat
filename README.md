@@ -54,7 +54,7 @@ Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/relea
 ## Features
 
 - **Terminal UI** - Beautiful TUI built with Bubble Tea
-- **Real-time Chat** - Fast WebSocket messaging with SQLite backend (PostgreSQL/MySQL planned)
+- **Real-time Chat** - Fast WebSocket messaging with SQLite, PostgreSQL, or MySQL backends
 - **Message Management** - Edit, delete, pin, react to, and search messages
 - **Direct Messages** - Private DM conversations between users
 - **Channels** - Multiple chat rooms with join/leave and per-channel messaging
@@ -75,7 +75,7 @@ Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/relea
 
 ## Overview
 
-marchat started as a fun weekend project for father-son coding sessions and has evolved into a lightweight, self-hosted terminal chat application designed specifically for developers who love the command line. Currently runs with SQLite, with PostgreSQL and MySQL support planned for greater scalability.
+marchat started as a fun weekend project for father-son coding sessions and has evolved into a lightweight, self-hosted terminal chat application designed specifically for developers who love the command line. It supports SQLite by default and can also run against PostgreSQL or MySQL for larger deployments.
 
 **Key Benefits:**
 - **Self-hosted**: No external services required
@@ -205,7 +205,7 @@ go build -o marchat-client ./client
 | `MARCHAT_ADMIN_KEY` | Yes | - | Admin authentication key |
 | `MARCHAT_USERS` | Yes | - | Comma-separated admin usernames |
 | `MARCHAT_PORT` | No | `8080` | Server port |
-| `MARCHAT_DB_PATH` | No | `./config/marchat.db` | Database file path |
+| `MARCHAT_DB_PATH` | No | `./config/marchat.db` | Database path/DSN. Supports SQLite file path, `postgres://...`, or `mysql:...` |
 | `MARCHAT_TLS_CERT_FILE` | No | - | TLS certificate (enables wss://) |
 | `MARCHAT_TLS_KEY_FILE` | No | - | TLS private key |
 | `MARCHAT_GLOBAL_E2E_KEY` | No | - | Base64 32-byte global encryption key |
@@ -214,6 +214,28 @@ go build -o marchat-client ./client
 | `MARCHAT_ALLOWED_USERS` | No | - | Username allowlist (comma-separated) |
 
 **Additional variables:** `MARCHAT_LOG_LEVEL`, `MARCHAT_CONFIG_DIR`, `MARCHAT_BAN_HISTORY_GAPS`, `MARCHAT_PLUGIN_REGISTRY_URL`
+
+### Database backend setup
+
+`MARCHAT_DB_PATH` accepts either a SQLite path or a DSN-style backend URL/prefix:
+
+```bash
+# SQLite (default)
+export MARCHAT_DB_PATH=./config/marchat.db
+
+# PostgreSQL
+export MARCHAT_DB_PATH='postgres://marchat:marchat@127.0.0.1:5432/marchat?sslmode=disable'
+
+# MySQL
+export MARCHAT_DB_PATH='mysql:marchat:marchat@tcp(127.0.0.1:3306)/marchat?parseTime=true'
+```
+
+Notes:
+- PostgreSQL requires a reachable database and credentials with schema/table create permissions.
+- MySQL DSNs should include `parseTime=true` so timestamp fields decode correctly.
+- **MariaDB** generally works with the same `mysql:` DSN shape and `parseTime=true` as MySQL.
+- The server creates **dialect-specific DDL** (for example, MySQL/MariaDB use fixed-width strings where indexes, primary keys, or unique constraints apply, because full `TEXT` keys are rejected). Long message bodies still use a large text type.
+- SQLite remains the easiest local development option.
 
 **Doctor / diagnostics:** Set `MARCHAT_DOCTOR_NO_NETWORK` to `1` to skip the GitHub latest-release check in `-doctor` / `-doctor-json`.
 
@@ -248,7 +270,7 @@ The repository’s `config/` directory holds **server** runtime files and the **
 
 ### Diagnostics (`-doctor`)
 
-Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, masked `MARCHAT_*` env, sanity checks). Use **`-doctor-json`** for machine-readable output. If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, masked `MARCHAT_*` env, sanity checks). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, and attempts a DB ping. Use **`-doctor-json`** for machine-readable output. If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 ## Admin Commands
 
@@ -681,6 +703,9 @@ Profiles stored in platform-appropriate locations:
 | Clipboard issues (Linux) | Install xclip: `sudo apt install xclip` |
 | Port in use | Change port: `export MARCHAT_PORT=8081` |
 | Database migration fails | Check file permissions, backup before source build |
+| PostgreSQL connection fails | Verify URL format: `postgres://user:pass@host:5432/db?sslmode=disable`; test with `psql` using same creds |
+| MySQL connection fails | Verify DSN prefix `mysql:` and DSN body `user:pass@tcp(host:3306)/db?parseTime=true`; test with `mysql` CLI |
+| SQL syntax error after backend switch | Ensure tables were created by the current server version and restart after changing `MARCHAT_DB_PATH` |
 | Message history missing | Expected after updates - user states reset for ban/unban improvements |
 | Ban history gaps not working | Ensure `MARCHAT_BAN_HISTORY_GAPS=true` (disabled by default) and `ban_history` table exists |
 | TLS certificate errors | Use `--skip-tls-verify` for dev with self-signed certs |

@@ -11,7 +11,9 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/shared"
@@ -50,6 +52,42 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+var (
+	recentMessagesCache      []shared.Message
+	recentMessagesCachedAt   time.Time
+	recentMessagesCacheTTL   = 2 * time.Second
+	recentMessagesCacheMutex sync.RWMutex
+)
+
+func invalidateRecentMessagesCache() {
+	recentMessagesCacheMutex.Lock()
+	defer recentMessagesCacheMutex.Unlock()
+	recentMessagesCache = nil
+	recentMessagesCachedAt = time.Time{}
+}
+
+func maxMessageRetention() int {
+	maxMsgs := 1000
+	if raw := strings.TrimSpace(os.Getenv("MARCHAT_MESSAGE_RETENTION_MAX")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+			maxMsgs = n
+		}
+	}
+	return maxMsgs
+}
+
+func messageTTL() time.Duration {
+	raw := strings.TrimSpace(os.Getenv("MARCHAT_MESSAGE_TTL_HOURS"))
+	if raw == "" {
+		return 0
+	}
+	h, err := strconv.Atoi(raw)
+	if err != nil || h <= 0 {
+		return 0
+	}
+	return time.Duration(h) * time.Hour
+}
+
 type WSMessage struct {
 	Type string          `json:"type"`
 	Data json.RawMessage `json:"data"`
@@ -84,20 +122,46 @@ func getClientIP(r *http.Request) string {
 }
 
 func CreateSchema(db *sql.DB) {
-	// First, create the basic messages table if it doesn't exist
-	basicSchema := `
-	CREATE TABLE IF NOT EXISTS messages (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		sender TEXT,
-		content TEXT,
-		created_at DATETIME,
-		is_encrypted BOOLEAN DEFAULT 0,
-		encrypted_data BLOB,
-		nonce BLOB,
-		recipient TEXT
-	);`
+	dialect := getDBDialect(db)
+	idColumn := "id INTEGER PRIMARY KEY AUTOINCREMENT"
+	boolDefault := "BOOLEAN DEFAULT 0"
+	dateTimeType := "DATETIME"
+	blobType := "BLOB"
+	textType := "TEXT"
+	keyedTextType := "TEXT"
+	switch dialect {
+	case DialectPostgres:
+		idColumn = "id BIGSERIAL PRIMARY KEY"
+		boolDefault = "BOOLEAN DEFAULT FALSE"
+		dateTimeType = "TIMESTAMPTZ"
+		blobType = "BYTEA"
+	case DialectMySQL:
+		idColumn = "id BIGINT PRIMARY KEY AUTO_INCREMENT"
+		boolDefault = "BOOLEAN DEFAULT FALSE"
+		dateTimeType = "DATETIME"
+		blobType = "LONGBLOB"
+		textType = "LONGTEXT"
+		keyedTextType = "VARCHAR(191)"
+	}
 
-	_, err := db.Exec(basicSchema)
+	// First, create the basic messages table if it doesn't exist
+	basicSchema := fmt.Sprintf(`
+	CREATE TABLE IF NOT EXISTS messages (
+		%s,
+		sender %s,
+		content %s,
+		created_at %s,
+		is_encrypted %s,
+		message_id INTEGER NOT NULL DEFAULT 0,
+		edited %s,
+		deleted %s,
+		pinned %s,
+		encrypted_data %s,
+		nonce %s,
+		recipient %s
+	);`, idColumn, textType, textType, dateTimeType, boolDefault, boolDefault, boolDefault, boolDefault, blobType, blobType, textType)
+
+	_, err := dbExec(db, basicSchema)
 	if err != nil {
 		log.Fatal("failed to create basic schema:", err)
 	}
@@ -115,13 +179,20 @@ func CreateSchema(db *sql.DB) {
 
 	for _, m := range migrations {
 		var exists int
-		err = db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name=?`, m.column).Scan(&exists)
+		switch dialect {
+		case DialectPostgres:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'messages' AND column_name = ?`, m.column).Scan(&exists)
+		case DialectMySQL:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = ?`, m.column).Scan(&exists)
+		default:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name=?`, m.column).Scan(&exists)
+		}
 		if err != nil {
 			log.Printf("Warning: failed to check for %s column: %v", m.column, err)
 			continue
 		}
 		if exists == 0 {
-			_, err = db.Exec(m.ddl)
+			_, err = dbExec(db, m.ddl)
 			if err != nil {
 				log.Printf("Warning: failed to add %s column: %v", m.column, err)
 			} else {
@@ -133,36 +204,48 @@ func CreateSchema(db *sql.DB) {
 	// Create user_message_state table
 	userStateSchema := `
 	CREATE TABLE IF NOT EXISTS user_message_state (
-		username TEXT PRIMARY KEY,
+		username ` + keyedTextType + ` PRIMARY KEY,
 		last_message_id INTEGER NOT NULL DEFAULT 0,
-		last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+		last_seen ` + dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
 
-	_, err = db.Exec(userStateSchema)
+	_, err = dbExec(db, userStateSchema)
 	if err != nil {
 		log.Fatal("failed to create user_message_state table:", err)
 	}
 
 	// Create ban_history table
+	banHistoryID := "id INTEGER PRIMARY KEY AUTOINCREMENT"
+	switch dialect {
+	case DialectPostgres:
+		banHistoryID = "id BIGSERIAL PRIMARY KEY"
+	case DialectMySQL:
+		banHistoryID = "id BIGINT PRIMARY KEY AUTO_INCREMENT"
+	}
 	banHistorySchema := `
 	CREATE TABLE IF NOT EXISTS ban_history (
-		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		username TEXT NOT NULL,
-		banned_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		unbanned_at DATETIME,
-		banned_by TEXT NOT NULL
+		` + banHistoryID + `,
+		username ` + keyedTextType + ` NOT NULL,
+		banned_at ` + dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		unbanned_at ` + dateTimeType + `,
+		banned_by ` + keyedTextType + ` NOT NULL
 	);`
 
-	_, err = db.Exec(banHistorySchema)
+	_, err = dbExec(db, banHistorySchema)
 	if err != nil {
 		log.Printf("Warning: failed to create ban_history table: %v", err)
 	}
 
-	// Create indexes for performance
+	// Create indexes for performance (MySQL needs a prefix length when indexing LONGTEXT)
+	recipientIdx := `CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient)`
+	if dialect == DialectMySQL {
+		recipientIdx = `CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient(191))`
+	}
 	indexes := []string{
 		`CREATE INDEX IF NOT EXISTS idx_messages_message_id ON messages(message_id)`,
 		`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient)`,
+		recipientIdx,
+		`CREATE INDEX IF NOT EXISTS idx_messages_deleted_created_at ON messages(deleted, created_at)`,
 		`CREATE INDEX IF NOT EXISTS idx_user_message_state_username ON user_message_state(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_ban_history_username ON ban_history(username)`,
 		`CREATE INDEX IF NOT EXISTS idx_ban_history_banned_at ON ban_history(banned_at)`,
@@ -170,79 +253,150 @@ func CreateSchema(db *sql.DB) {
 	}
 
 	for _, index := range indexes {
-		_, err = db.Exec(index)
+		q := index
+		if dialect == DialectMySQL {
+			// MySQL does not support "CREATE INDEX IF NOT EXISTS ..." (syntax error).
+			q = strings.Replace(index, "IF NOT EXISTS ", "", 1)
+		}
+		_, err = dbExec(db, q)
 		if err != nil {
+			if dialect == DialectMySQL && isMySQLDuplicateKeyName(err) {
+				continue
+			}
 			log.Printf("Warning: failed to create index: %v", err)
 		}
 	}
 
 	// Migration: Update existing messages to have message_id = id
-	_, err = db.Exec(`UPDATE messages SET message_id = id WHERE message_id = 0 OR message_id IS NULL`)
+	_, err = dbExec(db, `UPDATE messages SET message_id = id WHERE message_id = 0 OR message_id IS NULL`)
 	if err != nil {
 		log.Printf("Warning: failed to migrate existing messages: %v", err)
 	} else {
 		log.Printf("Successfully migrated existing messages")
 	}
+
+	// Reactions table (durable reactions across reconnects)
+	_, err = dbExec(db, `
+	CREATE TABLE IF NOT EXISTS message_reactions (
+		`+idColumn+`,
+		message_id INTEGER NOT NULL,
+		username `+keyedTextType+` NOT NULL,
+		emoji `+keyedTextType+` NOT NULL,
+		created_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		UNIQUE(message_id, username, emoji)
+	);`)
+	if err != nil {
+		log.Printf("Warning: failed to create message_reactions table: %v", err)
+	}
+
+	// Channel memberships table (durable memberships across reconnects)
+	_, err = dbExec(db, `
+	CREATE TABLE IF NOT EXISTS user_channels (
+		username `+keyedTextType+` NOT NULL,
+		channel `+keyedTextType+` NOT NULL,
+		updated_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (username)
+	);`)
+	if err != nil {
+		log.Printf("Warning: failed to create user_channels table: %v", err)
+	}
+
+	// Read receipt state tracking
+	_, err = dbExec(db, `
+	CREATE TABLE IF NOT EXISTS read_receipts (
+		username `+keyedTextType+` NOT NULL,
+		message_id INTEGER NOT NULL,
+		read_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		PRIMARY KEY (username, message_id)
+	);`)
+	if err != nil {
+		log.Printf("Warning: failed to create read_receipts table: %v", err)
+	}
 }
 
 func InsertMessage(db *sql.DB, msg shared.Message) (int64, error) {
-	result, err := db.Exec(`INSERT INTO messages (sender, content, created_at, is_encrypted) VALUES (?, ?, ?, ?)`,
-		msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted)
-	if err != nil {
-		log.Println("Insert error:", err)
-		return 0, fmt.Errorf("insert message: %w", err)
+	var id int64
+	if supportsLastInsertID(db) {
+		result, err := dbExec(db, `INSERT INTO messages (sender, content, created_at, is_encrypted) VALUES (?, ?, ?, ?)`,
+			msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted)
+		if err != nil {
+			log.Println("Insert error:", err)
+			return 0, fmt.Errorf("insert message: %w", err)
+		}
+		var errID error
+		id, errID = result.LastInsertId()
+		if errID != nil {
+			log.Println("Error getting last insert ID:", errID)
+			return 0, fmt.Errorf("last insert id: %w", errID)
+		}
+	} else {
+		err := dbQueryRow(db, `INSERT INTO messages (sender, content, created_at, is_encrypted) VALUES (?, ?, ?, ?) RETURNING id`,
+			msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted).Scan(&id)
+		if err != nil {
+			log.Println("Insert returning error:", err)
+			return 0, fmt.Errorf("insert message returning: %w", err)
+		}
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		log.Println("Error getting last insert ID:", err)
-		return 0, fmt.Errorf("last insert id: %w", err)
-	}
-
-	_, err = db.Exec(`UPDATE messages SET message_id = ? WHERE id = ?`, id, id)
+	_, err := dbExec(db, `UPDATE messages SET message_id = ? WHERE id = ?`, id, id)
 	if err != nil {
 		log.Println("Error updating message_id:", err)
 	}
 
-	// Enforce message cap: keep only the most recent 1000 messages
-	_, err = db.Exec(`DELETE FROM messages WHERE id NOT IN (SELECT id FROM messages ORDER BY id DESC LIMIT 1000)`)
-	if err != nil {
-		log.Println("Error enforcing message cap:", err)
-	}
+	enforceMessageRetention(db)
+	invalidateRecentMessagesCache()
 	return id, nil
 }
 
 // InsertEncryptedMessage stores an encrypted message in the database
 func InsertEncryptedMessage(db *sql.DB, encryptedMsg *shared.EncryptedMessage) error {
-	result, err := db.Exec(`INSERT INTO messages (sender, content, created_at, is_encrypted, encrypted_data, nonce, recipient) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		encryptedMsg.Sender, encryptedMsg.Content, encryptedMsg.CreatedAt,
-		encryptedMsg.IsEncrypted, encryptedMsg.Encrypted, encryptedMsg.Nonce, encryptedMsg.Recipient)
-	if err != nil {
-		log.Println("Insert encrypted message error:", err)
-		return fmt.Errorf("insert encrypted message: %w", err)
+	var id int64
+	if supportsLastInsertID(db) {
+		result, err := dbExec(db, `INSERT INTO messages (sender, content, created_at, is_encrypted, encrypted_data, nonce, recipient) VALUES (?, ?, ?, ?, ?, ?, ?)`,
+			encryptedMsg.Sender, encryptedMsg.Content, encryptedMsg.CreatedAt,
+			encryptedMsg.IsEncrypted, encryptedMsg.Encrypted, encryptedMsg.Nonce, encryptedMsg.Recipient)
+		if err != nil {
+			log.Println("Insert encrypted message error:", err)
+			return fmt.Errorf("insert encrypted message: %w", err)
+		}
+		var errID error
+		id, errID = result.LastInsertId()
+		if errID != nil {
+			log.Println("Error getting last insert ID for encrypted message:", errID)
+		}
+	} else {
+		err := dbQueryRow(db, `INSERT INTO messages (sender, content, created_at, is_encrypted, encrypted_data, nonce, recipient) VALUES (?, ?, ?, ?, ?, ?, ?) RETURNING id`,
+			encryptedMsg.Sender, encryptedMsg.Content, encryptedMsg.CreatedAt,
+			encryptedMsg.IsEncrypted, encryptedMsg.Encrypted, encryptedMsg.Nonce, encryptedMsg.Recipient).Scan(&id)
+		if err != nil {
+			log.Println("Insert encrypted message returning error:", err)
+			return fmt.Errorf("insert encrypted message: %w", err)
+		}
 	}
 
-	// Get the inserted ID and update message_id
-	id, err := result.LastInsertId()
-	if err != nil {
-		log.Println("Error getting last insert ID for encrypted message:", err)
-	} else {
-		_, err = db.Exec(`UPDATE messages SET message_id = ? WHERE id = ?`, id, id)
+	if id > 0 {
+		_, err := dbExec(db, `UPDATE messages SET message_id = ? WHERE id = ?`, id, id)
 		if err != nil {
 			log.Println("Error updating message_id for encrypted message:", err)
 		}
 	}
 
-	// Enforce message cap: keep only the most recent 1000 messages
-	_, err = db.Exec(`DELETE FROM messages WHERE id NOT IN (SELECT id FROM messages ORDER BY id DESC LIMIT 1000)`)
-	if err != nil {
-		log.Println("Error enforcing message cap:", err)
-	}
+	enforceMessageRetention(db)
+	invalidateRecentMessagesCache()
 	return nil
 }
 
 func GetRecentMessages(db *sql.DB) []shared.Message {
-	rows, err := db.Query(`SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages ORDER BY created_at DESC LIMIT 50`)
+	recentMessagesCacheMutex.RLock()
+	if time.Since(recentMessagesCachedAt) <= recentMessagesCacheTTL && len(recentMessagesCache) > 0 {
+		out := make([]shared.Message, len(recentMessagesCache))
+		copy(out, recentMessagesCache)
+		recentMessagesCacheMutex.RUnlock()
+		return out
+	}
+	recentMessagesCacheMutex.RUnlock()
+
+	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		log.Println("Query error:", err)
 		return nil
@@ -267,7 +421,47 @@ func GetRecentMessages(db *sql.DB) []shared.Message {
 	// CRITICAL FIX: Always sort messages by timestamp for consistent chronological display
 	// Note: SQL query fetches newest messages first (DESC), but we sort chronologically (ASC) for display
 	sortMessagesByTimestamp(messages)
+
+	recentMessagesCacheMutex.Lock()
+	recentMessagesCache = make([]shared.Message, len(messages))
+	copy(recentMessagesCache, messages)
+	recentMessagesCachedAt = time.Now()
+	recentMessagesCacheMutex.Unlock()
+
 	return messages
+}
+
+func enforceMessageRetention(db *sql.DB) {
+	maxMessages := maxMessageRetention()
+	ttl := messageTTL()
+
+	if ttl > 0 {
+		for {
+			// Nested subquery keeps MySQL happy (LIMIT inside IN/NOT IN is invalid otherwise).
+			result, err := dbExec(db, `DELETE FROM messages WHERE id IN (
+				SELECT id FROM (
+					SELECT id FROM messages WHERE created_at < ? ORDER BY id ASC LIMIT 500
+				) AS ttl_batch
+			)`, time.Now().Add(-ttl))
+			if err != nil {
+				log.Printf("Error enforcing TTL retention: %v", err)
+				break
+			}
+			rows, _ := result.RowsAffected()
+			if rows == 0 {
+				break
+			}
+		}
+	}
+
+	_, err := dbExec(db, `DELETE FROM messages WHERE id NOT IN (
+		SELECT id FROM (
+			SELECT id FROM messages ORDER BY id DESC LIMIT ?
+		) AS keep_batch
+	)`, maxMessages)
+	if err != nil {
+		log.Printf("Error enforcing message cap: %v", err)
+	}
 }
 
 // GetRecentMessagesForUser returns personalized message history for a specific user
@@ -350,7 +544,7 @@ func GetRecentMessagesForUser(db *sql.DB, username string, defaultLimit int, ban
 
 // GetMessagesAfter retrieves messages with ID > lastMessageID
 func GetMessagesAfter(db *sql.DB, lastMessageID int64, limit int) []shared.Message {
-	rows, err := db.Query(`SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages WHERE message_id > ? ORDER BY created_at DESC LIMIT ?`, lastMessageID, limit)
+	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages WHERE message_id > ? ORDER BY created_at DESC LIMIT ?`, lastMessageID, limit)
 	if err != nil {
 		log.Println("Query error in GetMessagesAfter:", err)
 		return nil
@@ -381,20 +575,20 @@ func GetMessagesAfter(db *sql.DB, lastMessageID int64, limit int) []shared.Messa
 // getUserLastMessageID queries user_message_state table
 func getUserLastMessageID(db *sql.DB, username string) (int64, error) {
 	var lastMessageID int64
-	err := db.QueryRow(`SELECT last_message_id FROM user_message_state WHERE username = ?`, username).Scan(&lastMessageID)
+	err := dbQueryRow(db, `SELECT last_message_id FROM user_message_state WHERE username = ?`, username).Scan(&lastMessageID)
 	return lastMessageID, err
 }
 
-// setUserLastMessageID INSERT OR REPLACE into user_message_state
+// setUserLastMessageID upserts user_message_state in a backend-compatible way
 func setUserLastMessageID(db *sql.DB, username string, messageID int64) error {
-	_, err := db.Exec(`INSERT OR REPLACE INTO user_message_state (username, last_message_id, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)`, username, messageID)
+	_, err := dbExec(db, upsertUserMessageStateSQL(db), username, messageID)
 	return err
 }
 
 // getLatestMessageID returns MAX(id) from messages table
 func getLatestMessageID(db *sql.DB) int64 {
 	var latestID int64
-	err := db.QueryRow(`SELECT MAX(id) FROM messages`).Scan(&latestID)
+	err := dbQueryRow(db, `SELECT MAX(id) FROM messages`).Scan(&latestID)
 	if err != nil {
 		// Handle empty table case
 		return 0
@@ -404,13 +598,13 @@ func getLatestMessageID(db *sql.DB) int64 {
 
 // clearUserMessageState deletes user's record from user_message_state
 func clearUserMessageState(db *sql.DB, username string) error {
-	_, err := db.Exec(`DELETE FROM user_message_state WHERE username = ?`, username)
+	_, err := dbExec(db, `DELETE FROM user_message_state WHERE username = ?`, username)
 	return err
 }
 
 // recordBanEvent records a ban event in the ban_history table
 func recordBanEvent(db *sql.DB, username, bannedBy string) error {
-	_, err := db.Exec(`INSERT INTO ban_history (username, banned_by) VALUES (?, ?)`, username, bannedBy)
+	_, err := dbExec(db, `INSERT INTO ban_history (username, banned_by) VALUES (?, ?)`, username, bannedBy)
 	if err != nil {
 		log.Printf("Warning: failed to record ban event for user %s: %v", username, err)
 	}
@@ -419,7 +613,7 @@ func recordBanEvent(db *sql.DB, username, bannedBy string) error {
 
 // recordUnbanEvent records an unban event in the ban_history table
 func recordUnbanEvent(db *sql.DB, username string) error {
-	_, err := db.Exec(`UPDATE ban_history SET unbanned_at = CURRENT_TIMESTAMP WHERE username = ? AND unbanned_at IS NULL`, username)
+	_, err := dbExec(db, `UPDATE ban_history SET unbanned_at = CURRENT_TIMESTAMP WHERE username = ? AND unbanned_at IS NULL`, username)
 	if err != nil {
 		log.Printf("Warning: failed to record unban event for user %s: %v", username, err)
 	}
@@ -431,7 +625,7 @@ func getUserBanPeriods(db *sql.DB, username string) ([]struct {
 	BannedAt   time.Time
 	UnbannedAt *time.Time
 }, error) {
-	rows, err := db.Query(`SELECT banned_at, unbanned_at FROM ban_history WHERE username = ? ORDER BY banned_at ASC`, username)
+	rows, err := dbQuery(db, `SELECT banned_at, unbanned_at FROM ban_history WHERE username = ? ORDER BY banned_at ASC`, username)
 	if err != nil {
 		return nil, err
 	}
@@ -498,12 +692,13 @@ func sortMessagesByTimestamp(messages []shared.Message) {
 }
 
 func ClearMessages(db *sql.DB) error {
-	_, err := db.Exec(`DELETE FROM messages`)
+	_, err := dbExec(db, `DELETE FROM messages`)
+	invalidateRecentMessagesCache()
 	return err
 }
 
 func EditMessage(db *sql.DB, messageID int64, sender, newContent string) error {
-	result, err := db.Exec(
+	result, err := dbExec(db,
 		`UPDATE messages SET content = ?, edited = 1, is_encrypted = 0 WHERE message_id = ? AND sender = ?`,
 		newContent, messageID, sender)
 	if err != nil {
@@ -513,6 +708,7 @@ func EditMessage(db *sql.DB, messageID int64, sender, newContent string) error {
 	if rows == 0 {
 		return fmt.Errorf("message not found or you are not the sender")
 	}
+	invalidateRecentMessagesCache()
 	return nil
 }
 
@@ -526,7 +722,7 @@ func DeleteMessage(db *sql.DB, messageID int64, sender string, isAdmin bool) err
 		query = `UPDATE messages SET content = '[deleted]', deleted = 1, is_encrypted = 0 WHERE message_id = ? AND sender = ?`
 		args = []interface{}{messageID, sender}
 	}
-	result, err := db.Exec(query, args...)
+	result, err := dbExec(db, query, args...)
 	if err != nil {
 		return fmt.Errorf("delete message: %w", err)
 	}
@@ -534,6 +730,7 @@ func DeleteMessage(db *sql.DB, messageID int64, sender string, isAdmin bool) err
 	if rows == 0 {
 		return fmt.Errorf("message not found or you are not the sender")
 	}
+	invalidateRecentMessagesCache()
 	return nil
 }
 
@@ -541,7 +738,7 @@ func SearchMessages(db *sql.DB, query string, limit int) []shared.Message {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := db.Query(
+	rows, err := dbQuery(db,
 		`SELECT sender, content, created_at, is_encrypted, message_id FROM messages WHERE content LIKE ? AND deleted = 0 ORDER BY created_at DESC LIMIT ?`,
 		"%"+query+"%", limit)
 	if err != nil {
@@ -564,12 +761,12 @@ func SearchMessages(db *sql.DB, query string, limit int) []shared.Message {
 
 func TogglePinMessage(db *sql.DB, messageID int64) (bool, error) {
 	var currentlyPinned bool
-	err := db.QueryRow(`SELECT COALESCE(pinned, 0) FROM messages WHERE message_id = ?`, messageID).Scan(&currentlyPinned)
+	err := dbQueryRow(db, `SELECT COALESCE(pinned, 0) FROM messages WHERE message_id = ?`, messageID).Scan(&currentlyPinned)
 	if err != nil {
 		return false, fmt.Errorf("message not found: %w", err)
 	}
 	newPinned := !currentlyPinned
-	_, err = db.Exec(`UPDATE messages SET pinned = ? WHERE message_id = ?`, newPinned, messageID)
+	_, err = dbExec(db, `UPDATE messages SET pinned = ? WHERE message_id = ?`, newPinned, messageID)
 	if err != nil {
 		return false, fmt.Errorf("toggle pin: %w", err)
 	}
@@ -577,7 +774,7 @@ func TogglePinMessage(db *sql.DB, messageID int64) (bool, error) {
 }
 
 func GetPinnedMessages(db *sql.DB) []shared.Message {
-	rows, err := db.Query(`SELECT sender, content, created_at, message_id FROM messages WHERE pinned = 1 ORDER BY created_at DESC`)
+	rows, err := dbQuery(db, `SELECT sender, content, created_at, message_id FROM messages WHERE pinned = 1 ORDER BY created_at DESC`)
 	if err != nil {
 		log.Println("Pinned messages query error:", err)
 		return nil
@@ -613,7 +810,7 @@ func BackupDatabase(dbPath string) (string, error) {
 
 	// For WAL mode, we need to checkpoint the WAL file to ensure all data is in the main file
 	// This is safe to do while the database is in use
-	_, err = db.Exec("PRAGMA wal_checkpoint(FULL);")
+	_, err = dbExec(db, "PRAGMA wal_checkpoint(FULL);")
 	if err != nil {
 		log.Printf("Warning: WAL checkpoint failed during backup: %v", err)
 		// Continue with backup even if checkpoint fails
@@ -629,7 +826,7 @@ func BackupDatabase(dbPath string) (string, error) {
 
 	// Execute VACUUM INTO to create a clean backup
 	// This creates a complete, consistent copy of the database
-	_, err = db.Exec(fmt.Sprintf("VACUUM INTO '%s';", backupPath))
+	_, err = dbExec(db, fmt.Sprintf("VACUUM INTO '%s';", backupPath))
 	if err != nil {
 		return "", fmt.Errorf("failed to create database backup: %v", err)
 	}
@@ -643,21 +840,21 @@ func GetDatabaseStats(db *sql.DB) (string, error) {
 
 	// Count messages
 	var messageCount int
-	err := db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&messageCount)
+	err := dbQueryRow(db, "SELECT COUNT(*) FROM messages").Scan(&messageCount)
 	if err != nil {
 		return "", fmt.Errorf("failed to count messages: %v", err)
 	}
 
 	// Count unique users
 	var userCount int
-	err = db.QueryRow("SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
+	err = dbQueryRow(db, "SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
 	if err != nil {
 		return "", fmt.Errorf("failed to count users: %v", err)
 	}
 
 	// Get oldest and newest message dates
 	var oldestDate, newestDate sql.NullString
-	err = db.QueryRow("SELECT MIN(created_at), MAX(created_at) FROM messages").Scan(&oldestDate, &newestDate)
+	err = dbQueryRow(db, "SELECT MIN(created_at), MAX(created_at) FROM messages").Scan(&oldestDate, &newestDate)
 	if err != nil {
 		return "", fmt.Errorf("failed to get date range: %v", err)
 	}
@@ -838,10 +1035,25 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		log.Printf("Client %s connected (admin=%v, IP: %s)", username, isAdmin, ipAddr)
 		hub.register <- client
 
+		if persistedChannel := LoadUserChannel(db, username); persistedChannel != "" && persistedChannel != "general" {
+			hub.leaveChannel(client, "general")
+			hub.joinChannel(client, persistedChannel)
+		}
+
 		// Send personalized recent messages to new client
 		msgs, _ := GetRecentMessagesForUser(db, username, 50, banGapsHistory)
+		messageIDs := make([]int64, 0, len(msgs))
 		for _, msg := range msgs {
 			client.send <- msg
+			if msg.MessageID > 0 {
+				messageIDs = append(messageIDs, msg.MessageID)
+			}
+		}
+		for _, reactionMsg := range LoadReactionsForMessages(db, messageIDs) {
+			client.send <- reactionMsg
+		}
+		for _, receiptMsg := range LoadReadReceiptsForMessages(db, username, messageIDs) {
+			client.send <- receiptMsg
 		}
 		hub.broadcastUserList()
 

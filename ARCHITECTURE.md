@@ -20,9 +20,9 @@ Marchat is a self-hosted, terminal-based chat application built in Go with a cli
          ▼                       ▼                       ▼
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
 │ Configuration   │    │ Shared Types    │    │ Database Layer  │
-│ • Profiles      │    │ • Message Types │    │ • SQLite        │
-│ • Encryption    │    │ • Crypto Utils  │    │ • Persistence   │
-│ • Themes        │    │ • Protocols     │    │ • State Mgmt    │
+│ • Profiles      │    │ • Message Types │    │ • SQL Backends  │
+│ • Encryption    │    │ • Crypto Utils  │    │ • Postgres/MySQL│
+│ • Themes        │    │ • Protocols     │    │ • Dialect State │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
 ```
 
@@ -108,7 +108,7 @@ The server package contains the core server logic and components that are used b
 #### Core Components
 
 - **WebSocket Handlers**: Connection management and message routing
-- **Database Layer**: SQLite integration with message persistence
+- **Database Layer**: Pluggable SQL backends (SQLite/PostgreSQL/MySQL) with dialect-aware schema and query helpers
 - **Admin Interfaces**: Both TUI and web-based administrative panels
 - **Plugin Integration**: Plugin command handling and execution
 - **Health Monitoring**: System metrics and health check endpoints
@@ -201,7 +201,7 @@ The **client** stores `config.json`, `profiles.json`, keystore (unless legacy `k
 #### Key Settings (server-oriented)
 
 - **Server Configuration**: Port, TLS certificates, admin authentication
-- **Database Settings**: SQLite file path and connection parameters
+- **Database Settings**: `MARCHAT_DB_PATH` selects backend and connection details (SQLite path or Postgres/MySQL DSN)
 - **Plugin Configuration**: Registry URL and installation directories
 - **Security Settings**: Admin keys, encryption keys, and authentication
 - **File Transfer**: Size limits and allowed file types
@@ -209,7 +209,7 @@ The **client** stores `config.json`, `profiles.json`, keystore (unless legacy `k
 
 ### Diagnostics (`internal/doctor`)
 
-Shared package invoked by **`marchat-client`** and **`marchat-server`** when passed **`-doctor`** (human-readable report) or **`-doctor-json`** (JSON on stdout). It summarizes Go/OS, resolved config directories, known `MARCHAT_*` variables with secrets masked, role-specific checks (client: profiles, clipboard, TTY; server: `.env`, validation, DB/TLS/sqlite ping), and optionally compares the embedded version to the latest GitHub release. Set **`MARCHAT_DOCTOR_NO_NETWORK=1`** to skip the release check (e.g. air-gapped environments).
+Shared package invoked by **`marchat-client`** and **`marchat-server`** when passed **`-doctor`** (human-readable report) or **`-doctor-json`** (JSON on stdout). It summarizes Go/OS, resolved config directories, known `MARCHAT_*` variables with secrets masked, role-specific checks (client: profiles, clipboard, TTY; server: `.env`, validation, detected DB dialect, DB connection-string format validation, DB/TLS ping checks), and optionally compares the embedded version to the latest GitHub release. Set **`MARCHAT_DOCTOR_NO_NETWORK=1`** to skip the release check (e.g. air-gapped environments).
 
 ### Command Line Tools (`cmd/`)
 
@@ -235,10 +235,25 @@ Both **`marchat-client`** and **`marchat-server`** embed diagnostics via **`inte
 
 ```
 Client: Input → Encrypt → WebSocket Send
-Server: WebSocket Receive → Hub → Plugin Processing → Database
-Server: Database → Hub → WebSocket Broadcast  
+Server: WebSocket Receive → Hub → Plugin Processing → SQL Backend
+Server: SQL Backend → Hub → WebSocket Broadcast  
 Client: WebSocket Receive → Decrypt → Display
 ```
+
+### Database Backends and Durability
+
+- The server chooses a backend at runtime using `MARCHAT_DB_PATH`:
+  - SQLite path (default local setup)
+  - PostgreSQL DSN (`postgres://` / `postgresql://`)
+  - MySQL DSN (`mysql:` / `mysql://`)
+- Schema creation and upsert/insert-ignore SQL are dialect-aware.
+- Placeholder rebinding keeps shared query callsites portable across backends.
+- SQLite-specific optimizations (for example WAL mode) are applied only when the selected backend is SQLite.
+- Durable state includes:
+  - message history
+  - reactions
+  - read receipts
+  - last channel per user
 
 ### WebSocket Protocol
 
@@ -304,14 +319,15 @@ CREATE TABLE ban_history (
 
 ### Key Features
 
-- **WAL Mode**: Write-Ahead Logging for better concurrency and crash recovery
-- **Database Files**: Creates three files - `marchat.db` (main), `marchat.db-wal` (write-ahead log), `marchat.db-shm` (shared memory)
+- **Backend Selection**: `MARCHAT_DB_PATH` chooses SQLite/PostgreSQL/MySQL at runtime
+- **WAL Mode (SQLite only)**: Write-Ahead Logging for better concurrency and crash recovery when SQLite is selected
+- **SQLite Database Files**: `marchat.db` (main), `marchat.db-wal` (write-ahead log), `marchat.db-shm` (shared memory)
 - **Message ID Tracking**: Sequential message IDs for user state management
 - **Encryption Support**: Binary storage for encrypted message data
 - **Performance Indexes**: Optimized queries for message retrieval and user state
 - **Message Cap**: Automatic cleanup maintaining 1000 most recent messages
 - **Ban History**: Comprehensive tracking of user moderation actions
-- **Performance Tuning**: Optimized SQLite settings for chat workloads
+- **Performance Tuning**: Backend-aware optimizations (SQLite pragmas when SQLite is selected)
 
 ## Administrative Interfaces
 
@@ -384,13 +400,13 @@ The web-based interface provides the same functionality through a browser:
 
 ### Database Optimization
 
-- **WAL Mode**: Write-Ahead Logging enabled for improved concurrency and performance
+- **WAL Mode (SQLite only)**: Write-Ahead Logging enabled for improved concurrency and performance
 - **Indexed Queries**: Performance indexes on frequently queried columns
 - **Batch Operations**: Efficient bulk message operations
 - **Connection Reuse**: Persistent database connections
 - **Query Optimization**: Prepared statements for common operations
-- **Performance Tuning**: Optimized SQLite pragmas for chat workloads
-- **Backup Considerations**: WAL mode creates additional files; backups may miss recent uncommitted data if taken while server is running
+- **Performance Tuning**: SQLite-specific pragmas are applied only on SQLite; Postgres/MySQL use driver/backend defaults
+- **Backup Considerations**: SQLite WAL mode creates additional files; backups may miss recent uncommitted data if taken while server is running
 
 ## Development Patterns
 

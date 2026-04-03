@@ -158,9 +158,10 @@ Messages initiated by the server to update client state.
 - On user connect/disconnect:
   - Broadcasts updated user list.
 - On message send:
-  - Persists eligible messages to SQLite.
+  - Persists eligible messages to the configured SQL backend selected by `MARCHAT_DB_PATH` (SQLite path, PostgreSQL DSN, or MySQL DSN).
   - Delivers to all connected clients **or** only to members of a channel when `channel` is non-empty and `sender` is not `System` (see [Channels](#channels)). Direct messages use a separate path (sender and recipient only).
-- Messages are saved to SQLite and capped at 1000 messages.
+- Reactions, read receipts, and last channel per user may be persisted server-side and replayed to reconnecting clients.
+- Message history is capped at 1000 messages.
 
 ---
 
@@ -186,7 +187,7 @@ Exceeded messages are dropped silently from the client’s perspective (the serv
 
 ## Message Retention
 
-- Messages are stored in SQLite.
+- Messages are stored in the backend configured by `MARCHAT_DB_PATH` (SQLite/PostgreSQL/MySQL).
 - The most recent 1000 messages are retained.
 - Older messages are deleted automatically.
 
@@ -206,7 +207,7 @@ If `admin` is not requested, `admin_key` is not required.
 
 ## Configuration
 
-Client settings are usually stored in **`config.json`** under the **client configuration directory** (per-user application data, or `MARCHAT_CONFIG_DIR`). That directory is separate from the **server** directory (`.env`, SQLite DB). Use **`marchat-client -doctor`** / **`marchat-server -doctor`** to print resolved paths.
+Client settings are usually stored in **`config.json`** under the **client configuration directory** (per-user application data, or `MARCHAT_CONFIG_DIR`). That directory is separate from the **server** directory (`.env` plus local DB file when SQLite is used). Use **`marchat-client -doctor`** / **`marchat-server -doctor`** to print resolved paths.
 
 Example `config.json` shape:
 
