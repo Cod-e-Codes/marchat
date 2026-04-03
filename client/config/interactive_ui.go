@@ -301,7 +301,7 @@ func (m ConfigUIModel) View() string {
 	var b strings.Builder
 
 	// Title
-	b.WriteString(titleStyle.Render("🚀 marchat Configuration"))
+	b.WriteString(titleStyle.Render("marchat Configuration"))
 	b.WriteString("\n\n")
 
 	// Server URL
@@ -355,7 +355,7 @@ func (m ConfigUIModel) View() string {
 
 	// Error message
 	if m.errorMessage != "" {
-		b.WriteString(errorStyle.Render("❌ " + m.errorMessage))
+		b.WriteString(errorStyle.Render("ERROR: " + m.errorMessage))
 		b.WriteString("\n\n")
 	}
 
@@ -655,13 +655,13 @@ func (m ProfileSelectionModel) View() string {
 	if m.message != "" {
 		switch m.messageType {
 		case "success":
-			b.WriteString(successStyle.Render("✓ " + m.message))
+			b.WriteString(successStyle.Render("[OK] " + m.message))
 		case "error":
-			b.WriteString(errorStyle.Render("✗ " + m.message))
+			b.WriteString(errorStyle.Render("ERROR: " + m.message))
 		case "warning":
-			b.WriteString(warningStyle.Render("⚠ " + m.message))
+			b.WriteString(warningStyle.Render("[WARN] " + m.message))
 		case "info":
-			b.WriteString(infoStyle.Render("ℹ " + m.message))
+			b.WriteString(infoStyle.Render("[INFO] " + m.message))
 		default:
 			b.WriteString(m.message)
 		}
@@ -683,7 +683,7 @@ func (m ProfileSelectionModel) View() string {
 		line := fmt.Sprintf("%s (%s@%s)%s", profile.Name, profile.Username, profile.ServerURL, status)
 
 		if i == m.cursor {
-			b.WriteString(focusedStyle.Render("▶ " + line))
+			b.WriteString(focusedStyle.Render("> " + line))
 		} else {
 			b.WriteString("  " + line)
 		}
@@ -694,7 +694,7 @@ func (m ProfileSelectionModel) View() string {
 	if m.showNewOption {
 		newProfileLine := "Create New Profile"
 		if m.cursor == len(m.profiles) {
-			b.WriteString(focusedStyle.Render("▶ " + newProfileLine))
+			b.WriteString(focusedStyle.Render("> " + newProfileLine))
 		} else {
 			b.WriteString("  " + newProfileLine)
 		}
@@ -780,7 +780,7 @@ func (m ProfileSelectionModel) viewRename() string {
 	b.WriteString("\n\n")
 
 	if m.message != "" && m.messageType == "error" {
-		b.WriteString(errorStyle.Render("✗ " + m.message))
+		b.WriteString(errorStyle.Render("ERROR: " + m.message))
 		b.WriteString("\n\n")
 	}
 
@@ -795,7 +795,7 @@ func (m ProfileSelectionModel) viewDelete() string {
 	b.WriteString(titleStyle.Render("Delete Profile"))
 	b.WriteString("\n\n")
 
-	b.WriteString(warningStyle.Render("⚠ Warning: This action cannot be undone!"))
+	b.WriteString(warningStyle.Render("[WARN] Warning: This action cannot be undone!"))
 	b.WriteString("\n\n")
 
 	b.WriteString("Delete profile '")
@@ -1092,7 +1092,7 @@ func (m SensitiveDataModel) View() string {
 	b.WriteString("\n")
 
 	if m.errorMessage != "" {
-		b.WriteString(errorStyle.Render("✗ " + m.errorMessage))
+		b.WriteString(errorStyle.Render("ERROR: " + m.errorMessage))
 		b.WriteString("\n\n")
 	}
 

@@ -1086,7 +1086,7 @@ func (ap *AdminPanel) View() string {
 	doc := strings.Builder{}
 
 	// Title
-	doc.WriteString(titleStyle.Width(availableWidth).Render("🧃 Marchat Admin Panel"))
+	doc.WriteString(titleStyle.Width(availableWidth).Render("Marchat Admin Panel"))
 	doc.WriteString("\n\n")
 
 	// Tabs

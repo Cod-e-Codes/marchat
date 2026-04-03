@@ -604,7 +604,7 @@ func (m codeSnippetModel) formatCodeBlock(language, plainCode string, copied boo
 
 	// Add status message
 	if copied {
-		highlighted += "\n" + m.styles.Banner.Render("✓ Code copied to clipboard!")
+		highlighted += "\n" + m.styles.Banner.Render("[OK] Code copied to clipboard!")
 	} else {
 		highlighted += "\n" + m.styles.Time.Render("Press Enter to send message, 'r' to restart, 'c' to copy, Esc to cancel.")
 	}

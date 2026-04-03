@@ -132,9 +132,9 @@ func (m *model) executeAdminAction(action, targetUser string) (tea.Model, tea.Cm
 		}
 		err := m.conn.WriteJSON(msg)
 		if err != nil {
-			m.banner = "❌ Failed to send admin command"
+			m.banner = "[ERROR] Failed to send admin command"
 		} else {
-			m.banner = fmt.Sprintf("✅ %s action sent for %s", action, targetUser)
+			m.banner = fmt.Sprintf("[OK] %s action sent for %s", action, targetUser)
 			if action == "kick" || action == "ban" || action == "forcedisconnect" {
 				m.selectedUserIndex = -1
 				m.selectedUser = ""
@@ -184,9 +184,9 @@ func (m *model) executePluginCommand(command string) (tea.Model, tea.Cmd) {
 		}
 		err := m.conn.WriteJSON(msg)
 		if err != nil {
-			m.banner = "❌ Failed to send plugin command (connection lost)"
+			m.banner = "[ERROR] Failed to send plugin command (connection lost)"
 		} else {
-			m.banner = fmt.Sprintf("✅ Sent: %s", command)
+			m.banner = fmt.Sprintf("[OK] Sent: %s", command)
 		}
 	}
 
@@ -209,9 +209,9 @@ func (m *model) executeDBAction(action string) (tea.Model, tea.Cmd) {
 			}
 			err := m.conn.WriteJSON(msg)
 			if err != nil {
-				m.banner = "❌ Failed to send cleardb command"
+				m.banner = "[ERROR] Failed to send cleardb command"
 			} else {
-				m.banner = "✅ Database clear command sent"
+				m.banner = "[OK] Database clear command sent"
 			}
 		}
 	case "backup":
@@ -223,9 +223,9 @@ func (m *model) executeDBAction(action string) (tea.Model, tea.Cmd) {
 			}
 			err := m.conn.WriteJSON(msg)
 			if err != nil {
-				m.banner = "❌ Failed to send backup command"
+				m.banner = "[ERROR] Failed to send backup command"
 			} else {
-				m.banner = "✅ Database backup command sent"
+				m.banner = "[OK] Database backup command sent"
 			}
 		}
 	case "stats":
@@ -237,9 +237,9 @@ func (m *model) executeDBAction(action string) (tea.Model, tea.Cmd) {
 			}
 			err := m.conn.WriteJSON(msg)
 			if err != nil {
-				m.banner = "❌ Failed to send stats command"
+				m.banner = "[ERROR] Failed to send stats command"
 			} else {
-				m.banner = "✅ Database stats command sent"
+				m.banner = "[OK] Database stats command sent"
 			}
 		}
 	}

@@ -1068,6 +1068,8 @@ func TestResolveReactionEmoji(t *testing.T) {
 	}{
 		{"+1", "👍"},
 		{"-1", "👎"},
+		{"check", "✅"},
+		{"x", "❌"},
 		{"heart", "❤️"},
 		{"fire", "🔥"},
 		{"party", "🎉"},
