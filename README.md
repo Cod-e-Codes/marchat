@@ -270,7 +270,7 @@ The repository’s `config/` directory holds **server** runtime files and the **
 
 ### Diagnostics (`-doctor`)
 
-Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, masked `MARCHAT_*` env, sanity checks). Use **`-doctor-json`** for machine-readable output. If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, masked `MARCHAT_*` env, sanity checks). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, and attempts a DB ping. Use **`-doctor-json`** for machine-readable output. If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 ## Admin Commands
 
