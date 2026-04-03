@@ -6,7 +6,7 @@ Get a **server** and **client** running in a few minutes. For full detail, see [
 
 - **Server**: `MARCHAT_ADMIN_KEY` (secret) and `MARCHAT_USERS` (comma-separated admin usernames). No other env vars are required for a local trial.
 - **Client**: A username and the WebSocket URL (default path is `/ws`).
-- **Optional**: [Go 1.25+](https://go.dev/dl/) only if you build from source; `openssl` (or any way to produce 64 hex chars) to generate the admin key.
+- **Optional**: [Go 1.25.8+](https://go.dev/dl/) only if you build from source; `openssl` (or any way to produce 64 hex chars) to generate the admin key.
 
 ## 1. Install binaries
 
