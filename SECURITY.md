@@ -7,7 +7,8 @@ All security updates and fixes are applied to the `main` branch.
 
 | Version            | Supported |
 |--------------------|-----------|
-| v0.10.x (main)     | ✅        |
+| v0.11.x (`main`)   | ✅        |
+| v0.10.x            | ❌        |
 | v0.9.x             | ❌        |
 | Earlier versions   | ❌        |
 
@@ -57,6 +58,10 @@ It **does not cover**:
 ### Diagnostics output
 
 The `-doctor` / `-doctor-json` commands print masked values for sensitive `MARCHAT_*` variables; avoid sharing raw process environment dumps alongside doctor output. For air-gapped hosts, set `MARCHAT_DOCTOR_NO_NETWORK=1` so doctor does not call the GitHub API.
+
+### Indirect Go modules and vulnerability scanners
+
+Dependabot may flag **transitive** dependencies that do not expose reachable vulnerable APIs in marchat. For example, **CVE-2026-26958** ([GHSA-fw7p-63qq-7hpr](https://github.com/advisories/GHSA-fw7p-63qq-7hpr)) affects **`filippo.io/edwards25519`** before **v1.1.1** (`MultiScalarMult` receiver initialization). marchat does not use that API; the advisory notes many consumers (including typical **`github.com/go-sql-driver/mysql`** usage) are unaffected. The module is still pinned at **v1.1.1** on **`main`** to pick up the fix. For reachability, run **`govulncheck ./...`** against your build.
 
 ---
 
