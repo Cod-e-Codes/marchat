@@ -7,10 +7,10 @@ All security updates and fixes are applied to the `main` branch.
 
 | Version            | Supported |
 |--------------------|-----------|
-| v0.11.x (`main`)   | ✅        |
-| v0.10.x            | ❌        |
-| v0.9.x             | ❌        |
-| Earlier versions   | ❌        |
+| v0.11.x (`main`)   | Yes       |
+| v0.10.x            | No        |
+| v0.9.x             | No        |
+| Earlier versions   | No        |
 
 ---
 
