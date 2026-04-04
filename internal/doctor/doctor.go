@@ -134,7 +134,6 @@ func RunServer(o Options) error {
 	if absErr != nil {
 		absDir = dir
 	}
-	envLines := buildEnvLines()
 	checks := make([]Check, 0, 16)
 
 	appendCheck(&checks, "config_dir", "ok", fmt.Sprintf("resolved config directory (absolute): %s", absDir))
@@ -233,6 +232,9 @@ func RunServer(o Options) error {
 	} else {
 		appendCheck(&checks, "update", "warn", fmt.Sprintf("newer release available: %s (running %s)", up.Latest, up.Current))
 	}
+
+	// Snapshot MARCHAT_* after config load so .env (godotenv.Overload) is reflected.
+	envLines := buildEnvLines()
 
 	rep := Report{
 		Role:          "server",

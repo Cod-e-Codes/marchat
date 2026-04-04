@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -92,6 +94,69 @@ func TestCheckUpdate_noNetworkEnv(t *testing.T) {
 	info := checkUpdate(Options{}, "v1.0.0")
 	if !info.Skipped || info.SkipReason == "" {
 		t.Fatalf("expected skip: %+v", info)
+	}
+}
+
+// TestRunServerDoctor_environmentReflectsDotenv ensures the Environment section
+// reflects MARCHAT_* values after server config loads config/.env (godotenv.Overload).
+// Not parallel: RunServer mutates process environment.
+func TestRunServerDoctor_environmentReflectsDotenv(t *testing.T) {
+	t.Setenv("MARCHAT_DOCTOR_NO_NETWORK", "1")
+
+	prevCfgDir := os.Getenv("MARCHAT_CONFIG_DIR")
+	t.Cleanup(func() {
+		if prevCfgDir == "" {
+			_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+		} else {
+			_ = os.Setenv("MARCHAT_CONFIG_DIR", prevCfgDir)
+		}
+	})
+	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
+	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "doctor.sqlite")
+	envBody := "MARCHAT_ADMIN_KEY=mysecretkey123456789012\nMARCHAT_USERS=alice,bob\nMARCHAT_DB_PATH=" + dbPath + "\n"
+	if err := os.WriteFile(filepath.Join(tmp, ".env"), []byte(envBody), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	dotenvKeys := []string{"MARCHAT_ADMIN_KEY", "MARCHAT_USERS", "MARCHAT_DB_PATH"}
+	prev := make(map[string]string, len(dotenvKeys))
+	for _, k := range dotenvKeys {
+		prev[k] = os.Getenv(k)
+	}
+	t.Cleanup(func() {
+		for _, k := range dotenvKeys {
+			if prev[k] == "" {
+				_ = os.Unsetenv(k)
+			} else {
+				_ = os.Setenv(k, prev[k])
+			}
+		}
+	})
+
+	var buf bytes.Buffer
+	if err := RunServer(Options{JSON: true, Out: &buf, ServerConfigDirFlag: tmp}); err != nil {
+		t.Fatalf("RunServer: %v", err)
+	}
+	var rep Report
+	if err := json.Unmarshal(buf.Bytes(), &rep); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	var adminDisplay, usersDisplay string
+	for _, e := range rep.Environment {
+		switch e.Key {
+		case "MARCHAT_ADMIN_KEY":
+			adminDisplay = e.Display
+		case "MARCHAT_USERS":
+			usersDisplay = e.Display
+		}
+	}
+	if strings.Contains(adminDisplay, "not set") || adminDisplay == "" {
+		t.Fatalf("MARCHAT_ADMIN_KEY should reflect .env (masked), got %q", adminDisplay)
+	}
+	if usersDisplay != "alice,bob" {
+		t.Fatalf("MARCHAT_USERS want alice,bob from .env, got %q", usersDisplay)
 	}
 }
 
