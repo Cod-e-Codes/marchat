@@ -33,6 +33,7 @@ Marchat is a self-hosted, terminal-based chat application built in Go with a cli
 The client is a standalone terminal user interface built with the Bubble Tea framework. It's a complete application that can be built and run independently. The code is split across several files:
 
 - **`main.go`**: Core model, state, Update loop, and command handlers
+- **`cli_output.go`**: Lipgloss helpers for pre-TUI stdout (connection, E2E status, profile flow messages)
 - **`hotkeys.go`**: Key binding definitions and methods
 - **`render.go`**: Message rendering and UI display logic (optional per-line metadata: message id and encrypted flag)
 - **`websocket.go`**: WebSocket connection management, send/receive, and E2E encryption helpers
@@ -43,8 +44,8 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 
 - **`model`**: Main application state manager handling WebSocket communication, message rendering, and user interactions
 - **`ConfigUIModel`**: Interactive configuration interface for server connection settings
-- **`ProfileSelectionModel`**: Multi-profile management system for different server configurations
-- **`SensitiveDataModel`**: Secure credential input for admin keys and encryption passphrases
+- **`ProfileSelectionModel`**: Multi-profile management system for different server configurations (colored URL and `[Admin]` / `[E2E]` / `[Recent]` tags in the list)
+- **`SensitiveDataModel`**: Secure credential input for admin keys and encryption passphrases (inactive fields use dim styling)
 - **`codeSnippetModel`**: Code block rendering with syntax highlighting and selection capabilities
 - **`filePickerModel`**: Interactive file selection interface with filtering and preview
 - **`NotificationManager`**: Notification system supporting bell sounds and desktop notifications
@@ -73,7 +74,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 
 ### Server Application (`cmd/server/main.go`)
 
-The server is a standalone HTTP/WebSocket server application that provides real-time communication with plugin support and administrative interfaces.
+The server is a standalone HTTP/WebSocket server application that provides real-time communication with plugin support and administrative interfaces. The ASCII banner is followed by **lipgloss**-styled status lines (WebSocket URL, admins, version, TLS state, tips, and optional admin-panel key hints) on stdout before the process settles into serving.
 
 #### Core Structures
 

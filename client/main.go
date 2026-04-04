@@ -2292,11 +2292,11 @@ func main() {
 
 		if isFirstTime {
 			// First time user - show welcome and go straight to config creation
-			fmt.Println("Welcome to marchat! Let's get you set up...")
+			cliWelcomeLine("Welcome to marchat! Let's get you set up...")
 
 			configResult, keystorePass, err := config.RunInteractiveConfig()
 			if err != nil {
-				fmt.Printf("Configuration error: %v\n", err)
+				cliPrintErr(fmt.Sprintf("Configuration error: %v", err))
 				os.Exit(1)
 			}
 			cfg = configResult
@@ -2315,13 +2315,13 @@ func main() {
 			}
 			profiles.Profiles = append(profiles.Profiles, *profile)
 			if err := loader.SaveProfiles(profiles); err != nil {
-				fmt.Printf("Warning: Could not save profile: %v\n", err)
+				cliPrintWarn(fmt.Sprintf("Warning: Could not save profile: %v", err))
 			}
-			fmt.Println("[OK] Configuration saved! Next time you can use --auto or --quick-start for faster connections.")
+			cliPrintOK("[OK] Configuration saved! Next time you can use --auto or --quick-start for faster connections.")
 
 		} else {
 			// Existing user - show profile selection with option to create new
-			fmt.Println("Select a connection profile or create a new one...")
+			cliPrintMuted("Select a connection profile or create a new one...")
 
 			// Sort profiles by last used (most recent first)
 			sort.Slice(profiles.Profiles, func(i, j int) bool {
@@ -2330,17 +2330,17 @@ func main() {
 
 			selectedProfile, isCreateNew, err := config.RunProfileSelectionWithNew(profiles.Profiles, loader)
 			if err != nil {
-				fmt.Printf("Profile selection error: %v\n", err)
+				cliPrintErr(fmt.Sprintf("Profile selection error: %v", err))
 				os.Exit(1)
 			}
 
 			if isCreateNew {
 				// User chose to create a new profile
-				fmt.Println("Creating a new connection profile...")
+				cliPrintMuted("Creating a new connection profile...")
 
 				configResult, keystorePass, err := config.RunInteractiveConfig()
 				if err != nil {
-					fmt.Printf("Configuration error: %v\n", err)
+					cliPrintErr(fmt.Sprintf("Configuration error: %v", err))
 					os.Exit(1)
 				}
 				cfg = configResult
@@ -2360,16 +2360,16 @@ func main() {
 				}
 				profiles.Profiles = append(profiles.Profiles, *profile)
 				if err := loader.SaveProfiles(profiles); err != nil {
-					fmt.Printf("Warning: Could not save profile: %v\n", err)
+					cliPrintWarn(fmt.Sprintf("Warning: Could not save profile: %v", err))
 				}
-				fmt.Printf("[OK] Configuration saved as '%s'! You can use --auto or --quick-start for faster connections.\n", profileName)
+				cliPrintOK(fmt.Sprintf("[OK] Configuration saved as '%s'! You can use --auto or --quick-start for faster connections.", profileName))
 
 			} else {
 				// We now have the actual profile object, not just an index!
 				// Reload profiles in case they were modified during selection
 				profiles, err = loader.LoadProfiles()
 				if err != nil {
-					fmt.Printf("Error reloading profiles: %v\n", err)
+					cliPrintErr(fmt.Sprintf("Error reloading profiles: %v", err))
 					os.Exit(1)
 				}
 
@@ -2385,19 +2385,19 @@ func main() {
 				}
 
 				if profileIndex == -1 {
-					fmt.Println("Error: Selected profile no longer exists")
+					cliPrintErr("Error: Selected profile no longer exists")
 					os.Exit(1)
 				}
 
 				// User selected an existing profile
 				profile := &profiles.Profiles[profileIndex]
-				fmt.Printf("Selected: %s\n", profile.Name)
+				cliSelectedProfile(profile.Name)
 
 				// Update last used timestamp
 				profile.LastUsed = time.Now().Unix()
 				if err := loader.SaveProfiles(profiles); err != nil {
 					// Log error but don't fail the connection
-					fmt.Printf("Warning: Could not update profile usage timestamp: %v\n", err)
+					cliPrintWarn(fmt.Sprintf("Warning: Could not update profile usage timestamp: %v", err))
 				}
 
 				// Convert profile to config
@@ -2413,7 +2413,7 @@ func main() {
 				// Get sensitive data
 				adminKeyFromConfig, keystorePassFromConfig, err = loader.PromptSensitiveData(cfg.IsAdmin, cfg.UseE2E)
 				if err != nil {
-					fmt.Printf("Error getting sensitive data: %v\n", err)
+					cliPrintErr(fmt.Sprintf("Error getting sensitive data: %v", err))
 					os.Exit(1)
 				}
 			}
@@ -2503,14 +2503,13 @@ func validateFlags(isAdmin bool, adminKey string, useE2E bool, keystorePassphras
 }
 
 func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam string) {
-	// Your existing client initialization code here...
-	fmt.Printf("Connecting to %s as %s...\n", cfg.ServerURL, cfg.Username)
+	cliPrintConnecting(cfg.ServerURL, cfg.Username)
 
 	// Termux clipboard availability notice
 	if isTermux() {
-		fmt.Println("[WARN]  Termux environment detected")
+		cliPrintWarn("[WARN] Termux environment detected")
 		if !checkClipboardSupport() {
-			fmt.Println("[WARN]  Clipboard operations may be unavailable - text will be shown in banner")
+			cliPrintWarn("[WARN] Clipboard operations may be unavailable - text will be shown in banner")
 		}
 	}
 
@@ -2528,17 +2527,17 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	if cfg.UseE2E {
 		keystorePath, err := config.GetKeystorePath()
 		if err != nil {
-			fmt.Printf("Error getting keystore path: %v\n", err)
+			cliPrintErr(fmt.Sprintf("Error getting keystore path: %v", err))
 			os.Exit(1)
 		}
 		keystore = crypto.NewKeyStore(keystorePath)
 
 		if err := keystore.Initialize(keystorePassphraseParam); err != nil {
-			fmt.Printf("Error initializing keystore: %v\n", err)
+			cliPrintErr(fmt.Sprintf("Error initializing keystore: %v", err))
 			os.Exit(1)
 		}
 
-		fmt.Printf("E2E encryption enabled\n")
+		cliPrintOK("E2E encryption enabled")
 	}
 
 	// Setup textarea
@@ -2565,36 +2564,36 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	if cfg.UseE2E && keystore != nil {
 		// Check environment variable status
 		if envKey := os.Getenv("MARCHAT_GLOBAL_E2E_KEY"); envKey != "" {
-			fmt.Printf("Using global E2E key from environment variable\n")
+			cliPrintAccent("Using global E2E key from environment variable")
 		} else {
-			fmt.Printf("No MARCHAT_GLOBAL_E2E_KEY environment variable found\n")
+			cliPrintMuted("No MARCHAT_GLOBAL_E2E_KEY environment variable found")
 		}
 
 		// Verify keystore is properly unlocked
 		if err := verifyKeystoreUnlocked(keystore); err != nil {
-			fmt.Printf("Keystore unlock verification failed: %v\n", err)
+			cliPrintErr(fmt.Sprintf("Keystore unlock verification failed: %v", err))
 			os.Exit(1)
 		}
 
 		// Display global key info
 		if globalKey := keystore.GetGlobalKey(); globalKey != nil {
-			fmt.Printf("Global chat encryption: ENABLED (Key ID: %s)\n", globalKey.KeyID)
+			cliPrintGlobalKeyID(globalKey.KeyID)
 		} else {
-			fmt.Printf("Global key not available\n")
+			cliPrintErr("Global key not available")
 			os.Exit(1)
 		}
 
 		// Test encryption roundtrip (non-blocking for production use)
 		if err := validateEncryptionRoundtrip(keystore, cfg.Username); err != nil {
-			fmt.Printf("Encryption validation failed: %v\n", err)
-			fmt.Printf("E2E encryption will continue but may have issues\n")
+			cliPrintWarn(fmt.Sprintf("Encryption validation failed: %v", err))
+			cliPrintWarn("E2E encryption will continue but may have issues")
 			log.Printf("WARNING: Encryption validation failed: %v", err)
 		} else {
-			fmt.Printf("Encryption validation passed\n")
+			cliPrintOK("Encryption validation passed")
 		}
 
 		keystorePath, _ := config.GetKeystorePath()
-		fmt.Printf("E2E encryption enabled with keystore: %s\n", keystorePath)
+		cliPrintKeystorePath(keystorePath)
 	}
 
 	// Update global flags for compatibility with existing code

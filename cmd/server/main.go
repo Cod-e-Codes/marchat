@@ -19,7 +19,20 @@ import (
 	"github.com/Cod-e-Codes/marchat/server"
 	"github.com/Cod-e-Codes/marchat/shared"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
+)
+
+// Pre-TUI / banner styling (respects NO_COLOR via lipgloss/termenv).
+var (
+	srvLabel = lipgloss.NewStyle().Foreground(lipgloss.Color("#90A4AE")).Bold(true)
+	srvVal   = lipgloss.NewStyle().Foreground(lipgloss.Color("#ECEFF1"))
+	srvURL   = lipgloss.NewStyle().Foreground(lipgloss.Color("#4FC3F7"))
+	srvOK    = lipgloss.NewStyle().Foreground(lipgloss.Color("#81C784"))
+	srvWarn  = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB74D"))
+	srvKey   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFF59D"))
+	srvDim   = lipgloss.NewStyle().Foreground(lipgloss.Color("#78909C"))
+	srvInfo  = lipgloss.NewStyle().Foreground(lipgloss.Color("#4DD0E1"))
 )
 
 // Multi-admin support
@@ -72,15 +85,16 @@ func printBanner(addr string, admins []string, scheme string, tlsEnabled bool) {
 ░██       ░██ ░██   ░██  ░██      ░██    ░██ ░██    ░██ ░██   ░██     ░██    
 ░██       ░██  ░█████░██ ░██       ░███████  ░██    ░██  ░█████░██     ░████ `)
 	fmt.Println()
-	fmt.Printf("WebSocket: %s://%s/ws\n", scheme, addr)
-	fmt.Printf("Admins: %s\n", strings.Join(admins, ", "))
-	fmt.Printf("Version: %s\n", shared.GetServerVersionInfo())
+	ws := fmt.Sprintf("%s://%s/ws", scheme, addr)
+	fmt.Println(srvLabel.Render("WebSocket: ") + srvURL.Render(ws))
+	fmt.Println(srvLabel.Render("Admins: ") + srvVal.Render(strings.Join(admins, ", ")))
+	fmt.Println(srvLabel.Render("Version: ") + srvVal.Render(shared.GetServerVersionInfo()))
 	if tlsEnabled {
-		fmt.Println("TLS: Enabled")
+		fmt.Println(srvLabel.Render("TLS: ") + srvOK.Render("Enabled"))
 	} else {
-		fmt.Println("TLS: Disabled")
+		fmt.Println(srvLabel.Render("TLS: ") + srvWarn.Render("Disabled"))
 	}
-	fmt.Println("Tip: Use --username <admin> --admin --admin-key <key> to connect as admin")
+	fmt.Println(srvDim.Render("Tip: Use ") + srvKey.Render("--username <admin> --admin --admin-key <key>") + srvDim.Render(" to connect as admin"))
 }
 
 func main() {
@@ -154,8 +168,8 @@ func main() {
 			os.Exit(2)
 		}
 
-		fmt.Println("[INFO] Welcome to marchat server setup!")
-		fmt.Println("Some required configuration is missing. Let's set it up interactively.")
+		fmt.Println(srvInfo.Render("[INFO]") + " Welcome to marchat server setup!")
+		fmt.Println(srvDim.Render("Some required configuration is missing. Let's set it up interactively."))
 		fmt.Println()
 
 		serverConfig, err := server.RunServerConfig()
@@ -182,8 +196,8 @@ func main() {
 		}
 
 		fmt.Println()
-		fmt.Println("[OK] Configuration saved. You can now start the server.")
-		fmt.Println("[TIP] Set environment variables to avoid this setup next time.")
+		fmt.Println(srvOK.Render("[OK]") + " Configuration saved. You can now start the server.")
+		fmt.Println(srvDim.Render("[TIP] Set environment variables to avoid this setup next time."))
 		fmt.Println()
 	}
 
@@ -323,7 +337,7 @@ func main() {
 	// Print banner
 	printBanner(serverAddr, admins, scheme, cfg.IsTLSEnabled())
 	if adminPanelReady {
-		fmt.Println("Admin panel: Press Ctrl+A to open admin panel, Ctrl+C to shutdown")
+		fmt.Println(srvDim.Render("Admin panel: Press ") + srvKey.Render("Ctrl+A") + srvDim.Render(" to open admin panel, ") + srvKey.Render("Ctrl+C") + srvDim.Render(" to shutdown"))
 	}
 
 	// Create a custom server instance

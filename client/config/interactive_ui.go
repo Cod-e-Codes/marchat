@@ -23,6 +23,12 @@ var (
 	infoStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#00BCD4"))
 	dimStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#444444"))
 
+	// Profile list: tags and URL stand out from the name/user text.
+	tagAdminStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB74D")).Bold(true)
+	tagE2EStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#A5D6A7"))
+	tagRecentStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#90CAF9"))
+	profileURLStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#4DD0E1"))
+
 	focusedButton = focusedStyle.Render("[ Connect ]")
 	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Connect"))
 )
@@ -630,6 +636,40 @@ func (m ProfileSelectionModel) handleDeleteOperation(msg tea.Msg) (tea.Model, te
 	return m, nil
 }
 
+// formatProfileLine renders one profile row with colored URL and [Admin]/[E2E]/[Recent] tags.
+func (m ProfileSelectionModel) formatProfileLine(i int, profile ConnectionProfile) string {
+	var tags strings.Builder
+	if profile.IsAdmin {
+		tags.WriteString(" ")
+		tags.WriteString(tagAdminStyle.Render("[Admin]"))
+	}
+	if profile.UseE2E {
+		tags.WriteString(" ")
+		tags.WriteString(tagE2EStyle.Render("[E2E]"))
+	}
+	if i == 0 && profile.LastUsed > 0 {
+		tags.WriteString(" ")
+		tags.WriteString(tagRecentStyle.Render("[Recent]"))
+	}
+
+	name := profile.Name
+	user := profile.Username
+	surl := profile.ServerURL
+
+	var body string
+	if i == m.cursor {
+		body = focusedStyle.Render("> "+name+" ("+user+"@") +
+			profileURLStyle.Render(surl) +
+			focusedStyle.Render(")")
+	} else {
+		body = "  " +
+			blurredStyle.Render(name+" ("+user+"@") +
+			profileURLStyle.Render(surl) +
+			blurredStyle.Render(")")
+	}
+	return body + tags.String()
+}
+
 func (m ProfileSelectionModel) View() string {
 	// Show operation-specific views
 	switch m.operation {
@@ -669,24 +709,7 @@ func (m ProfileSelectionModel) View() string {
 	}
 
 	for i, profile := range m.profiles {
-		status := ""
-		if profile.IsAdmin {
-			status += " [Admin]"
-		}
-		if profile.UseE2E {
-			status += " [E2E]"
-		}
-		if i == 0 && profile.LastUsed > 0 {
-			status += " [Recent]"
-		}
-
-		line := fmt.Sprintf("%s (%s@%s)%s", profile.Name, profile.Username, profile.ServerURL, status)
-
-		if i == m.cursor {
-			b.WriteString(focusedStyle.Render("> " + line))
-		} else {
-			b.WriteString("  " + line)
-		}
+		b.WriteString(m.formatProfileLine(i, profile))
 		b.WriteString("\n")
 	}
 
@@ -977,7 +1000,9 @@ func NewSensitiveDataPrompt(isAdmin, useE2E bool) SensitiveDataModel {
 		m.inputs[idx] = t
 	}
 
-	return m
+	mp := &m
+	mp.updateFocus()
+	return *mp
 }
 
 func (m SensitiveDataModel) Init() tea.Cmd {
@@ -1062,8 +1087,8 @@ func (m *SensitiveDataModel) updateFocus() {
 			m.inputs[i].TextStyle = focusedStyle
 		} else {
 			m.inputs[i].Blur()
-			m.inputs[i].PromptStyle = noStyle
-			m.inputs[i].TextStyle = noStyle
+			m.inputs[i].PromptStyle = blurredStyle
+			m.inputs[i].TextStyle = blurredStyle
 		}
 	}
 }
