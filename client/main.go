@@ -144,7 +144,8 @@ type model struct {
 
 	userListViewport viewport.Model // NEW: scrollable user list
 
-	twentyFourHour bool // NEW: timestamp format toggle
+	twentyFourHour      bool // NEW: timestamp format toggle
+	showMessageMetadata bool
 
 	sending bool // NEW: sending message feedback
 
@@ -645,7 +646,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 		wasAtBottom := m.viewport.AtBottom()
-		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 		if wasAtBottom {
 			m.viewport.GotoBottom()
 			m.unreadCount = 0
@@ -829,7 +830,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.banner = fmt.Sprintf("Theme: %s", themeInfo)
 
 			// Redraw viewport and user list with new theme
-			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 			m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
 			return m, nil
 		case key.Matches(v, m.keys.TimeFormatHotkey):
@@ -838,7 +839,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.TwentyFourHour = m.twentyFourHour
 			_ = config.SaveConfig(m.configFilePath, m.cfg)
 			m.banner = "Timestamp format: " + map[bool]string{true: "24h", false: "12h"}[m.twentyFourHour]
-			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+			return m, nil
+		case key.Matches(v, m.keys.MessageInfoHotkey):
+			m.showMessageMetadata = !m.showMessageMetadata
+			m.banner = "Message metadata: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
+			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 			return m, nil
 		case key.Matches(v, m.keys.ClearHotkey):
 			// Clear chat history
@@ -1243,7 +1249,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.messages = m.messages[len(m.messages)-maxMessages+1:]
 				}
 				m.messages = append(m.messages, systemMsg)
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 				m.viewport.GotoBottom()
 
 				m.textarea.SetValue("")
@@ -1289,7 +1295,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.banner = fmt.Sprintf("Theme changed to: %s", GetThemeInfo(actualThemeName))
 
 						// Redraw viewport and user list with new theme
-						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 						m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
 					}
 				} else {
@@ -1316,7 +1322,15 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cfg.TwentyFourHour = m.twentyFourHour
 				_ = config.SaveConfig(m.configFilePath, m.cfg)
 				m.banner = "Timestamp format: " + map[bool]string{true: "24h", false: "12h"}[m.twentyFourHour]
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+				m.viewport.GotoBottom()
+				m.textarea.SetValue("")
+				return m, nil
+			}
+			if text == ":msginfo" {
+				m.showMessageMetadata = !m.showMessageMetadata
+				m.banner = "Message metadata: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
 				return m, nil
@@ -1543,7 +1557,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
 				return m, nil
@@ -1563,7 +1577,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
 				return m, nil
@@ -1602,7 +1616,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				} else {
 					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :search <query>", CreatedAt: time.Now(), Type: shared.TextMessage})
-					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 					m.viewport.GotoBottom()
 				}
 				m.textarea.SetValue("")
@@ -1612,13 +1626,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				parts := strings.Fields(text)
 				if len(parts) < 3 {
 					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :react <message_id> <emoji>", CreatedAt: time.Now(), Type: shared.TextMessage})
-					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 					m.viewport.GotoBottom()
 				} else {
 					id, err := strconv.ParseInt(parts[1], 10, 64)
 					if err != nil {
 						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
-						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 						m.viewport.GotoBottom()
 					} else {
 						emoji := resolveReactionEmoji(parts[2])
@@ -1642,13 +1656,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				parts := strings.Fields(text)
 				if len(parts) < 2 {
 					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :pin <message_id>", CreatedAt: time.Now(), Type: shared.TextMessage})
-					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 					m.viewport.GotoBottom()
 				} else {
 					id, err := strconv.ParseInt(parts[1], 10, 64)
 					if err != nil {
 						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
-						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 						m.viewport.GotoBottom()
 					} else {
 						pinMsg := shared.Message{Type: shared.PinMessage, MessageID: id, Sender: m.cfg.Username}
@@ -1729,7 +1743,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.conn != nil {
 					// Check if this is a server-side command (admin/plugin) that should bypass encryption
 					// Client-side commands are handled above and never reach this point
-					clientOnlyCommands := []string{":theme", ":time", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":search", ":react", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
+					clientOnlyCommands := []string{":theme", ":time", ":msginfo", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":search", ":react", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
 					isClientCommand := false
 					for _, cmd := range clientOnlyCommands {
 						// Check if text is exactly the command or starts with "command "
@@ -1898,7 +1912,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.helpViewport.Width = helpWidth
 		m.helpViewport.Height = helpHeight
 
-		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.reactions))
+		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 		m.viewport.GotoBottom()
 		m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, userListWidth, *isAdmin, m.selectedUserIndex))
 		return m, nil
@@ -1952,6 +1966,7 @@ func (m *model) View() string {
 	if m.unreadCount > 0 {
 		footerText += fmt.Sprintf(" | %d unread", m.unreadCount)
 	}
+	footerText += " | Msg info: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
 	footer := m.styles.Footer.Width(m.viewport.Width + userListWidth + 4).Render(footerText)
 
 	// Banner
@@ -2594,24 +2609,25 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	}
 
 	m := &model{
-		cfg:               *cfg,
-		configFilePath:    configFilePath,
-		profileName:       getCurrentProfileName(cfg),
-		textarea:          ta,
-		viewport:          vp,
-		styles:            getThemeStyles(cfg.Theme),
-		users:             []string{cfg.Username},
-		userListViewport:  userListVp,
-		helpViewport:      helpVp,
-		dbMenuViewport:    dbMenuVp,
-		twentyFourHour:    cfg.TwentyFourHour,
-		keystore:          keystore,
-		useE2E:            cfg.UseE2E,
-		keys:              newKeyMap(),
-		selectedUserIndex: -1,
-		typingUsers:       make(map[string]time.Time),
-		typingTimeout:     3 * time.Second,
-		reactions:         make(map[int64]map[string]map[string]bool),
+		cfg:                 *cfg,
+		configFilePath:      configFilePath,
+		profileName:         getCurrentProfileName(cfg),
+		textarea:            ta,
+		viewport:            vp,
+		styles:              getThemeStyles(cfg.Theme),
+		users:               []string{cfg.Username},
+		userListViewport:    userListVp,
+		helpViewport:        helpVp,
+		dbMenuViewport:      dbMenuVp,
+		twentyFourHour:      cfg.TwentyFourHour,
+		showMessageMetadata: true,
+		keystore:            keystore,
+		useE2E:              cfg.UseE2E,
+		keys:                newKeyMap(),
+		selectedUserIndex:   -1,
+		typingUsers:         make(map[string]time.Time),
+		typingTimeout:       3 * time.Second,
+		reactions:           make(map[int64]map[string]map[string]bool),
 	}
 
 	// Initialize notification manager with config settings

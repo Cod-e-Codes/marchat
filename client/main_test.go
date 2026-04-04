@@ -755,7 +755,7 @@ func TestRenderMessages(t *testing.T) {
 	twentyFourHour := true
 
 	// Test basic rendering
-	result := renderMessages(messages, styles, username, users, width, twentyFourHour)
+	result := renderMessages(messages, styles, username, users, width, twentyFourHour, true)
 	if result == "" {
 		t.Error("renderMessages should return non-empty result")
 	}
@@ -774,7 +774,7 @@ func TestRenderMessages(t *testing.T) {
 		},
 	}
 
-	fileResult := renderMessages(fileMessages, styles, username, users, width, twentyFourHour)
+	fileResult := renderMessages(fileMessages, styles, username, users, width, twentyFourHour, true)
 	if !strings.Contains(fileResult, "test.txt") {
 		t.Error("renderMessages should include filename for file messages")
 	}
@@ -789,7 +789,7 @@ func TestRenderMessages(t *testing.T) {
 		},
 	}
 
-	mentionResult := renderMessages(mentionMessages, styles, username, users, width, twentyFourHour)
+	mentionResult := renderMessages(mentionMessages, styles, username, users, width, twentyFourHour, true)
 	if !strings.Contains(mentionResult, "@user1") {
 		t.Error("renderMessages should preserve mentions")
 	}
@@ -804,13 +804,13 @@ func TestRenderMessages(t *testing.T) {
 		},
 	}
 
-	linkResult := renderMessages(linkMessages, styles, username, users, width, twentyFourHour)
+	linkResult := renderMessages(linkMessages, styles, username, users, width, twentyFourHour, true)
 	if !strings.Contains(linkResult, "https://example.com") {
 		t.Error("renderMessages should preserve URLs")
 	}
 
 	// Test 12-hour format
-	twelveHourResult := renderMessages(messages, styles, username, users, width, false)
+	twelveHourResult := renderMessages(messages, styles, username, users, width, false, true)
 	if twelveHourResult == "" {
 		t.Error("renderMessages should work with 12-hour format")
 	}
@@ -826,7 +826,7 @@ func TestRenderMessages(t *testing.T) {
 		}
 	}
 
-	limitedResult := renderMessages(tooManyMessages, styles, username, users, width, twentyFourHour)
+	limitedResult := renderMessages(tooManyMessages, styles, username, users, width, twentyFourHour, true)
 	if limitedResult == "" {
 		t.Error("renderMessages should handle message limit")
 	}
@@ -903,7 +903,7 @@ func TestRenderMessagesEdited(t *testing.T) {
 		},
 	}
 	styles := baseThemeStyles()
-	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, true)
 	if !strings.Contains(result, "edited") {
 		t.Error("edited message should show (edited) tag")
 	}
@@ -921,7 +921,7 @@ func TestRenderMessagesDeleted(t *testing.T) {
 		},
 	}
 	styles := baseThemeStyles()
-	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, true)
 	if !strings.Contains(result, "[deleted]") {
 		t.Error("deleted message should show [deleted]")
 	}
@@ -939,7 +939,7 @@ func TestRenderMessagesDirectMessage(t *testing.T) {
 		},
 	}
 	styles := baseThemeStyles()
-	result := renderMessages(messages, styles, "bob", []string{"alice", "bob"}, 80, true)
+	result := renderMessages(messages, styles, "bob", []string{"alice", "bob"}, 80, true, true)
 	if !strings.Contains(result, "DM") {
 		t.Error("DM message should show [DM] indicator")
 	}
@@ -968,7 +968,7 @@ func TestRenderMessagesFiltersTypingAndReadReceipt(t *testing.T) {
 		},
 	}
 	styles := baseThemeStyles()
-	result := renderMessages(messages, styles, "user1", []string{"user1", "user2", "user3"}, 80, true)
+	result := renderMessages(messages, styles, "user1", []string{"user1", "user2", "user3"}, 80, true, true)
 	if !strings.Contains(result, "visible") {
 		t.Error("text message should be visible")
 	}
@@ -987,7 +987,7 @@ func TestRenderMessagesWithMessageID(t *testing.T) {
 		},
 	}
 	styles := baseThemeStyles()
-	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, true)
 	if !strings.Contains(result, "[id:42]") {
 		t.Error("message should show message metadata with id:42")
 	}
@@ -1006,12 +1006,31 @@ func TestRenderMessagesWithEncryptedMetadata(t *testing.T) {
 		},
 	}
 	styles := baseThemeStyles()
-	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, true)
 	if strings.Contains(result, "🔒") {
 		t.Error("message should not show lock emoji in content")
 	}
 	if !strings.Contains(result, "[id:7, encrypted]") {
 		t.Error("message should show encrypted metadata suffix")
+	}
+}
+
+func TestRenderMessagesWithoutMetadataWhenMinimalMode(t *testing.T) {
+	now := time.Now()
+	messages := []shared.Message{
+		{
+			Sender:    "user1",
+			Content:   "secret",
+			CreatedAt: now,
+			Type:      shared.TextMessage,
+			Encrypted: true,
+			MessageID: 99,
+		},
+	}
+	styles := baseThemeStyles()
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, false)
+	if strings.Contains(result, "[id:99") || strings.Contains(result, "encrypted]") {
+		t.Error("message metadata should be hidden in minimal mode")
 	}
 }
 
@@ -1033,7 +1052,7 @@ func TestRenderMessagesWithReactions(t *testing.T) {
 		},
 	}
 	styles := baseThemeStyles()
-	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, reactions)
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, true, reactions)
 	if !strings.Contains(result, "👍") {
 		t.Error("should render thumbs up reaction")
 	}
@@ -1055,7 +1074,7 @@ func TestRenderMessagesNoReactionsWithoutMap(t *testing.T) {
 	}
 	styles := baseThemeStyles()
 	// Call without reactions parameter -- should work fine
-	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true)
+	result := renderMessages(messages, styles, "user2", []string{"user1", "user2"}, 80, true, true)
 	if !strings.Contains(result, "hello") {
 		t.Error("should render message content")
 	}

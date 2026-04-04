@@ -301,6 +301,7 @@ Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text 
 | `:theme <name>` | Switch theme (built-in or custom) | `Ctrl+T` (cycles) |
 | `:themes` | List all available themes | - |
 | `:time` | Toggle 12/24-hour format | `Alt+T` |
+| `:msginfo` | Toggle message metadata (message id / encrypted) on chat lines | `Alt+M` |
 | `:clear` | Clear chat buffer | `Ctrl+L` |
 | `:q` | Quit application (vim-style) | - |
 | `:sendfile [path]` | Send file (or open picker without path) | `Alt+F` |
@@ -392,6 +393,7 @@ Navigate with arrow keys, Enter to select/open folders, ".. (Parent Directory)" 
 | `Alt+C` | Create code snippet |
 | `Ctrl+T` | Cycle themes |
 | `Alt+T` | Toggle 12/24h time |
+| `Alt+M` | Toggle message metadata (id / encrypted) on chat lines |
 | `Alt+N` | Toggle desktop notifications |
 | `Ctrl+L` | Clear chat history |
 

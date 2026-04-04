@@ -27,7 +27,7 @@ func sortMessagesByTimestamp(messages []shared.Message) {
 	})
 }
 
-func renderMessages(msgs []shared.Message, styles themeStyles, username string, users []string, width int, twentyFourHour bool, reactions ...map[int64]map[string]map[string]bool) string {
+func renderMessages(msgs []shared.Message, styles themeStyles, username string, users []string, width int, twentyFourHour bool, showMessageMetadata bool, reactions ...map[int64]map[string]map[string]bool) string {
 	var reactionMap map[int64]map[string]map[string]bool
 	if len(reactions) > 0 {
 		reactionMap = reactions[0]
@@ -88,16 +88,18 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 			}
 		}
 
-		var metadata []string
-		if msg.MessageID > 0 {
-			metadata = append(metadata, fmt.Sprintf("id:%d", msg.MessageID))
-		}
-		if msg.Encrypted {
-			metadata = append(metadata, "encrypted")
-		}
 		metaSuffix := ""
-		if len(metadata) > 0 {
-			metaSuffix = " " + styles.Timestamp.Render("["+strings.Join(metadata, ", ")+"]")
+		if showMessageMetadata {
+			var metadata []string
+			if msg.MessageID > 0 {
+				metadata = append(metadata, fmt.Sprintf("id:%d", msg.MessageID))
+			}
+			if msg.Encrypted {
+				metadata = append(metadata, "encrypted")
+			}
+			if len(metadata) > 0 {
+				metaSuffix = " " + styles.Timestamp.Render("["+strings.Join(metadata, ", ")+"]")
+			}
 		}
 
 		switch msg.Sender {

@@ -34,7 +34,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 
 - **`main.go`**: Core model, state, Update loop, and command handlers
 - **`hotkeys.go`**: Key binding definitions and methods
-- **`render.go`**: Message rendering and UI display logic
+- **`render.go`**: Message rendering and UI display logic (optional per-line metadata: message id and encrypted flag)
 - **`websocket.go`**: WebSocket connection management, send/receive, and E2E encryption helpers
 - **`commands.go`**: Help text generation and command-related utilities
 - **`notification_manager.go`**: Desktop/bell notification system

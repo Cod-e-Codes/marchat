@@ -30,6 +30,7 @@ func (m *model) generateHelpContent() string {
 	shortcuts += "  Alt+C                Create code snippet\n"
 	shortcuts += "  Ctrl+T               Cycle themes\n"
 	shortcuts += "  Alt+T                Toggle 12/24h time\n"
+	shortcuts += "  Alt+M                Toggle message metadata (id/encrypted)\n"
 	shortcuts += "  Alt+N                Toggle desktop notifications\n"
 	shortcuts += "  Ctrl+L               Clear chat history\n"
 
@@ -40,6 +41,7 @@ func (m *model) generateHelpContent() string {
 	commands += "  :theme <name>        Change theme (or Ctrl+T to cycle)\n"
 	commands += "  :themes              List all available themes\n"
 	commands += "  :time                Toggle 12/24h time (or Alt+T)\n"
+	commands += "  :msginfo             Toggle message metadata (or Alt+M)\n"
 	commands += "  :clear               Clear chat history (or Ctrl+L)\n"
 	commands += "  :code                Create code snippet (or Alt+C)\n"
 	commands += "  :edit <id> <text>    Edit a message by ID\n"

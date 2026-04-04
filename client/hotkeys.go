@@ -27,6 +27,7 @@ type keyMap struct {
 	SendFileHotkey    key.Binding
 	ThemeHotkey       key.Binding
 	TimeFormatHotkey  key.Binding
+	MessageInfoHotkey key.Binding
 	ClearHotkey       key.Binding
 	CodeSnippetHotkey key.Binding
 	// Notification controls
@@ -71,7 +72,7 @@ func (k keyMap) FullHelp() [][]key.Binding {
 func (k keyMap) GetCommandHelp(isAdmin, useE2E bool) [][]key.Binding {
 	commands := [][]key.Binding{
 		{k.SendFile, k.SaveFile, k.Theme, k.CodeSnippet},
-		{k.SendFileHotkey, k.ThemeHotkey, k.TimeFormatHotkey, k.ClearHotkey, k.CodeSnippetHotkey},
+		{k.SendFileHotkey, k.ThemeHotkey, k.TimeFormatHotkey, k.MessageInfoHotkey, k.ClearHotkey, k.CodeSnippetHotkey},
 	}
 
 	if isAdmin {
@@ -166,6 +167,10 @@ func newKeyMap() keyMap {
 		TimeFormatHotkey: key.NewBinding(
 			key.WithKeys("alt+t"),
 			key.WithHelp("alt+t", "toggle 12/24h time format"),
+		),
+		MessageInfoHotkey: key.NewBinding(
+			key.WithKeys("alt+m"),
+			key.WithHelp("alt+m", "toggle message metadata"),
 		),
 		ClearHotkey: key.NewBinding(
 			key.WithKeys("ctrl+l"),
