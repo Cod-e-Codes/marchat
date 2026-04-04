@@ -22,7 +22,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 
 | File | Description | Coverage |
 |------|-------------|----------|
-| `internal/doctor/doctor_test.go` | CLI diagnostics | Env masking, GitHub release JSON parsing, update check with fake HTTP transport |
+| `internal/doctor/doctor_test.go` | CLI diagnostics | Env masking, GitHub release JSON parsing, update check with fake HTTP transport, plain `-doctor` output when writer is not a terminal |
 | `config/config_test.go` | Configuration loading and validation | Environment variables, validation rules |
 | `shared/crypto_test.go` | Cryptographic operations | Key generation, encryption, decryption, session keys |
 | `shared/types_test.go` | Data structures and serialization | Message types, JSON marshaling/unmarshaling |

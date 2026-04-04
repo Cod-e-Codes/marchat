@@ -210,7 +210,7 @@ The **client** stores `config.json`, `profiles.json`, keystore (unless legacy `k
 
 ### Diagnostics (`internal/doctor`)
 
-Shared package invoked by **`marchat-client`** and **`marchat-server`** when passed **`-doctor`** (human-readable report) or **`-doctor-json`** (JSON on stdout). It summarizes Go/OS, resolved config directories, known `MARCHAT_*` variables with secrets masked, role-specific checks (client: profiles, clipboard, TTY; server: `.env`, validation, detected DB dialect, DB connection-string format validation, DB/TLS ping checks), and optionally compares the embedded version to the latest GitHub release. Set **`MARCHAT_DOCTOR_NO_NETWORK=1`** to skip the release check (e.g. air-gapped environments).
+Shared package invoked by **`marchat-client`** and **`marchat-server`** when passed **`-doctor`** (human-readable report) or **`-doctor-json`** (JSON on stdout). It summarizes Go/OS, resolved config directories, known `MARCHAT_*` variables with secrets masked, role-specific checks (client: profiles, clipboard, TTY; server: `.env`, validation, detected DB dialect, DB connection-string format validation, DB/TLS ping checks), and optionally compares the embedded version to the latest GitHub release. The **text** report is **colorized** when stdout is a terminal and **`NO_COLOR`** is unset (otherwise plain); **`-doctor-json`** is always unstyled JSON. Set **`MARCHAT_DOCTOR_NO_NETWORK=1`** to skip the release check (e.g. air-gapped environments).
 
 ### Command Line Tools (`cmd/`)
 

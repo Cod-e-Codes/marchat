@@ -17,10 +17,25 @@ import (
 	appconfig "github.com/Cod-e-Codes/marchat/config"
 	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/atotto/clipboard"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
+)
+
+// Text report styling (aligned with server pre-TUI banner). Lipgloss disables color
+// for NO_COLOR, non-TTY, and dumb terminals automatically when rendering.
+var (
+	docTitle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#4DD0E1")).Bold(true)
+	docLabel   = lipgloss.NewStyle().Foreground(lipgloss.Color("#90A4AE")).Bold(true)
+	docVal     = lipgloss.NewStyle().Foreground(lipgloss.Color("#ECEFF1"))
+	docSection = lipgloss.NewStyle().Foreground(lipgloss.Color("#90A4AE")).Bold(true)
+	docKey     = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFF59D"))
+	docDim     = lipgloss.NewStyle().Foreground(lipgloss.Color("#78909C"))
+	docOK      = lipgloss.NewStyle().Foreground(lipgloss.Color("#81C784")).Bold(true)
+	docWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFB74D")).Bold(true)
+	docErr     = lipgloss.NewStyle().Foreground(lipgloss.Color("#E57373")).Bold(true)
 )
 
 // Options configures doctor output and networking.
@@ -380,7 +395,40 @@ func RunClient(o Options) error {
 	return nil
 }
 
+func doctorColorEnabled(w io.Writer) bool {
+	if os.Getenv("NO_COLOR") != "" {
+		return false
+	}
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("TERM")), "dumb") {
+		return false
+	}
+	f, ok := w.(*os.File)
+	if !ok {
+		return false
+	}
+	return term.IsTerminal(f.Fd())
+}
+
+func checkStatusStyle(status string) lipgloss.Style {
+	switch status {
+	case "error":
+		return docErr
+	case "warn":
+		return docWarn
+	default:
+		return docOK
+	}
+}
+
 func writeTextReport(w io.Writer, rep Report) {
+	if !doctorColorEnabled(w) {
+		writeTextReportPlain(w, rep)
+		return
+	}
+	writeTextReportColor(w, rep)
+}
+
+func writeTextReportPlain(w io.Writer, rep Report) {
 	fmt.Fprintf(w, "marchat doctor (%s)\n", rep.Role)
 	fmt.Fprintf(w, "  version: %s\n", rep.VersionDetail)
 	fmt.Fprintf(w, "  go: %s  OS/Arch: %s/%s  stdout TTY: %v\n", rep.GoVersion, rep.GOOS, rep.GOARCH, rep.StdoutTTY)
@@ -396,7 +444,10 @@ func writeTextReport(w io.Writer, rep Report) {
 		fmt.Fprintf(w, "  [%s] %s: %s\n", c.Status, c.ID, c.Message)
 	}
 	fmt.Fprintln(w, "\nUpdates:")
-	u := rep.Update
+	writeUpdatesPlain(w, rep.Update)
+}
+
+func writeUpdatesPlain(w io.Writer, u UpdateInfo) {
 	switch {
 	case u.Error != "":
 		fmt.Fprintf(w, "  [warn] %s\n", u.Error)
@@ -406,5 +457,42 @@ func writeTextReport(w io.Writer, rep Report) {
 		fmt.Fprintf(w, "  [ok] up to date (latest %s)\n", u.Latest)
 	default:
 		fmt.Fprintf(w, "  [warn] newer release %s available (running %s)\n", u.Latest, u.Current)
+	}
+}
+
+func writeTextReportColor(w io.Writer, rep Report) {
+	fmt.Fprintln(w, docTitle.Render(fmt.Sprintf("marchat doctor (%s)", rep.Role)))
+	fmt.Fprintln(w, docLabel.Render("  version: ")+docVal.Render(rep.VersionDetail))
+	fmt.Fprintln(w, docLabel.Render("  go: ")+docVal.Render(fmt.Sprintf("%s  OS/Arch: %s/%s  stdout TTY: %v", rep.GoVersion, rep.GOOS, rep.GOARCH, rep.StdoutTTY)))
+	if rep.ConfigDir != "" {
+		fmt.Fprintln(w, docLabel.Render("  config dir: ")+docVal.Render(rep.ConfigDir))
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, docSection.Render("Environment (MARCHAT_*, secrets masked):"))
+	for _, e := range rep.Environment {
+		fmt.Fprintln(w, "  "+docKey.Render(e.Key+"=")+docVal.Render(e.Display))
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, docSection.Render("Checks:"))
+	for _, c := range rep.Checks {
+		tag := checkStatusStyle(c.Status).Render("[" + c.Status + "]")
+		line := docDim.Render(c.ID+": ") + docVal.Render(c.Message)
+		fmt.Fprintln(w, "  "+tag+" "+line)
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintln(w, docSection.Render("Updates:"))
+	writeUpdatesColor(w, rep.Update)
+}
+
+func writeUpdatesColor(w io.Writer, u UpdateInfo) {
+	switch {
+	case u.Error != "":
+		fmt.Fprintln(w, "  "+docWarn.Render("[warn]")+" "+docVal.Render(u.Error))
+	case u.Skipped:
+		fmt.Fprintln(w, "  "+docOK.Render("[ok]")+" "+docVal.Render("skipped: "+u.SkipReason))
+	case u.UpToDate:
+		fmt.Fprintln(w, "  "+docOK.Render("[ok]")+" "+docVal.Render(fmt.Sprintf("up to date (latest %s)", u.Latest)))
+	default:
+		fmt.Fprintln(w, "  "+docWarn.Render("[warn]")+" "+docVal.Render(fmt.Sprintf("newer release %s available (running %s)", u.Latest, u.Current)))
 	}
 }

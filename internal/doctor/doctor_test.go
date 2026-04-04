@@ -95,6 +95,31 @@ func TestCheckUpdate_noNetworkEnv(t *testing.T) {
 	}
 }
 
+func TestWriteTextReport_nonTTYWriterIsPlainASCII(t *testing.T) {
+	t.Parallel()
+	rep := Report{
+		Role:          "client",
+		VersionDetail: "v0.0.0-test",
+		GoVersion:     "go1.test",
+		GOOS:          "plan9",
+		GOARCH:        "amd64",
+		StdoutTTY:     false,
+		Checks: []Check{
+			{ID: "sample", Status: "ok", Message: "all good"},
+		},
+		Update: UpdateInfo{Skipped: true, SkipReason: "test"},
+	}
+	var buf bytes.Buffer
+	writeTextReport(&buf, rep)
+	out := buf.String()
+	if strings.Contains(out, "\x1b[") {
+		t.Fatalf("expected plain output without ANSI escapes, got %q", out)
+	}
+	if !strings.Contains(out, "marchat doctor (client)") || !strings.Contains(out, "[ok] sample: all good") {
+		t.Fatalf("unexpected plain report: %s", out)
+	}
+}
+
 func TestReportJSON_roundTrip(t *testing.T) {
 	t.Parallel()
 	rep := Report{
