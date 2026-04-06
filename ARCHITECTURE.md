@@ -447,6 +447,7 @@ marchat produces two main executables:
 - **Termux (Android aarch64)**: Use the **linux-arm64** release zip (static **`GOOS=linux`** binary); there is no separate `android-*` artifact
 - **CGO**: Release CI sets **`CGO_ENABLED=0`** on the **`build`** job for static binaries and the pure Go SQLite stack, consistent with **`Dockerfile`**, **`build-release.ps1`**, and **`scripts/build-linux.sh`**
 - **Release versioning**: A **`resolve-version`** job runs first and exports the tag (published release) or workflow input (`workflow_dispatch`); matrix jobs cannot expose outputs, so Docker image tags, release notes, and **`go build -ldflags`** all consume **`needs.resolve-version.outputs.version`**
+- **GitHub release assets**: For **`release: published`** (not `workflow_dispatch`), **`upload-assets`** runs **`gh release upload`** for the artifact zips and the **`docker`** job appends the Docker Hub section with **`gh release edit`**, so publishing does not depend on **`softprops/action-gh-release`** (still **`node20`** in its `action.yml`, which triggers deprecation annotations if forced onto Node 24)
 - **Release Scripts**: `build-release.ps1` and related helpers for local release-style builds
 - **Docker Support**: Containerized deployment with health checks
 

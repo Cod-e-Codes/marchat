@@ -13,11 +13,6 @@ on:
 permissions:
   contents: read
 
-# Until action-gh-release ships node24 in action.yml, opt JS actions into Node 24 (Node 20 runner deprecation).
-# https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   # Matrix jobs cannot expose job outputs; docker/release text need a stable VERSION from one job.
   resolve-version:
@@ -141,15 +136,21 @@ jobs:
         with:
           path: release-artifacts
 
-      - name: Add Artifacts to GitHub Release
+      # softprops/action-gh-release is still node20 in action.yml; gh CLI avoids the forced-node24 annotation.
+      - name: Upload zips to GitHub Release
         if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
-        with:
-          append_body: true
-          files: |
-            release-artifacts/**/*
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name }}"
+          REPO="${{ github.repository }}"
+          mapfile -t zips < <(find release-artifacts -type f -name '*.zip' | sort)
+          if [ "${#zips[@]}" -eq 0 ]; then
+            echo "No .zip files under release-artifacts"
+            exit 1
+          fi
+          gh release upload "$TAG" "${zips[@]}" --clobber --repo "$REPO"
 
       - name: Delete Uploaded Artifacts
         if: ${{ github.event_name != 'workflow_dispatch' }}
@@ -206,21 +207,24 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Add Docker Image Info to GitHub Release
+      - name: Append Docker image info to GitHub Release
         if: ${{ github.event_name != 'workflow_dispatch' }}
-        uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2.6.1
-        with:
-          append_body: true
-          body: |
-
-            ## Docker Image
-
-            A multi-architecture Docker image (linux/amd64, linux/arm64) is available on Docker Hub:
-
-            ```bash
-            docker pull codecodesxyz/marchat:${{ needs.resolve-version.outputs.version }}
-            # or use latest tag
-            docker pull codecodesxyz/marchat:latest
-            ```
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ needs.resolve-version.outputs.version }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.event.release.tag_name }}"
+          REPO="${{ github.repository }}"
+          EXISTING="$(gh release view "$TAG" --repo "$REPO" --json body -q '(.body // "")')"
+          {
+            printf '%s\n\n' "$EXISTING"
+            printf '%s\n\n' '## Docker Image'
+            printf '%s\n\n' 'A multi-architecture Docker image (linux/amd64, linux/arm64) is available on Docker Hub:'
+            printf '%s\n' '```bash'
+            printf 'docker pull codecodesxyz/marchat:%s\n' "$VERSION"
+            printf '%s\n' '# or use latest tag'
+            printf '%s\n' 'docker pull codecodesxyz/marchat:latest'
+            printf '%s\n' '```'
+          } > /tmp/marchat-release-body.md
+          gh release edit "$TAG" --repo "$REPO" --notes-file /tmp/marchat-release-body.md

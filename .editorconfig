@@ -1,0 +1,11 @@
+# https://editorconfig.org
+root = true
+
+# Match .gitattributes: shell scripts and Dockerfile must stay LF for Docker/Linux.
+[*.sh]
+end_of_line = lf
+insert_final_newline = true
+
+[Dockerfile]
+end_of_line = lf
+insert_final_newline = true

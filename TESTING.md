@@ -16,7 +16,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 
 **Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. The default `go test ./...` run does not start Postgres or MySQL; exercise those with manual smoke tests or your own CI against real servers. Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
 
-**Release workflow (maintainers):** `.github/workflows/release.yml` uses a **`resolve-version`** job so the version string is available to Docker and all matrix legs (GitHub Actions does not support job outputs from matrix jobs). The **`build`** job sets **`CGO_ENABLED=0`** for static cross-compiled binaries. **Termux** installs use the **linux-arm64** zip; `install.sh` / `install.ps1` map Android+aarch64 to that asset when needed.
+**Release workflow (maintainers):** `.github/workflows/release.yml` uses a **`resolve-version`** job so the version string is available to Docker and all matrix legs (GitHub Actions does not support job outputs from matrix jobs). The **`build`** job sets **`CGO_ENABLED=0`** for static cross-compiled binaries. On a **published** release (not `workflow_dispatch`), **`upload-assets`** uploads all matrix **`.zip`** files with **`gh release upload`**, and the **`docker`** job appends Docker Hub pull instructions with **`gh release edit`** (GitHub CLI on the runner, **`GITHUB_TOKEN`**), avoiding third-party actions that still declare Node 20. **Termux** installs use the **linux-arm64** zip; `install.sh` / `install.ps1` map Android+aarch64 to that asset when needed.
 
 ## Test Structure
 

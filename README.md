@@ -19,7 +19,7 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **Go 1.25.8** across CI, Docker, and docs; **SECURITY.md** updates (supported versions, edwards25519 note)
 - **UX**: Terminal-native chrome (reaction/message emoji unchanged); **Alt+M** / **`:msginfo`** toggle message metadata; colorized server banner and client pre-TUI (**`NO_COLOR`** respected)
 - **Doctor**: TTY color for text mode; server **`MARCHAT_*`** reflects **`config/.env`**; docs for **`-doctor-json`** / **`NO_COLOR`**
-- **Server**: Hardened license cache, username reservation, DB backup SQL; **CI**: static release builds, Node 24 for **`action-gh-release`**; **Termux** → **linux-arm64** assets
+- **Server**: Hardened license cache, username reservation, DB backup SQL; **CI**: static release builds; published releases attach zips with **`gh release upload`** and append the Docker blurb with **`gh release edit`** (avoids Node 20–labeled JS actions); **Termux** → **linux-arm64** assets
 
 ### Earlier
 - **v0.11.0-beta.1**: **[PR #83](https://github.com/Cod-e-Codes/marchat/pull/83)**: SQLite / PostgreSQL / MySQL, durable reactions & read receipts, message-state layer; release **`resolve-version`** + static builds; serialized WS writes; admin TUI & doctor DB checks (see **ARCHITECTURE.md**, **PROTOCOL.md**)
