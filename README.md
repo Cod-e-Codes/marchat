@@ -29,8 +29,23 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
-![Server Demo](assets/demo-server.gif "marchat server startup")
-![Client Demo](assets/demo-client-1.gif "marchat client interface")
+## Demos
+
+Screen recordings of a current build (GIF autoplay depends on the viewer).
+
+**Server:** startup with the banner, optional web admin panel, and `marchat-server -doctor`.
+
+**Client:** reactions and built-in help, `:theme`, and `marchat-client -doctor`.
+
+![Server startup and web admin panel](assets/demo-server-admin-panel.gif "marchat server startup and web admin panel")
+
+![Server diagnostics (doctor)](assets/demo-server-doctor.gif "marchat-server -doctor output")
+
+![Client reactions and help](assets/demo-client-reactions-help.gif "marchat client reactions and help")
+
+![Client theme switching](assets/demo-client-theme-switch.gif "marchat client :theme")
+
+![Client diagnostics (doctor)](assets/demo-client-doctor.gif "marchat-client -doctor output")
 
 ## Features
 
@@ -64,10 +79,6 @@ marchat started as a fun weekend project for father-son coding sessions and has 
 - **Secure**: Optional E2E encryption with X25519/ChaCha20-Poly1305
 - **Extensible**: Plugin ecosystem for custom functionality
 - **Lightweight**: Minimal resource usage, perfect for servers
-
-| Cross-Platform | Theme Switching |
-|---------------|----------------|
-| <img src="assets/mobile-file-transfer.jpg" width="300"/> | <img src="assets/theme-switching.jpg" width="300"/> |
 
 ## Quick Start
 
