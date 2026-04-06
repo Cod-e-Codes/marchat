@@ -1,6 +1,7 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -509,6 +510,80 @@ func TestInteractiveConfigLoaderFormatSanitizedLaunchCommand(t *testing.T) {
 
 	if !contains(command, "--keystore-passphrase <your-passphrase>") {
 		t.Error("Expected command to contain sanitized keystore passphrase")
+	}
+}
+
+func TestDedupeProfilesByName(t *testing.T) {
+	a := ConnectionProfile{Name: "Profile-2", ServerURL: "wss://a/ws", Username: "u", LastUsed: 10}
+	b := ConnectionProfile{Name: "Profile-2", ServerURL: "wss://a/ws", Username: "u", LastUsed: 99}
+	c := ConnectionProfile{Name: "Profile-3", ServerURL: "ws://b/ws", Username: "v", LastUsed: 5}
+
+	out := dedupeProfilesByName([]ConnectionProfile{a, b, c})
+	if len(out) != 2 {
+		t.Fatalf("want 2 profiles after dedupe, got %d", len(out))
+	}
+	if out[0].Name != "Profile-2" || out[0].LastUsed != 99 {
+		t.Errorf("want Profile-2 with LastUsed 99, got %+v", out[0])
+	}
+	if out[1].Name != "Profile-3" {
+		t.Errorf("want Profile-3 second, got %+v", out[1])
+	}
+
+	// Tie on LastUsed keeps first in file order
+	x := ConnectionProfile{Name: "P", LastUsed: 5, Theme: "first"}
+	y := ConnectionProfile{Name: "P", LastUsed: 5, Theme: "second"}
+	out2 := dedupeProfilesByName([]ConnectionProfile{x, y})
+	if len(out2) != 1 || out2[0].Theme != "first" {
+		t.Errorf("tie should keep first entry, got %+v", out2)
+	}
+}
+
+func TestNextDefaultProfileName(t *testing.T) {
+	if got := NextDefaultProfileName(nil); got != "Profile-1" {
+		t.Errorf("empty list: got %q", got)
+	}
+	profiles := []ConnectionProfile{
+		{Name: "Profile-2"}, {Name: "Profile-9"}, {Name: "Custom"},
+	}
+	if got := NextDefaultProfileName(profiles); got != "Profile-10" {
+		t.Errorf("got %q want Profile-10", got)
+	}
+}
+
+func TestLoadProfilesDeduplicatesOnDisk(t *testing.T) {
+	tmpDir := t.TempDir()
+	path := filepath.Join(tmpDir, "profiles.json")
+	raw := `{
+  "profiles": [
+    {"name": "Profile-2", "server_url": "wss://x/ws", "username": "Lamar", "is_admin": true, "use_e2e": true, "last_used": 100},
+    {"name": "Profile-2", "server_url": "wss://x/ws", "username": "Lamar", "is_admin": true, "use_e2e": true, "last_used": 200},
+    {"name": "Profile-2", "server_url": "wss://x/ws", "username": "Lamar", "is_admin": true, "use_e2e": true, "last_used": 50}
+  ]
+}`
+	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
+		t.Fatal(err)
+	}
+	icl := &InteractiveConfigLoader{ProfilesPath: path}
+	loaded, err := icl.LoadProfiles()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(loaded.Profiles) != 1 {
+		t.Fatalf("want 1 profile, got %d", len(loaded.Profiles))
+	}
+	if loaded.Profiles[0].LastUsed != 200 {
+		t.Errorf("want LastUsed 200, got %d", loaded.Profiles[0].LastUsed)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var again Profiles
+	if err := json.Unmarshal(data, &again); err != nil {
+		t.Fatal(err)
+	}
+	if len(again.Profiles) != 1 {
+		t.Errorf("file on disk should have 1 profile after self-heal, got %d", len(again.Profiles))
 	}
 }
 

@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -63,6 +65,65 @@ type ConnectionProfile struct {
 type Profiles struct {
 	Default  string              `json:"default,omitempty"`
 	Profiles []ConnectionProfile `json:"profiles"`
+}
+
+var profileNameNumberRE = regexp.MustCompile(`^Profile-(\d+)$`)
+
+// dedupeProfilesByName collapses duplicate profile names, keeping the entry with the
+// highest LastUsed (ties keep the first occurrence in the file). Empty names are
+// not merged with each other.
+func dedupeProfilesByName(profiles []ConnectionProfile) []ConnectionProfile {
+	if len(profiles) < 2 {
+		return profiles
+	}
+	type best struct {
+		p     ConnectionProfile
+		order int
+	}
+	seen := make(map[string]best)
+	var keys []string
+
+	for i, p := range profiles {
+		key := p.Name
+		if key == "" {
+			key = "\x00empty:" + strconv.Itoa(i)
+		}
+		if prev, ok := seen[key]; ok {
+			if p.LastUsed > prev.p.LastUsed {
+				seen[key] = best{p: p, order: prev.order}
+			}
+			continue
+		}
+		seen[key] = best{p: p, order: i}
+		keys = append(keys, key)
+	}
+
+	out := make([]ConnectionProfile, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, seen[key].p)
+	}
+	return out
+}
+
+// NextDefaultProfileName returns "Profile-<n>" where n is one greater than the
+// highest existing "Profile-<digits>" name. Falls back to len(profiles)+1 when
+// no numbered profiles exist (avoids colliding after duplicates inflated len).
+func NextDefaultProfileName(profiles []ConnectionProfile) string {
+	maxN := 0
+	for _, p := range profiles {
+		m := profileNameNumberRE.FindStringSubmatch(p.Name)
+		if len(m) != 2 {
+			continue
+		}
+		n, err := strconv.Atoi(m[1])
+		if err == nil && n > maxN {
+			maxN = n
+		}
+	}
+	if maxN == 0 {
+		return fmt.Sprintf("Profile-%d", len(profiles)+1)
+	}
+	return fmt.Sprintf("Profile-%d", maxN+1)
 }
 
 // InteractiveConfigLoader handles interactive configuration
@@ -322,6 +383,16 @@ func (icl *InteractiveConfigLoader) LoadProfiles() (*Profiles, error) {
 
 	if err := json.Unmarshal(data, &profiles); err != nil {
 		return nil, err
+	}
+
+	before := len(profiles.Profiles)
+	profiles.Profiles = dedupeProfilesByName(profiles.Profiles)
+	if len(profiles.Profiles) < before {
+		// Self-heal on disk so the picker and future saves stay consistent.
+		if err := icl.SaveProfiles(&profiles); err != nil {
+			// Return deduplicated in-memory list even if we cannot rewrite the file.
+			return &profiles, nil
+		}
 	}
 
 	return &profiles, nil

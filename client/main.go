@@ -2348,7 +2348,7 @@ func main() {
 				keystorePassFromConfig = keystorePass
 
 				// Save as a new profile
-				profileName := fmt.Sprintf("Profile-%d", len(profiles.Profiles)+1)
+				profileName := config.NextDefaultProfileName(profiles.Profiles)
 				profile := &config.ConnectionProfile{
 					Name:      profileName,
 					ServerURL: cfg.ServerURL,
