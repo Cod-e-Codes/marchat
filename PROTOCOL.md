@@ -34,7 +34,7 @@ The handshake message introduces the user to the server. It must be the first me
 
 ### Fields
 
-- `username` (string): **Required.** Display name. Must be unique among currently connected users.
+- `username` (string): **Required.** Display name. Must be unique among currently connected users. The server reserves the name under lock during handshake before registering the session, so two simultaneous connections cannot claim the same username.
 - `admin` (bool): Optional. Request admin access. Defaults to `false`.
 - `admin_key` (string): Required only if `admin` is `true`. Must match the server-configured key.
 
@@ -43,7 +43,7 @@ If `admin` is requested:
 - The username must match one in the admin allowlist (case-insensitive).
 - The provided key must match the server’s configured key.
 
-Invalid handshakes (missing username, duplicate names, or invalid admin credentials) result in immediate connection termination.
+Invalid handshakes (missing username, duplicate names, or invalid admin credentials) result in immediate connection termination. Duplicate usernames typically produce a close reason indicating the name is already taken (for example: `Username already taken - please choose a different username`).
 
 ---
 

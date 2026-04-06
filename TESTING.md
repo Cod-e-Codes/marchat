@@ -51,7 +51,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `plugin/manager/manager_test.go` | Plugin Manager | Installation, uninstallation, command execution |
 | `plugin/integration_test.go` | Plugin Integration | End-to-end plugin system workflows |
 | `shared/version_test.go` | Version information | Version functions, variable validation, format consistency |
-| `plugin/license/validator_test.go` | License validation | Signature verification, caching, expiration checks |
+| `plugin/license/validator_test.go` | License validation | Signature verification, caching, expiration, tampered cache, plugin/cache key mismatch |
 | `cmd/license/main_test.go` | License CLI tool functions | CLI functions (validateLicense, generateLicense, generateKeyPair, checkLicense) |
 
 ### Detailed File Coverage (from coverage profile)

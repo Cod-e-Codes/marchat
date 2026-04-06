@@ -13,6 +13,7 @@ import (
 
 type Hub struct {
 	clients      map[*Client]bool
+	usernames    map[string]struct{}
 	clientsMutex sync.RWMutex
 	broadcast    chan interface{}
 	register     chan *Client
@@ -45,6 +46,7 @@ func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
 
 	return &Hub{
 		clients:              make(map[*Client]bool),
+		usernames:            make(map[string]struct{}),
 		broadcast:            make(chan interface{}),
 		register:             make(chan *Client),
 		unregister:           make(chan *Client),
@@ -55,6 +57,27 @@ func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
 		db:                   db,
 		channels:             make(map[string]map[*Client]bool),
 	}
+}
+
+func (h *Hub) TryReserveUsername(username string) bool {
+	lowerUsername := strings.ToLower(username)
+
+	h.clientsMutex.Lock()
+	defer h.clientsMutex.Unlock()
+
+	if _, exists := h.usernames[lowerUsername]; exists {
+		return false
+	}
+	h.usernames[lowerUsername] = struct{}{}
+	return true
+}
+
+func (h *Hub) ReleaseUsername(username string) {
+	lowerUsername := strings.ToLower(username)
+
+	h.clientsMutex.Lock()
+	delete(h.usernames, lowerUsername)
+	h.clientsMutex.Unlock()
 }
 
 // BanUser adds a user to the permanent ban list
@@ -304,7 +327,7 @@ func (h *Hub) CleanupStaleConnections() {
 		if _, exists := h.clients[client]; exists {
 			log.Printf("[CLEANUP] Removing stale connection for user '%s' (IP: %s)", client.username, client.ipAddr)
 			delete(h.clients, client)
-			close(client.send)
+			delete(h.usernames, strings.ToLower(client.username))
 			client.conn.Close()
 		}
 	}
@@ -334,7 +357,7 @@ func (h *Hub) ForceDisconnectUser(username string, adminUsername string) bool {
 
 	// Remove from clients map
 	delete(h.clients, target)
-	close(target.send)
+	delete(h.usernames, strings.ToLower(target.username))
 	h.clientsMutex.Unlock()
 
 	// Close connection outside the lock
@@ -406,7 +429,10 @@ func (h *Hub) Run() {
 			h.clientsMutex.Lock()
 			if _, ok := h.clients[client]; ok {
 				delete(h.clients, client)
-				close(client.send)
+				delete(h.usernames, strings.ToLower(client.username))
+				// Intentionally do not close client.send here.
+				// Closing send while readPump is still processing can trigger send-on-closed-channel panics.
+				// Connection close is the teardown signal; writePump exits on failed writes/pings.
 				HubLogger.Info("Client unregistered", map[string]interface{}{
 					"username": client.username,
 					"ip":       client.ipAddr,
@@ -441,8 +467,10 @@ func (h *Hub) Run() {
 						case client.send <- message:
 						default:
 							log.Printf("Dropping client %s due to full send channel\n", client.username)
-							close(client.send)
 							delete(h.clients, client)
+							delete(h.usernames, strings.ToLower(client.username))
+							// Fail-fast backpressure handling: drop slow client and close socket.
+							client.conn.Close()
 						}
 					}
 				}
@@ -453,8 +481,10 @@ func (h *Hub) Run() {
 					case client.send <- message:
 					default:
 						log.Printf("Dropping client %s due to full send channel\n", client.username)
-						close(client.send)
 						delete(h.clients, client)
+						delete(h.usernames, strings.ToLower(client.username))
+						// Fail-fast backpressure handling: drop slow client and close socket.
+						client.conn.Close()
 					}
 				}
 			}

@@ -78,7 +78,9 @@ func (lv *LicenseValidator) ValidateLicense(licensePath string) (*License, error
 	return &license, nil
 }
 
-// ValidateCachedLicense validates a license from cache
+// ValidateCachedLicense loads a license from the on-disk cache, verifies plugin_name matches
+// the requested plugin and re-checks the Ed25519 signature, then enforces expiry. Bad cache
+// files are removed.
 func (lv *LicenseValidator) ValidateCachedLicense(pluginName string) (*License, error) {
 	cachePath := filepath.Join(lv.cacheDir, pluginName+".license")
 
@@ -92,10 +94,20 @@ func (lv *LicenseValidator) ValidateCachedLicense(pluginName string) (*License, 
 		return nil, fmt.Errorf("failed to parse cached license: %w", err)
 	}
 
+	if license.PluginName != pluginName {
+		_ = os.Remove(cachePath)
+		return nil, fmt.Errorf("cached license plugin mismatch")
+	}
+
+	if err := lv.validateSignature(&license, nil); err != nil {
+		_ = os.Remove(cachePath)
+		return nil, fmt.Errorf("invalid cached license signature: %w", err)
+	}
+
 	// Check if cached license is still valid
 	if time.Now().After(license.ExpiresAt) {
 		// Remove expired cache
-		os.Remove(cachePath)
+		_ = os.Remove(cachePath)
 		return nil, fmt.Errorf("cached license has expired")
 	}
 

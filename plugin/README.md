@@ -306,7 +306,7 @@ Official (paid) plugins require license validation:
 
 1. **License file**: `.license` file in plugin directory
 2. **Cryptographic verification**: Ed25519 signature validation
-3. **Offline support**: Licenses cached after first validation
+3. **Offline support**: Licenses cached after first validation; the server re-verifies the signature (and that `plugin_name` matches the cache key) whenever it reads the cache, and drops invalid cache files
 
 ### License Management
 

@@ -384,6 +384,15 @@ func TestBackupDatabase(t *testing.T) {
 	}
 }
 
+func TestSQLiteQuoteLiteral(t *testing.T) {
+	input := "/tmp/ma'rchat.db"
+	got := sqliteQuoteLiteral(input)
+	want := "'/tmp/ma''rchat.db'"
+	if got != want {
+		t.Fatalf("sqliteQuoteLiteral() = %q, want %q", got, want)
+	}
+}
+
 func TestGetDatabaseStats(t *testing.T) {
 	// Create a real database for this test
 	db, err := sql.Open("sqlite", ":memory:")

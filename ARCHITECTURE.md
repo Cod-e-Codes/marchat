@@ -78,7 +78,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 
 #### Core Structures
 
-- **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state
+- **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered
 - **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing
 - **`AdminPanel`**: Terminal-based administrative interface for server management
 - **`WebAdminServer`**: Web-based administrative interface with session authentication
@@ -95,7 +95,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - Reaction broadcasting
 - User management including ban, kick, and allow operations
 - Plugin command execution and management
-- Database backup and maintenance operations
+- Database backup and maintenance operations (SQLite `VACUUM INTO` uses proper string quoting so backup paths containing `'` remain safe)
 - System metrics collection and health monitoring
 - Web-based admin panel with CSRF protection
 - Health check endpoints for monitoring systems
@@ -170,7 +170,7 @@ Extensible architecture allowing custom functionality through external plugins.
 - **Host** (`plugin/host/`): Subprocess management and JSON-based communication
 - **Manager** (`plugin/manager/`): Plugin installation, store integration, and command execution
 - **Store** (`plugin/store/`): Terminal-based plugin browsing and installation interface
-- **License** (`plugin/license/`): Cryptographic license validation for official plugins
+- **License** (`plugin/license/`): Cryptographic license validation for official plugins (cached licenses re-verified on read)
 
 #### Communication Protocol
 
@@ -228,7 +228,7 @@ Both **`marchat-client`** and **`marchat-server`** embed diagnostics via **`inte
 - **License Generation**: Create signed licenses for official plugins
 - **License Validation**: Verify plugin license authenticity
 - **Key Management**: Generate Ed25519 key pairs for signing
-- **Cache Management**: Offline license validation support
+- **Cache Management**: Offline license validation support; cached licenses are re-signature-checked (and `plugin_name` must match the cache key) on read
 
 ## Data Flow and Communication
 

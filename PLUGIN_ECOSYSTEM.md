@@ -96,6 +96,7 @@ The plugin ecosystem consists of several interconnected components:
 - License generation and caching
 - Offline validation support
 - Expiration checking
+- On-disk cache integrity: each cache read re-checks `plugin_name` matches the requested plugin and re-verifies the signature; bad or mismatched cache files are removed
 
 ### 6. Command Integration (`server/`)
 
@@ -207,7 +208,7 @@ func (p *MyPlugin) Commands() []sdk.PluginCommand {
 ### Official Plugin Licensing
 - License files: `.license` files in plugin directories
 - Cryptographic validation: Ed25519 signature verification
-- Offline support: Licenses cached after first validation
+- Offline support: Licenses cached after first validation; cached copies are signature-checked on every read (and must match the plugin name in the cache filename)
 - Expiration checking: Automatic license expiration handling
 
 ### License Management CLI
@@ -312,7 +313,7 @@ MARCHAT_PLUGIN_REGISTRY_URL=https://raw.githubusercontent.com/Cod-e-Codes/marcha
 - Cryptographic signatures: Ed25519 signature validation
 - Offline validation: Licenses cached for offline use
 - Expiration checking: Automatic license expiration handling
-- Tamper detection: Signature verification prevents tampering
+- Tamper detection: Signature verification on file load and on cached license reads; tampered or wrong-plugin cache entries are deleted
 
 ## Performance Considerations
 

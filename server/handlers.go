@@ -826,12 +826,18 @@ func BackupDatabase(dbPath string) (string, error) {
 
 	// Execute VACUUM INTO to create a clean backup
 	// This creates a complete, consistent copy of the database
-	_, err = dbExec(db, fmt.Sprintf("VACUUM INTO '%s';", backupPath))
+	stmt := "VACUUM INTO " + sqliteQuoteLiteral(backupPath) + ";"
+	_, err = dbExec(db, stmt)
 	if err != nil {
 		return "", fmt.Errorf("failed to create database backup: %v", err)
 	}
 
 	return backupFilename, nil
+}
+
+// sqliteQuoteLiteral returns s as a single-quoted SQLite string literal (embedded ' doubled).
+func sqliteQuoteLiteral(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", "''") + "'"
 }
 
 // GetDatabaseStats returns statistics about the database
@@ -991,24 +997,21 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		// Extract IP address
 		ipAddr := getClientIP(r)
 
-		// Check for duplicate username
-		hub.clientsMutex.RLock()
-		isDuplicate := false
-		for client := range hub.clients {
-			if strings.EqualFold(client.username, username) {
-				log.Printf("Duplicate username attempt: '%s' (IP: %s) - username already in use by IP: %s", username, ipAddr, client.ipAddr)
-				isDuplicate = true
-				break
-			}
-		}
-		hub.clientsMutex.RUnlock()
-		if isDuplicate {
+		// Atomically reserve username before creating client/session state.
+		if !hub.TryReserveUsername(username) {
+			log.Printf("Duplicate username attempt blocked: '%s' (IP: %s)", username, ipAddr)
 			if err := conn.WriteMessage(websocket.CloseMessage, []byte("Username already taken - please choose a different username")); err != nil {
 				log.Printf("WriteMessage error: %v", err)
 			}
 			conn.Close()
 			return
 		}
+		usernameReserved := true
+		defer func() {
+			if usernameReserved {
+				hub.ReleaseUsername(username)
+			}
+		}()
 
 		// Check if user is banned
 		if hub.IsUserBanned(username) {
@@ -1034,6 +1037,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		}
 		log.Printf("Client %s connected (admin=%v, IP: %s)", username, isAdmin, ipAddr)
 		hub.register <- client
+		usernameReserved = false
 
 		if persistedChannel := LoadUserChannel(db, username); persistedChannel != "" && persistedChannel != "general" {
 			hub.leaveChannel(client, "general")

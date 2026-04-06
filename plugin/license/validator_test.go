@@ -1,6 +1,9 @@
 package license
 
 import (
+	"crypto/ed25519"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -243,6 +246,101 @@ func TestValidateCachedLicense(t *testing.T) {
 		}
 		if !contains(err.Error(), "cached license has expired") {
 			t.Errorf("Expected expiration error, got: %v", err)
+		}
+	})
+
+	t.Run("tampered cached license signature", func(t *testing.T) {
+		expiresAt := time.Now().Add(24 * time.Hour)
+		license, err := GenerateLicense("tampered-plugin", "customer123", expiresAt, privateKey)
+		if err != nil {
+			t.Fatalf("Failed to generate license: %v", err)
+		}
+
+		if err := validator.cacheLicense(license); err != nil {
+			t.Fatalf("Failed to cache license: %v", err)
+		}
+
+		cachePath := filepath.Join(cacheDir, "tampered-plugin.license")
+		data, err := os.ReadFile(cachePath)
+		if err != nil {
+			t.Fatalf("Failed to read cached license: %v", err)
+		}
+
+		var tampered License
+		if err := json.Unmarshal(data, &tampered); err != nil {
+			t.Fatalf("Failed to unmarshal cached license: %v", err)
+		}
+		tampered.ExpiresAt = tampered.ExpiresAt.Add(48 * time.Hour)
+
+		tamperedData, err := json.MarshalIndent(tampered, "", "  ")
+		if err != nil {
+			t.Fatalf("Failed to marshal tampered license: %v", err)
+		}
+		if err := os.WriteFile(cachePath, tamperedData, 0644); err != nil {
+			t.Fatalf("Failed to write tampered cache: %v", err)
+		}
+
+		_, err = validator.ValidateCachedLicense("tampered-plugin")
+		if err == nil {
+			t.Fatal("Expected error for tampered cached license, got nil")
+		}
+		if !contains(err.Error(), "invalid cached license signature") {
+			t.Errorf("Expected signature error, got: %v", err)
+		}
+	})
+
+	t.Run("cached license plugin mismatch", func(t *testing.T) {
+		expiresAt := time.Now().Add(24 * time.Hour)
+		license, err := GenerateLicense("mismatch-plugin", "customer123", expiresAt, privateKey)
+		if err != nil {
+			t.Fatalf("Failed to generate license: %v", err)
+		}
+
+		if err := validator.cacheLicense(license); err != nil {
+			t.Fatalf("Failed to cache license: %v", err)
+		}
+
+		cachePath := filepath.Join(cacheDir, "mismatch-plugin.license")
+		data, err := os.ReadFile(cachePath)
+		if err != nil {
+			t.Fatalf("Failed to read cached license: %v", err)
+		}
+
+		var mismatch License
+		if err := json.Unmarshal(data, &mismatch); err != nil {
+			t.Fatalf("Failed to unmarshal cached license: %v", err)
+		}
+		mismatch.PluginName = "other-plugin"
+		mismatch.Signature = ""
+
+		licenseCopy := mismatch
+		licenseCopy.Signature = ""
+		signatureData, err := json.Marshal(licenseCopy)
+		if err != nil {
+			t.Fatalf("Failed to marshal signature data: %v", err)
+		}
+		hash := sha256.Sum256(signatureData)
+		privateKeyDecoded, err := base64.StdEncoding.DecodeString(privateKey)
+		if err != nil {
+			t.Fatalf("Failed to decode private key: %v", err)
+		}
+		signature := ed25519.Sign(ed25519.PrivateKey(privateKeyDecoded), hash[:])
+		mismatch.Signature = base64.StdEncoding.EncodeToString(signature)
+
+		mismatchData, err := json.MarshalIndent(mismatch, "", "  ")
+		if err != nil {
+			t.Fatalf("Failed to marshal mismatch license: %v", err)
+		}
+		if err := os.WriteFile(cachePath, mismatchData, 0644); err != nil {
+			t.Fatalf("Failed to write mismatch cache: %v", err)
+		}
+
+		_, err = validator.ValidateCachedLicense("mismatch-plugin")
+		if err == nil {
+			t.Fatal("Expected plugin mismatch error, got nil")
+		}
+		if !contains(err.Error(), "cached license plugin mismatch") {
+			t.Errorf("Expected plugin mismatch error, got: %v", err)
 		}
 	})
 }
