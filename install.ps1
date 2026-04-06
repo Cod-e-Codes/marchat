@@ -49,9 +49,9 @@ if ([System.Environment]::Is64BitOperatingSystem) {
     $ARCH = "386"
 }
 
-# Handle Android detection
+# Termux: use linux-arm64 release asset (same static binary as Linux aarch64; not android-* zip)
 if ($env:PREFIX -and $env:PREFIX -like "*com.termux*") {
-    $OS = "android"
+    $OS = "linux"
     $ARCH = "arm64"
 }
 

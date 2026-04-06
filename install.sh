@@ -24,6 +24,12 @@ if [[ "$OS" == *"msys"* ]] || [[ "$OS" == *"mingw"* ]] || [[ "$OS" == *"cygwin"*
   OS="windows"
 fi
 
+# Termux often reports kernel "Linux" (already correct). Some environments report "Android";
+# release zips are named linux-$ARCH (static GOOS=linux), not android-$ARCH.
+if [[ "$OS" == "android" && "$ARCH" == "arm64" ]]; then
+  OS="linux"
+fi
+
 # Construct GitHub release URL
 URL="https://github.com/Cod-e-Codes/marchat/releases/download/$VERSION/marchat-$VERSION-$OS-$ARCH.zip"
 
