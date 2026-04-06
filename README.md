@@ -33,17 +33,23 @@ Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/relea
 
 Screen recordings of a current build (GIF autoplay depends on the viewer).
 
-**Server:** startup with the banner, optional web admin panel, and `marchat-server -doctor`.
-
-**Client:** reactions and built-in help, `:theme`, and `marchat-client -doctor`.
+### Server: startup banner and web admin panel
 
 ![Server startup and web admin panel](assets/demo-server-admin-panel.gif "marchat server startup and web admin panel")
 
+### Server: diagnostics (`marchat-server -doctor`)
+
 ![Server diagnostics (doctor)](assets/demo-server-doctor.gif "marchat-server -doctor output")
+
+### Client: reactions and help
 
 ![Client reactions and help](assets/demo-client-reactions-help.gif "marchat client reactions and help")
 
+### Client: theme switching (`:theme`)
+
 ![Client theme switching](assets/demo-client-theme-switch.gif "marchat client :theme")
+
+### Client: diagnostics (`marchat-client -doctor`)
 
 ![Client diagnostics (doctor)](assets/demo-client-doctor.gif "marchat-client -doctor output")
 
