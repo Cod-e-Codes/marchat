@@ -83,5 +83,6 @@ jobs:
       - name: Postgres and MySQL schema smoke
         env:
           MARCHAT_CI_POSTGRES_URL: postgres://marchat:marchat@127.0.0.1:5432/marchat_ci?sslmode=disable
-          MARCHAT_CI_MYSQL_URL: marchat:marchat@tcp(127.0.0.1:3306)/marchat_ci
+          # Must use mysql: or mysql:// prefix so detectDriver() does not treat the DSN as a SQLite path.
+          MARCHAT_CI_MYSQL_URL: mysql:marchat:marchat@tcp(127.0.0.1:3306)/marchat_ci
         run: go test -race ./server -run 'Test(Postgres|MySQL)InitDBAndSchemaSmoke' -count=1 -v

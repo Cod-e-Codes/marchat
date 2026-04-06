@@ -8,6 +8,7 @@ import (
 
 // CI sets MARCHAT_CI_POSTGRES_URL and MARCHAT_CI_MYSQL_URL when Postgres / MySQL (or MariaDB)
 // service containers are available. Local runs skip unless those variables are set.
+// MySQL DSNs must start with mysql: or mysql:// (see detectDriver in db.go); otherwise InitDB uses SQLite.
 
 func TestPostgresInitDBAndSchemaSmoke(t *testing.T) {
 	dsn := os.Getenv("MARCHAT_CI_POSTGRES_URL")
