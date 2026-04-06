@@ -268,13 +268,7 @@ func (ks *KeyStore) load() error {
 		return fmt.Errorf("failed to decrypt keystore: %w", err)
 	}
 
-	// Deserialize the data (supports both old and new formats)
 	var keystoreData struct {
-		// Legacy fields for backward compatibility
-		Keypair     *shared.KeyPair                  `json:"keypair,omitempty"`
-		PublicKeys  map[string]*shared.PublicKeyInfo `json:"public_keys,omitempty"`
-		SessionKeys map[string]*shared.SessionKey    `json:"session_keys,omitempty"`
-		// Current field
 		GlobalKey *shared.SessionKey `json:"global_key"`
 		Version   string             `json:"version"`
 	}
@@ -283,7 +277,6 @@ func (ks *KeyStore) load() error {
 		return fmt.Errorf("failed to unmarshal keystore: %w", err)
 	}
 
-	// Only load the global key (ignore legacy individual encryption data)
 	ks.globalKey = keystoreData.GlobalKey
 
 	return nil

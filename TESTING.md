@@ -267,11 +267,8 @@ go test -cover ./...
 - Verifies message ordering and retrieval
 
 ### Cryptographic Tests
-- Generates real keypairs using X25519
-- Tests ChaCha20-Poly1305 encryption
-- Verifies session key derivation
-- Tests key validation and ID generation
-- **Client Keystore**: Tests keystore initialization, encryption/decryption, file operations, passphrase handling
+- Tests ChaCha20-Poly1305 encrypt/decrypt for text payloads (`shared/crypto_test.go`)
+- **Client Keystore**: Tests keystore initialization, global key load, encryption/decryption, file operations, passphrase handling
 
 ### Message Tests
 - Tests various message types (text, file, admin)

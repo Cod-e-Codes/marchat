@@ -63,7 +63,7 @@ Screen recordings of a current build (GIF autoplay depends on the viewer).
 - **Typing Indicators** - See when other users are typing
 - **Read Receipts** - Message read acknowledgement (broadcast-level)
 - **Plugin System** - Remote registry with text commands and Alt+key hotkeys
-- **E2E Encryption** - X25519/ChaCha20-Poly1305 with global encryption, including file transfers
+- **E2E Encryption** - ChaCha20-Poly1305 with a shared global key (`MARCHAT_GLOBAL_E2E_KEY`), including file transfers
 - **File Sharing** - Send files up to 1MB (configurable) with interactive picker and optional E2E encryption
 - **Admin Controls** - User management, bans, kick system with ban history gaps
 - **Smart Notifications** - Bell + desktop notifications with quiet hours and focus mode ([guide](NOTIFICATIONS.md))
@@ -82,7 +82,7 @@ marchat started as a fun weekend project for father-son coding sessions and has 
 **Key Benefits:**
 - **Self-hosted**: No external services required
 - **Cross-platform**: Linux, macOS, Windows, and Android/Termux
-- **Secure**: Optional E2E encryption with X25519/ChaCha20-Poly1305
+- **Secure**: Optional E2E encryption with ChaCha20-Poly1305 (global symmetric key)
 - **Extensible**: Plugin ecosystem for custom functionality
 - **Lightweight**: Minimal resource usage, perfect for servers
 
@@ -499,11 +499,11 @@ export MARCHAT_USERS="admin1,admin2"
 Global encryption for secure group chat using shared keys across all clients.
 
 ### How It Works
-- **Shared Key Model**: All clients use same global encryption key for public channels
-- **Simplified Management**: No complex per-user key exchange
-- **X25519/ChaCha20-Poly1305**: Industry-standard encryption algorithms
-- **Environment Variable**: `MARCHAT_GLOBAL_E2E_KEY` for key distribution
-- **Auto-Generation**: Creates new key if none provided
+- **Shared Key Model**: All clients use the same 32-byte global key for encrypted chat (and optional encrypted files)
+- **Simplified Management**: No per-user public-key exchange on the wire; distribute the key out-of-band (env var or copy from first client)
+- **ChaCha20-Poly1305**: Authenticated encryption for payloads; see **PROTOCOL.md** for the on-the-wire layout
+- **Environment Variable**: `MARCHAT_GLOBAL_E2E_KEY` (base64) for key distribution
+- **Auto-Generation**: First client can generate a key if none is provided (then share it to peers)
 
 ### Setup Options
 
@@ -540,10 +540,9 @@ E2E encryption enabled with keystore: config/keystore.dat
 ```
 
 ### Security Features
-- **Forward Secrecy**: Unique session keys per conversation
-- **Server Privacy**: Server cannot read encrypted messages
-- **Local Keystore**: Encrypted with passphrase protection using PBKDF2
-- **Validation**: Automatic encryption/decryption testing on startup
+- **Server Privacy**: Server cannot read encrypted message bodies when E2E is used
+- **Local Keystore**: Global key stored in a passphrase-protected file (PBKDF2 + AES-GCM)
+- **Validation**: Automatic encryption/decryption round-trip test on startup
 
 **Note**: Keystore encryption was upgraded from SHA256 to PBKDF2 for enhanced security. Existing keystores encrypted with the old method will need to be re-initialized.
 

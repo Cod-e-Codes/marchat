@@ -80,7 +80,7 @@ Optional fields (`recipient`, `reaction`, etc.) are omitted from JSON when unset
 - `edited` (bool, optional): `true` if the message body was edited after send.
 - `channel` (string, optional): Channel name for scoped delivery; defaults to `"general"` when omitted on outgoing chat messages. See [Channels](#channels).
 - `reaction` (object, optional): Reaction payload when `type` is `"reaction"`. See [Reaction object](#reaction-object).
-- `encrypted` (bool, optional): `true` when `content` is end-to-end encrypted (opaque to the server).
+- `encrypted` (bool, optional): `true` when `content` is end-to-end encrypted (opaque to the server). See [End-to-end encryption](#end-to-end-encryption).
 
 #### File Object
 
@@ -147,6 +147,19 @@ Messages initiated by the server to update client state.
   }
 }
 ```
+
+---
+
+## End-to-end encryption
+
+Optional chat encryption uses a **shared symmetric key** for all participants (global model), not per-user public-key exchange.
+
+- **Key material**: 32 random bytes, distributed out-of-band. Clients load the same key via `MARCHAT_GLOBAL_E2E_KEY` (standard base64) or a locally generated key that operators then share manually.
+- **Algorithm**: ChaCha20-Poly1305 (RFC 8439). Each encrypted payload uses a random **12-byte nonce** (typical for this AEAD).
+- **Text messages on the wire**: Same JSON message shape as plaintext chat; set `encrypted` to `true`. The `content` field is **standard base64** encoding of **nonce ‖ ciphertext** (nonce first, 12 bytes, then the Poly1305-sealed ciphertext). The plaintext decrypted by the AEAD is a JSON object representing the inner chat message (e.g. sender, content, type, timestamp) as produced by the reference client.
+- **Files**: When `type` is `file` and E2E is enabled, the reference client encrypts file bytes with the same global key; see client implementation for the exact binary layout (nonce-prefixed ciphertext).
+
+The server stores and relays opaque `content` (and encrypted file blobs) without performing decryption.
 
 ---
 

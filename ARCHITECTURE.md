@@ -123,21 +123,19 @@ Common types and utilities used across client and server components.
 - **`Message`**: Standard chat message structure with encryption support, message IDs, recipient, channel, edited flag, and reaction metadata
 - **`MessageType`**: Type discriminator (`text`, `file`, `admin_command`, `edit`, `delete`, `typing`, `reaction`, `dm`, `search`, `pin`, `read_receipt`, `join_channel`, `leave_channel`, `list_channels`)
 - **`ReactionMeta`**: Emoji, target message ID, and removal flag
-- **`EncryptedMessage`**: End-to-end encrypted message format
+- **`EncryptedMessage`**: End-to-end encrypted message format (AEAD payload + metadata)
 - **`Handshake`**: WebSocket connection authentication structure
-- **`KeyPair`**: X25519 cryptographic identity for key exchange
-- **`SessionKey`**: Derived encryption keys for message security
+- **`SessionKey`**: 32-byte ChaCha20-Poly1305 key material for global E2E (fingerprint in `KeyID` for logs)
 - **`FileMeta`**: File transfer metadata including name, size, and data
 
 #### Encryption System
 
-The encryption system provides end-to-end security using modern cryptographic primitives:
+Chat end-to-end encryption uses a **global symmetric key** shared by all clients (via `MARCHAT_GLOBAL_E2E_KEY` or manual distribution), not per-user key exchange on the wire.
 
-- **X25519**: Elliptic curve key exchange for secure key establishment
-- **ChaCha20-Poly1305**: Authenticated encryption for message confidentiality and integrity
-- **Global E2E**: Server-wide encryption key for simplified key management
-- **Session Keys**: Derived keys for efficient message encryption
-- **File Transfer Encryption**: Raw byte encryption/decryption via `EncryptRaw`/`DecryptRaw` in the keystore
+- **ChaCha20-Poly1305**: Authenticated encryption for message and file confidentiality and integrity
+- **Global E2E**: One 32-byte key per deployment; the client stores it in the passphrase-protected keystore (`EncryptMessage` / `DecryptMessage` in `shared`, orchestrated by `client/crypto/keystore.go`)
+- **Keystore file**: Encrypted with **AES-GCM**; passphrase stretched with **PBKDF2** (see `client/crypto/keystore.go`)
+- **File transfer**: Raw byte encryption/decryption via `EncryptRaw`/`DecryptRaw` in the keystore using the same global key
 
 ### Plugin System (`plugin/`)
 
@@ -270,11 +268,11 @@ See [PROTOCOL.md](PROTOCOL.md) for the full message format specification.
 
 ### Encryption Flow
 
-1. **Key Generation**: Client generates X25519 keypair during initialization
-2. **Key Exchange**: Global session key established with server
-3. **Message Encryption**: Messages encrypted using ChaCha20-Poly1305
-4. **Transport**: Encrypted data base64-encoded for JSON transport
-5. **Storage**: Server stores encrypted messages in database
+1. **Key setup**: Operator shares a 32-byte key (e.g. `openssl rand -base64 32` as `MARCHAT_GLOBAL_E2E_KEY`) or the first client generates one and operators copy it to peers
+2. **Local storage**: Client holds the key in `keystore.dat` protected by `--keystore-passphrase`
+3. **Message encryption**: Inner JSON payload is sealed with ChaCha20-Poly1305; nonce ‖ ciphertext is base64-encoded into `content` with `encrypted: true` (see **PROTOCOL.md**)
+4. **Transport**: Standard WebSocket JSON; server does not decrypt
+5. **Storage**: Server persists opaque ciphertext in the database
 
 ## Database Schema
 
@@ -370,10 +368,9 @@ The web-based interface provides the same functionality through a browser:
 
 ### Encryption
 
-- **End-to-End**: Client-side encryption with server-side key management
-- **Key Derivation**: HKDF-based key derivation from passphrases
-- **Forward Secrecy**: Session-based keys for message security
-- **Authenticated Encryption**: ChaCha20-Poly1305 for confidentiality and integrity
+- **End-to-end (chat)**: Client-side ChaCha20-Poly1305 with a **shared global symmetric key**; the server never holds the plaintext key
+- **Keystore**: PBKDF2-derived key from the keystore passphrase protects `keystore.dat` (AES-GCM)
+- **Authenticated encryption**: ChaCha20-Poly1305 for chat and file payloads at the application layer
 
 ### Input Validation
 
@@ -493,7 +490,7 @@ marchat produces two main executables:
 
 - **WebSocket Protocol**: Standardized communication layer enabling any frontend
 - **JSON IPC**: Structured messages for easy parsing and integration
-- **Encryption Support**: X25519/ChaCha20-Poly1305 ensures secure messaging
+- **Encryption Support**: ChaCha20-Poly1305 (global symmetric E2E) for messaging and optional file encryption
 - **Frontend Flexibility**: Architecture supports multiple frontend technologies
   - Web, desktop, or mobile clients can implement real-time chat, file transfer, and admin commands
 - **Protocol Independence**: Frontends are decoupled from server implementation
