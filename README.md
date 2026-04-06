@@ -748,22 +748,25 @@ go test ./... -timeout 10s # With timeout (CI recommended)
 - **Windows**: `.\test.ps1`
 
 ### Coverage Summary
+Percentages are **statement coverage** from a merged profile (`go test -coverprofile=... ./...` then `go tool cover -func=...`). **Size** is non-test `.go` lines per package (approximate). See [TESTING.md](TESTING.md) for file-level tables and how to regenerate from your `coverage` / `coverage.out` file.
+
 | Package | Coverage | Size | Status |
 |---------|----------|------|--------|
-| `shared` | 85.9% | 348 LOC | High |
-| `plugin/license` | 83.1% | 229 LOC | High |
-| `client/crypto` | 79.5% | 354 LOC | High |
-| `config` | 73.2% | 327 LOC | High |
-| `client/config` | 54.5% | 1862 LOC | Medium |
-| `plugin/store` | 47.0% | 552 LOC | Medium |
-| `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 33.7% | 6558 LOC | Medium |
-| `plugin/manager` | 23.8% | 747 LOC | Low |
-| `client` | 23.3% | 5334 LOC | Low |
-| `plugin/host` | 21.1% | 617 LOC | Low |
-| `cmd/server` | 5.3% | 455 LOC | Low |
+| `shared` | 86.8% | 203 LOC | High |
+| `plugin/license` | 85.4% | 198 LOC | High |
+| `client/crypto` | 79.5% | 282 LOC | High |
+| `config` | 73.2% | 277 LOC | High |
+| `client/config` | 57.0% | 1679 LOC | Medium |
+| `internal/doctor` | 50.2% | 666 LOC | Medium |
+| `plugin/store` | 47.0% | 490 LOC | Medium |
+| `cmd/license` | 42.2% | 140 LOC | Medium |
+| `server` | 35.3% | 6273 LOC | Low |
+| `plugin/manager` | 26.8% | 626 LOC | Low |
+| `client` | 23.1% | 4950 LOC | Low |
+| `plugin/host` | 21.1% | 533 LOC | Low |
+| `cmd/server` | 13.7% | 424 LOC | Low |
 
-**Overall: 34.1%** - See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 35.7%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

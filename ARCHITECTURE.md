@@ -74,7 +74,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 
 ### Server Application (`cmd/server/main.go`)
 
-The server is a standalone HTTP/WebSocket server application that provides real-time communication with plugin support and administrative interfaces. The ASCII banner is followed by **lipgloss**-styled status lines (WebSocket URL, admins, version, TLS state, tips, and optional admin-panel key hints) on stdout before the process settles into serving.
+The server is a standalone HTTP/WebSocket server application that provides real-time communication with plugin support and administrative interfaces. The ASCII banner is followed by **lipgloss**-styled status lines (WebSocket URL, admins, version, TLS state, tips, and optional admin-panel key hints) on stdout before the process settles into serving. Before serving, startup checks require at least one admin, a non-empty admin key, and a valid listen port; admin names are trimmed, lowercased, deduplicated case-insensitively, and must not be empty after trim.
 
 #### Core Structures
 

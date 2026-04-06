@@ -9,11 +9,72 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
 )
+
+func TestValidatePluginName(t *testing.T) {
+	t.Parallel()
+
+	valid := []string{"echo", "plugin_1", "my-plugin"}
+	for _, name := range valid {
+		if err := validatePluginName(name); err != nil {
+			t.Fatalf("expected valid name %q, got error: %v", name, err)
+		}
+	}
+
+	invalid := []string{
+		"",
+		"../escape",
+		"/absolute",
+		"UpperCase",
+		"with.dot",
+		strings.Repeat("a", 65),
+	}
+	for _, name := range invalid {
+		if err := validatePluginName(name); err == nil {
+			t.Fatalf("expected invalid name %q to return error", name)
+		}
+	}
+}
+
+func TestLoadPluginStateFallbacks(t *testing.T) {
+	t.Parallel()
+
+	pluginDir := t.TempDir()
+	dataDir := t.TempDir()
+	manager := NewPluginManager(pluginDir, dataDir, "https://example.com/registry.json")
+
+	// Missing file should return empty map.
+	state := manager.loadPluginState()
+	if state == nil || state.Enabled == nil {
+		t.Fatalf("expected default state with initialized map")
+	}
+	if len(state.Enabled) != 0 {
+		t.Fatalf("expected no enabled plugins, got %d", len(state.Enabled))
+	}
+
+	// Corrupted JSON should also return default state.
+	if err := os.WriteFile(manager.stateFile, []byte("{not-json"), 0644); err != nil {
+		t.Fatalf("failed to write corrupted state file: %v", err)
+	}
+	state = manager.loadPluginState()
+	if state == nil || state.Enabled == nil || len(state.Enabled) != 0 {
+		t.Fatalf("expected default state for corrupted json")
+	}
+
+	// Valid JSON without enabled map should initialize map.
+	if err := os.WriteFile(manager.stateFile, []byte("{}"), 0644); err != nil {
+		t.Fatalf("failed to write empty state file: %v", err)
+	}
+	state = manager.loadPluginState()
+	if state.Enabled == nil {
+		t.Fatalf("expected enabled map to be initialized")
+	}
+}
 
 func TestNewPluginManager(t *testing.T) {
 	pluginDir := "/tmp/test-plugins"

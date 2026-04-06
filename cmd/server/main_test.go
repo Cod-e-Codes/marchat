@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 
@@ -264,23 +265,7 @@ func TestAdminUsernameNormalization(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Simulate the normalization logic from main.go
-			adminSet := make(map[string]struct{})
-			var err error
-
-			for _, u := range tt.input {
-				if strings.TrimSpace(u) == "" {
-					err = &ConfigError{Message: "admin username cannot be empty"}
-					break
-				}
-				lu := strings.ToLower(strings.TrimSpace(u))
-				if _, exists := adminSet[lu]; exists {
-					err = &ConfigError{Message: "duplicate admin username (case-insensitive): " + u}
-					break
-				}
-				adminSet[lu] = struct{}{}
-			}
-
+			normalizedAdmins, err := normalizeAndValidateAdmins(tt.input)
 			if tt.shouldError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -293,15 +278,9 @@ func TestAdminUsernameNormalization(t *testing.T) {
 				return
 			}
 
-			// Convert set back to slice and sort for comparison
-			normalizedAdmins := make([]string, 0, len(adminSet))
-			for u := range adminSet {
-				normalizedAdmins = append(normalizedAdmins, u)
-			}
-
 			// Sort both slices for comparison
-			sortStrings(normalizedAdmins)
-			sortStrings(tt.expected)
+			sort.Strings(normalizedAdmins)
+			sort.Strings(tt.expected)
 
 			if len(normalizedAdmins) != len(tt.expected) {
 				t.Errorf("Normalized admins length = %d, want %d", len(normalizedAdmins), len(tt.expected))
@@ -312,6 +291,64 @@ func TestAdminUsernameNormalization(t *testing.T) {
 				if admin != tt.expected[i] {
 					t.Errorf("Normalized admin[%d] = %s, want %s", i, admin, tt.expected[i])
 				}
+			}
+		})
+	}
+}
+
+func TestValidateStartupConfig(t *testing.T) {
+	tests := []struct {
+		name      string
+		admins    []string
+		key       string
+		port      int
+		wantError bool
+	}{
+		{
+			name:      "valid startup config",
+			admins:    []string{"admin"},
+			key:       "secret",
+			port:      8080,
+			wantError: false,
+		},
+		{
+			name:      "missing admins",
+			admins:    []string{},
+			key:       "secret",
+			port:      8080,
+			wantError: true,
+		},
+		{
+			name:      "missing admin key",
+			admins:    []string{"admin"},
+			key:       "",
+			port:      8080,
+			wantError: true,
+		},
+		{
+			name:      "port too low",
+			admins:    []string{"admin"},
+			key:       "secret",
+			port:      0,
+			wantError: true,
+		},
+		{
+			name:      "port too high",
+			admins:    []string{"admin"},
+			key:       "secret",
+			port:      70000,
+			wantError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateStartupConfig(tt.admins, tt.key, tt.port)
+			if tt.wantError && err == nil {
+				t.Fatalf("expected error but got nil")
+			}
+			if !tt.wantError && err != nil {
+				t.Fatalf("expected nil error but got %v", err)
 			}
 		})
 	}
@@ -444,17 +481,6 @@ func TestConfigurationValidation(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// Helper function to sort string slices
-func sortStrings(s []string) {
-	for i := 0; i < len(s)-1; i++ {
-		for j := i + 1; j < len(s); j++ {
-			if s[i] > s[j] {
-				s[i], s[j] = s[j], s[i]
-			}
-		}
 	}
 }
 
@@ -678,13 +704,4 @@ func TestMainFunctionIntegration(t *testing.T) {
 			t.Errorf("Expected admin ['testadmin'], got %v", cfg.Admins)
 		}
 	})
-}
-
-// Mock ConfigError type for testing
-type ConfigError struct {
-	Message string
-}
-
-func (e *ConfigError) Error() string {
-	return e.Message
 }

@@ -97,6 +97,36 @@ func printBanner(addr string, admins []string, scheme string, tlsEnabled bool) {
 	fmt.Println(srvDim.Render("Tip: Use ") + srvKey.Render("--username <admin> --admin --admin-key <key>") + srvDim.Render(" to connect as admin"))
 }
 
+func normalizeAndValidateAdmins(admins []string) ([]string, error) {
+	adminSet := make(map[string]struct{}, len(admins))
+	normalized := make([]string, 0, len(admins))
+	for _, raw := range admins {
+		name := strings.ToLower(strings.TrimSpace(raw))
+		if name == "" {
+			return nil, fmt.Errorf("admin username cannot be empty")
+		}
+		if _, exists := adminSet[name]; exists {
+			return nil, fmt.Errorf("duplicate admin username (case-insensitive): %s", raw)
+		}
+		adminSet[name] = struct{}{}
+		normalized = append(normalized, name)
+	}
+	return normalized, nil
+}
+
+func validateStartupConfig(admins []string, adminKey string, listenPort int) error {
+	if len(admins) == 0 {
+		return fmt.Errorf("at least one admin username is required (set MARCHAT_USERS or use --admin flag)")
+	}
+	if adminKey == "" {
+		return fmt.Errorf("admin_key is required (set MARCHAT_ADMIN_KEY or use --admin-key flag)")
+	}
+	if listenPort < 1 || listenPort > 65535 {
+		return fmt.Errorf("port must be between 1 and 65535")
+	}
+	return nil
+}
+
 func main() {
 	flag.Var(&adminUsers, "admin", "[DEPRECATED] Admin username (use MARCHAT_USERS env var instead)")
 	flag.Parse()
@@ -237,30 +267,15 @@ func main() {
 		listenPort = *port
 	}
 
-	// Final validation
-	if len(admins) == 0 {
-		log.Fatal("At least one admin username is required (set MARCHAT_USERS or use --admin flag).")
-	}
-	if key == "" {
-		log.Fatal("admin_key is required (set MARCHAT_ADMIN_KEY or use --admin-key flag).")
-	}
-	if listenPort < 1 || listenPort > 65535 {
-		log.Fatal("Port must be between 1 and 65535.")
+	if err := validateStartupConfig(admins, key, listenPort); err != nil {
+		log.Fatal(err)
 	}
 
-	// Normalize admin usernames to lowercase and check for duplicates
-	adminSet := make(map[string]struct{})
-	for _, u := range admins {
-		lu := strings.ToLower(u)
-		if _, exists := adminSet[lu]; exists {
-			log.Fatalf("Duplicate admin username (case-insensitive): %s", u)
-		}
-		adminSet[lu] = struct{}{}
+	normalizedAdmins, err := normalizeAndValidateAdmins(admins)
+	if err != nil {
+		log.Fatal(err)
 	}
-	admins = make([]string, 0, len(adminSet))
-	for u := range adminSet {
-		admins = append(admins, u)
-	}
+	admins = normalizedAdmins
 
 	// Initialize database with the configured path
 	db, err := server.InitDB(cfg.DBPath)
