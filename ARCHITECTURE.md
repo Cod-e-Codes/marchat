@@ -443,9 +443,11 @@ marchat produces two main executables:
 
 ### Build System
 
-- **Cross-Platform Builds**: Automated builds for Linux, macOS, Windows, and Android
-- **Architecture Support**: AMD64, ARM64, and ARM32 variants
-- **Release Scripts**: PowerShell and shell scripts for automated releases
+- **Cross-Platform Builds**: GitHub Actions (`.github/workflows/release.yml`) produces zips for **linux-amd64**, **linux-arm64**, **windows-amd64**, **darwin-amd64**, and **darwin-arm64**
+- **Termux (Android aarch64)**: Use the **linux-arm64** release zip (static **`GOOS=linux`** binary); there is no separate `android-*` artifact
+- **CGO**: Release CI sets **`CGO_ENABLED=0`** on the **`build`** job for static binaries and the pure Go SQLite stack, consistent with **`Dockerfile`**, **`build-release.ps1`**, and **`scripts/build-linux.sh`**
+- **Release versioning**: A **`resolve-version`** job runs first and exports the tag (published release) or workflow input (`workflow_dispatch`); matrix jobs cannot expose outputs, so Docker image tags, release notes, and **`go build -ldflags`** all consume **`needs.resolve-version.outputs.version`**
+- **Release Scripts**: `build-release.ps1` and related helpers for local release-style builds
 - **Docker Support**: Containerized deployment with health checks
 
 ### Configuration Management
@@ -465,8 +467,8 @@ marchat produces two main executables:
 
 ### Cross-Platform Support
 
-- **Operating Systems**: Linux, macOS, Windows, and Android/Termux
-- **Architecture Support**: AMD64, ARM64, and ARM32
+- **Operating Systems**: Linux, macOS, Windows, and Android/Termux (Termux: **linux/arm64** release asset)
+- **Architecture Support**: AMD64 and ARM64 in official release zips
 - **Terminal Compatibility**: Works with most terminal emulators
 - **File System**: Handles different path separators and permissions
 

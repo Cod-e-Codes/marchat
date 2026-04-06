@@ -12,7 +12,7 @@ Get a **server** and **client** running in a few minutes. For full detail, see [
 
 Pick one:
 
-- **GitHub releases**: Download the zip for your OS/arch from [releases](https://github.com/Cod-e-Codes/marchat/releases), unpack, and use `marchat-server` and `marchat-client`.
+- **GitHub releases**: Download the zip for your OS/arch from [releases](https://github.com/Cod-e-Codes/marchat/releases), unpack, and use `marchat-server` and `marchat-client`. **Termux (aarch64):** use **`linux-arm64`** (same static `GOOS=linux` build as Linux ARM64 servers).
 - **Windows (PowerShell)**:
 
   ```powershell

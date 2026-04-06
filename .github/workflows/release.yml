@@ -19,9 +19,29 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  # Matrix jobs cannot expose job outputs; docker/release text need a stable VERSION from one job.
+  resolve-version:
+    name: Resolve version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.VERSION }}
+    steps:
+      - name: Set version from release or workflow input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
+          else
+            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
+          fi
+
   build:
     name: Build Release Binaries
+    needs: [resolve-version]
     runs-on: ubuntu-latest
+    env:
+      # Static cross-compiled binaries (pure Go SQLite driver); matches Dockerfile and local release scripts.
+      CGO_ENABLED: "0"
     strategy:
       matrix:
         include:
@@ -29,6 +49,8 @@ jobs:
           - goos: linux
             goarch: amd64
             platform: linux-amd64
+          # linux/arm64: also use on Termux (Android). GOOS=linux + CGO_ENABLED=0 static ELF is the usual
+          # portable choice; GOOS=android cross-builds often require CGO/NDK and are a poor fit for CI.
           - goos: linux
             goarch: arm64
             platform: linux-arm64
@@ -44,13 +66,6 @@ jobs:
           - goos: darwin
             goarch: arm64
             platform: darwin-arm64
-          # Android
-          - goos: android
-            goarch: arm64
-            platform: android-arm64
-
-    outputs:
-      version: ${{ steps.version.outputs.VERSION }}
 
     steps:
       - name: Checkout code
@@ -62,15 +77,6 @@ jobs:
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
           go-version: '1.25.8'
-
-      - name: Get version
-        id: version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
-          else
-            echo "VERSION=${{ github.event.release.tag_name }}" >> $GITHUB_OUTPUT
-          fi
 
       - name: Get build metadata
         id: metadata
@@ -84,8 +90,8 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           go build \
-            -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=${{ steps.version.outputs.VERSION }} \
-                      -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=${{ steps.version.outputs.VERSION }} \
+            -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=${{ needs.resolve-version.outputs.version }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=${{ needs.resolve-version.outputs.version }} \
                       -X github.com/Cod-e-Codes/marchat/shared.BuildTime=${{ steps.metadata.outputs.BUILD_TIME }} \
                       -X github.com/Cod-e-Codes/marchat/shared.GitCommit=${{ steps.metadata.outputs.GIT_COMMIT }}" \
             -o "build/marchat-client-${{ matrix.platform }}${{ matrix.ext }}" \
@@ -97,8 +103,8 @@ jobs:
           GOARCH: ${{ matrix.goarch }}
         run: |
           go build \
-            -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=${{ steps.version.outputs.VERSION }} \
-                      -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=${{ steps.version.outputs.VERSION }} \
+            -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=${{ needs.resolve-version.outputs.version }} \
+                      -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=${{ needs.resolve-version.outputs.version }} \
                       -X github.com/Cod-e-Codes/marchat/shared.BuildTime=${{ steps.metadata.outputs.BUILD_TIME }} \
                       -X github.com/Cod-e-Codes/marchat/shared.GitCommit=${{ steps.metadata.outputs.GIT_COMMIT }}" \
             -o "build/marchat-server-${{ matrix.platform }}${{ matrix.ext }}" \
@@ -107,7 +113,7 @@ jobs:
       - name: Create release archive
         run: |
           cd build
-          zip "../marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip" \
+          zip "../marchat-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip" \
             "marchat-client-${{ matrix.platform }}${{ matrix.ext }}" \
             "marchat-server-${{ matrix.platform }}${{ matrix.ext }}"
 
@@ -116,7 +122,7 @@ jobs:
         with:
           name: marchat-${{ matrix.platform }}
           path: |
-            marchat-${{ steps.version.outputs.VERSION }}-${{ matrix.platform }}.zip
+            marchat-${{ needs.resolve-version.outputs.version }}-${{ matrix.platform }}.zip
 
   upload-assets:
     name: Upload GitHub Release Assets
@@ -155,12 +161,11 @@ jobs:
             marchat-windows-amd64
             marchat-darwin-amd64
             marchat-darwin-arm64
-            marchat-android-arm64
 
   docker:
     name: Build and Push Docker Image
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [build, resolve-version]
     permissions:
       contents: write
     steps:
@@ -192,11 +197,11 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           build-args: |
-            VERSION=${{ needs.build.outputs.VERSION }}
+            VERSION=${{ needs.resolve-version.outputs.version }}
             BUILD_TIME=${{ steps.meta.outputs.BUILD_TIME }}
             GIT_COMMIT=${{ steps.meta.outputs.GIT_COMMIT }}
           tags: |
-            codecodesxyz/marchat:${{ needs.build.outputs.VERSION }}
+            codecodesxyz/marchat:${{ needs.resolve-version.outputs.version }}
             codecodesxyz/marchat:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -213,7 +218,7 @@ jobs:
             A multi-architecture Docker image (linux/amd64, linux/arm64) is available on Docker Hub:
 
             ```bash
-            docker pull codecodesxyz/marchat:${{ needs.build.outputs.VERSION }}
+            docker pull codecodesxyz/marchat:${{ needs.resolve-version.outputs.version }}
             # or use latest tag
             docker pull codecodesxyz/marchat:latest
             ```

@@ -77,7 +77,7 @@ chmod +x scripts/build-linux.sh scripts/connect-local-wss.sh   # once, if needed
 .\scripts\build-windows.ps1
 ```
 
-Or mirror the same flags from **`build-release.ps1`** / **`.github/workflows/release.yml`**.
+Or mirror the same flags from **`build-release.ps1`** / **`.github/workflows/release.yml`**. The release workflow sets **`CGO_ENABLED=0`** on the **`build`** job (static cross-compiles, pure-Go SQLite) and uses a **`resolve-version`** job so the tag/input version is available to Docker and matrix builds (matrix jobs cannot publish job outputs).
 
 ---
 

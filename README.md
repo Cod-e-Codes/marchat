@@ -16,6 +16,7 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 ## Latest Updates
 
 ### v0.11.0-beta.1 (Current)
+- **Release CI**: `.github/workflows/release.yml` — **`resolve-version`** job fixes empty Docker/tag version (matrix jobs cannot export outputs); **`CGO_ENABLED=0`** on **`build`** for static release binaries; **Termux** uses **linux-arm64** zip (install scripts updated). Details: **ARCHITECTURE.md** (Build System), **QUICKSTART.md**, **TESTING.md**
 - **Merge [PR #83](https://github.com/Cod-e-Codes/marchat/pull/83) (`47c52e1`): multi-DB and durable state**: Large server/database overhaul: dialect-aware schema and queries for **SQLite**, **PostgreSQL**, and **MySQL/MariaDB**; **durable** storage for reactions and read receipts; dedicated **message-state** layer with retention-friendly cleanup and compatibility fixes (including MySQL index DDL and retention `DELETE` semantics). See **ARCHITECTURE.md** and **PROTOCOL.md** for backend and protocol alignment.
 - **Reliability**: Serialized WebSocket writes on each connection to avoid concurrent **ping** panics (landed on `main` ahead of this release)
 - **Admin TUI**: Layout, logs view, and heading alignment fixes
