@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.11.0--beta.1-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.1)
+[![Version](https://img.shields.io/badge/version-v0.11.0--beta.2-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -15,46 +15,17 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ## Latest Updates
 
-### v0.11.0-beta.1 (Current)
-- **Release CI**: `.github/workflows/release.yml` — **`resolve-version`** job fixes empty Docker/tag version (matrix jobs cannot export outputs); **`CGO_ENABLED=0`** on **`build`** for static release binaries; **Termux** uses **linux-arm64** zip (install scripts updated). Details: **ARCHITECTURE.md** (Build System), **QUICKSTART.md**, **TESTING.md**
-- **Merge [PR #83](https://github.com/Cod-e-Codes/marchat/pull/83) (`47c52e1`): multi-DB and durable state**: Large server/database overhaul: dialect-aware schema and queries for **SQLite**, **PostgreSQL**, and **MySQL/MariaDB**; **durable** storage for reactions and read receipts; dedicated **message-state** layer with retention-friendly cleanup and compatibility fixes (including MySQL index DDL and retention `DELETE` semantics). See **ARCHITECTURE.md** and **PROTOCOL.md** for backend and protocol alignment.
-- **Reliability**: Serialized WebSocket writes on each connection to avoid concurrent **ping** panics (landed on `main` ahead of this release)
-- **Admin TUI**: Layout, logs view, and heading alignment fixes
-- **Doctor**: Reports database dialect and DSN validity; validates empty durable-state tables
-- **Tests**: Reaction removal by target id; `db_dialect` and `message_state` coverage
+### v0.11.0-beta.2 (Current)
+- **Go 1.25.8** across CI, Docker, and docs; **SECURITY.md** updates (supported versions, edwards25519 note)
+- **UX**: Terminal-native chrome (reaction/message emoji unchanged); **Alt+M** / **`:msginfo`** toggle message metadata; colorized server banner and client pre-TUI (**`NO_COLOR`** respected)
+- **Doctor**: TTY color for text mode; server **`MARCHAT_*`** reflects **`config/.env`**; docs for **`-doctor-json`** / **`NO_COLOR`**
+- **Server**: Hardened license cache, username reservation, DB backup SQL; **CI**: static release builds, Node 24 for **`action-gh-release`**; **Termux** → **linux-arm64** assets
 
-### v0.10.0-beta.3
-- **Caddy / WSS**: `docker-compose.proxy.yml`, `deploy/caddy/` (`Caddyfile`, `proxy.env.example`), cross-platform `scripts/build-linux.sh` and `scripts/connect-local-wss.sh`, full walkthrough in `deploy/CADDY-REVERSE-PROXY.md`
-- **Client**: WSS/TLS tweaks; sanitize pasted `--server` URLs; connect from flags without profile picker when server+username are set (keystore passphrase prompted for `--e2e` unless `--non-interactive`); `MARCHAT_GLOBAL_E2E_KEY` unchanged
-- **Server config**: Document `godotenv.Overload` for `config/.env` vs process env (see README / env.example)
-
-### v0.10.0-beta.2
-- **CLI diagnostics**: `marchat-client` and `marchat-server` support `-doctor` and `-doctor-json` for environment, paths, and config health
-- **Build**: `build-release.ps1` sets `CGO_ENABLED=0` for consistent cross-compilation
-- **Dependencies**: `modernc.org/sqlite` 1.47.0 → 1.48.0 (via Dependabot)
-- **Docs**: Updated LOC and test coverage figures; streamlined beta.1 feature list in README
-- **Docker**: image entrypoint fixes `/data` volume permissions and drops to non-root via `su-exec`; Unix line endings on `entrypoint.sh` for reliable Windows-built images
-
-### v0.10.0-beta.1
-- **Message Management**: Edit, delete, pin, search messages by ID
-- **Reactions**: React to messages with emoji aliases (`:react 42 +1`, `heart`, `fire`, `party`, etc.)
-- **Direct Messages**: Private DM conversations between users
-- **Channels**: Multiple chat rooms with join/leave and per-channel messaging
-- **Typing Indicators**: See when other users are typing
-- **E2E File Transfers**: End-to-end encryption extended to file sharing
-- **UX Enhancements**: Connection status indicator, @mention tab completion, unread count, multi-line input (Alt+Enter/Ctrl+J), chat history export
-- **Security**: Rate limiting, constant-time admin key comparison, plugin download timeouts, SHA-pinned CI actions
-- **Refactoring**: Client split into hotkeys/render/websocket/commands modules, config directory unified, orphaned code removed
-- **Docker**: Added docker-compose.yml for local development
-- **Plugins**: Full plugin system wiring (message forwarding, user list updates, command responses, init handshake, store UI, license enforcement)
-
-### Recent Releases
-- **v0.11.0-beta.1**: **[PR #83](https://github.com/Cod-e-Codes/marchat/pull/83)** multi-DB + durable reactions/read receipts and message state; doctor DB diagnostics; WebSocket write serialization; admin TUI fixes
-- **v0.10.0-beta.3**: Caddy TLS proxy example, Unix helper scripts, client WSS/direct-connect UX, config `.env` precedence docs
-- **v0.10.0-beta.2**: Doctor CLI, build-release cross-compile fix, sqlite bump, doc metrics refresh, Docker image entrypoint/volume permission fixes
-- **v0.10.0-beta.1**: Message edit/delete/pin/search, reactions, DMs, channels, typing, E2E file transfer, plugins, rate limits, Docker Compose sample
-- **v0.9.0-beta.6**: Rebuilt with Go 1.25.8 to address CVE-2026-25679, CVE-2026-27142, CVE-2026-27139
-- **v0.9.0-beta.5**: Automated release workflow, PBKDF2 keystore key derivation, JWT secret auto-generation, race condition fixes, Docker optimizations
+### Earlier
+- **v0.11.0-beta.1**: **[PR #83](https://github.com/Cod-e-Codes/marchat/pull/83)**: SQLite / PostgreSQL / MySQL, durable reactions & read receipts, message-state layer; release **`resolve-version`** + static builds; serialized WS writes; admin TUI & doctor DB checks (see **ARCHITECTURE.md**, **PROTOCOL.md**)
+- **v0.10.0-beta.3**: Caddy TLS proxy sample ([**deploy/CADDY-REVERSE-PROXY.md**](deploy/CADDY-REVERSE-PROXY.md)), client WSS/TLS & direct-connect UX, **`config/.env`** precedence docs
+- **v0.10.0-beta.2**: **`-doctor`** / **`-doctor-json`**, **`CGO_ENABLED=0`** builds, sqlite bump, Docker entrypoint & volume permissions
+- **v0.10.0-beta.1**: Edit/delete/pin/search, reactions, DMs, channels, typing, E2E files, plugins, rate limits, Docker Compose; client modularization
 
 Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
@@ -150,12 +121,12 @@ Key tables for message tracking and moderation:
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.1/marchat-v0.11.0-beta.1-linux-amd64.zip
-unzip marchat-v0.11.0-beta.1-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.2/marchat-v0.11.0-beta.2-linux-amd64.zip
+unzip marchat-v0.11.0-beta.2-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.1/marchat-v0.11.0-beta.1-darwin-amd64.zip
-unzip marchat-v0.11.0-beta.1-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.2/marchat-v0.11.0-beta.2-darwin-amd64.zip
+unzip marchat-v0.11.0-beta.2-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -163,11 +134,11 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.11.0-beta.1
+docker pull codecodesxyz/marchat:v0.11.0-beta.2
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.11.0-beta.1
+  codecodesxyz/marchat:v0.11.0-beta.2
 ```
 
 **Docker Compose (local development):**

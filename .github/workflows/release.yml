@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., v0.11.0-beta.1)'
+        description: 'Version to build (e.g., v0.11.0-beta.2)'
         required: true
-        default: 'v0.11.0-beta.1'
+        default: 'v0.11.0-beta.2'
 
 permissions:
   contents: read
