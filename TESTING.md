@@ -12,9 +12,9 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 35.7%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or `coverage.out` from `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=coverage` (or `-func=coverage.out`).
+**Note**: This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 37.3%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or `coverage.out` from `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=coverage` (or `-func=coverage.out`).
 
-**Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. The default `go test ./...` run does not start Postgres or MySQL; exercise those with manual smoke tests or your own CI against real servers. Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
+**Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. **GitHub Actions** runs an extra **`database-smoke`** job (see `.github/workflows/go.yml`) with Postgres 16 and MySQL 8 service containers: it sets `MARCHAT_CI_POSTGRES_URL` and `MARCHAT_CI_MYSQL_URL` and runs `TestPostgresInitDBAndSchemaSmoke` / `TestMySQLInitDBAndSchemaSmoke` in `server/db_ci_smoke_test.go` (`InitDB` + `CreateSchema` + table checks). Locally, those tests **skip** unless you export the same variables. Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
 
 **Release workflow (maintainers):** `.github/workflows/release.yml` uses a **`resolve-version`** job so the version string is available to Docker and all matrix legs (GitHub Actions does not support job outputs from matrix jobs). The **`build`** job sets **`CGO_ENABLED=0`** for static cross-compiled binaries. On a **published** release (not `workflow_dispatch`), **`upload-assets`** uploads all matrix **`.zip`** files with **`gh release upload`**, and the **`docker`** job appends Docker Hub pull instructions with **`gh release edit`** (GitHub CLI on the runner, **`GITHUB_TOKEN`**), avoiding third-party actions that still declare Node 20. **Termux** installs use the **linux-arm64** zip; `install.sh` / `install.ps1` map Android+aarch64 to that asset when needed.
 
@@ -37,6 +37,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `client/websocket_sanitize_test.go` | WebSocket URL / TLS hints | Sanitization helpers for display and connection hints |
 | `internal/doctor/db_checks_test.go` | Doctor DB probes | SQLite connectivity and version checks used by `-doctor` |
 | `cmd/server/main_test.go` | Server main function and startup | Flag parsing, configuration validation, TLS setup, admin normalization, `validateStartupConfig`, deprecated flags |
+| `cmd/server/subprocess_doctor_test.go` | Server binary smoke | `go run ./cmd/server -doctor` / `-doctor-json` subprocess (covers `main` early exits) |
 | `server/handlers_test.go` | Server-side request handling | Database operations, message insertion, IP extraction |
 | `server/hub_test.go` | WebSocket hub management | User bans, kicks, connection management |
 | `server/integration_test.go` | End-to-end workflows | Message flow, ban flow, concurrent operations |
@@ -44,15 +45,18 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `server/config_ui_test.go` | Server configuration UI | Configuration management, environment handling |
 | `server/admin_panel_test.go` | Admin panel functionality | Admin-specific operations and controls |
 | `server/db_test.go` | Database operations | Database initialization, schema setup |
-| `server/db_dialect_test.go` | SQL dialect helpers | DSN → driver detection, Postgres placeholder rebinding |
+| `server/db_dialect_test.go` | SQL dialect helpers | DSN → driver detection, Postgres placeholder rebinding, `mysql://` DSN form |
+| `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables (env-gated) |
 | `server/message_state_test.go` | Durable reactions | Reaction persistence and replay helpers |
 | `server/config_test.go` | Server configuration | Server configuration logic and validation |
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations |
 | `server/health_test.go` | Server health monitoring | Health checks, system metrics, HTTP endpoints, concurrent access |
 | `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, JSON serialization, validation |
 | `plugin/host/host_test.go` | Plugin Host | Plugin lifecycle, communication, enable/disable |
+| `plugin/host/plugin_lifecycle_test.go` | Plugin Host subprocess IPC | Minimal JSON plugin built with `go build`, `StartPlugin` / `StopPlugin`, `ExecuteCommand`, double-start guard |
 | `plugin/store/store_test.go` | Plugin Store | Registry management, platform resolution, filtering |
 | `plugin/manager/manager_test.go` | Plugin Manager | `validatePluginName`, plugin state fallbacks, installation, uninstallation, command execution |
+| `plugin/manager/manager_lifecycle_test.go` | Plugin Manager + host | Discovery auto-start, `DisablePlugin` / `EnablePlugin`, `ExecuteCommand` delegation |
 | `plugin/integration_test.go` | Plugin Integration | End-to-end plugin system workflows |
 | `shared/version_test.go` | Version information | Version functions, variable validation, format consistency |
 | `plugin/license/validator_test.go` | License validation | Signature verification, caching, expiration, tampered cache, plugin/cache key mismatch |
@@ -75,7 +79,8 @@ Per-file statement percentages for important paths are listed under [Test Covera
 - **Client WebSocket helpers**: URL / TLS hint sanitization (`websocket_sanitize_test.go`)
 - **Client File Picker**: File browsing, directory navigation, file selection, size validation, error handling
 - **Doctor (`internal/doctor`)**: Server/client diagnostics, env masking, update checks, DB connectivity probes
-- **Server Main**: Flag parsing, multi-flag handling, banner display, startup config validation (`validateStartupConfig`), admin username normalization (`normalizeAndValidateAdmins`)
+- **Server Main**: Flag parsing, multi-flag handling, banner display, startup config validation (`validateStartupConfig`), admin username normalization (`normalizeAndValidateAdmins`), subprocess `-doctor` / `-doctor-json` smoke (`subprocess_doctor_test.go`)
+- **Plugin Host (lifecycle)**: Minimal JSON plugin built with `go build`, `StartPlugin` / `StopPlugin`, `ExecuteCommand` (`plugin_lifecycle_test.go`)
 - **Server Admin Web**: HTTP endpoints, authentication, admin panel functionality, web interface
 - **Server Configuration**: Configuration management, environment handling, UI components
 - **Server Database**: Database initialization, schema setup, connection management
@@ -164,23 +169,23 @@ go test -cover ./...
 
 | Package | Coverage | Status | Lines of Code¹ | Weighted Impact |
 |---------|----------|--------|----------------|-----------------|
-| `shared` | 86.8% | High | 203 | Small |
-| `plugin/license` | 85.4% | High | 198 | Small |
-| `client/crypto` | 79.5% | High | 282 | Small |
-| `config` | 73.2% | High | 277 | Small |
-| `client/config` | 57.0% | Medium | 1679 | Medium |
-| `internal/doctor` | 50.2% | Medium | 666 | Medium |
-| `plugin/store` | 47.0% | Medium | 490 | Medium |
-| `cmd/license` | 42.2% | Medium | 140 | Small |
-| `server` | 35.3% | Low | 6273 | Large |
-| `plugin/manager` | 26.8% | Low | 626 | Medium |
-| `client` | 23.1% | Low | 4950 | Large |
-| `plugin/host` | 21.1% | Low | 533 | Medium |
-| `cmd/server` | 13.7% | Low | 424 | Medium |
+| `shared` | 86.8% | High | 244 | Small |
+| `plugin/license` | 85.4% | High | 241 | Small |
+| `client/crypto` | 79.5% | High | 347 | Small |
+| `config` | 73.2% | High | 330 | Small |
+| `plugin/host` | 63.2% | Medium | 617 | Medium |
+| `client/config` | 57.0% | Medium | 1988 | Medium |
+| `internal/doctor` | 50.2% | Medium | 737 | Medium |
+| `plugin/store` | 47.0% | Medium | 552 | Medium |
+| `cmd/license` | 42.2% | Medium | 160 | Small |
+| `server` | 35.4% | Low | 7153 | Large |
+| `plugin/manager` | 32.1% | Low | 747 | Medium |
+| `client` | 23.1% | Low | 5499 | Large |
+| `cmd/server` | 13.7% | Low | 484 | Medium |
 
-¹Non-test `.go` files only, physical line count (`wc -l` style), per package directory.
+¹Non-test `.go` files only, physical line count (`wc -l` style), per package directory (regenerate with the Python snippet in **Test Metrics** or `find` + `wc`).
 
-**Overall coverage: 35.7%** (all packages in the main module; merged profile `coverage` / `coverage.out`)
+**Overall coverage: 37.3%** (all packages in the main module; merged profile `coverage` / `coverage.out`)
 
 ### High Coverage (70%+)
 - **Shared Package**: Cryptographic operations, data types, message handling, version utilities (86.8%)
@@ -189,17 +194,17 @@ go test -cover ./...
 - **Config Package**: Configuration loading, validation, environment variables (73.2%)
 
 ### Medium Coverage (40-70%)
+- **Plugin Host Package**: Load/start/stop lifecycle, JSON IPC with a minimal test plugin, `ExecuteCommand` (63.2%)
 - **Client Config Package**: Configuration management, path utilities, keystore migration, interactive UI (57.0%)
 - **Doctor Package**: Server/client diagnostics, env checks, update metadata, DB probes (50.2%)
 - **Plugin Store**: Registry management, platform resolution, filtering, caching (47.0%)
 - **Command License**: CLI functions for license management (42.2%)
 
 ### Low Coverage (<40%)
-- **Server Package**: WebSocket handling, admin panel, database operations, message edit/delete/pin/search, channels, DMs (35.3%)
-- **Plugin Manager**: Installation, uninstallation, command execution, plugin state (26.8%)
+- **Server Package**: WebSocket handling, admin panel, database operations, message edit/delete/pin/search, channels, DMs (35.4%)
+- **Plugin Manager**: Installation, store download paths, enable/disable with persisted state (32.1%)
 - **Client Package**: Message rendering, user lists, encryption functions, flag validation, TUI entrypoints (23.1%)
-- **Plugin Host**: Plugin lifecycle management, communication, enable/disable (21.1%)
-- **Server Main (`cmd/server`)**: Full `main` startup, HTTP/TLS serving, admin panel wiring (13.7%); helpers such as `normalizeAndValidateAdmins` and `validateStartupConfig` are covered by unit tests
+- **Server Main (`cmd/server`)**: Full `main` startup, HTTP/TLS serving, admin panel wiring (13.7% for `cmd/server`); helpers such as `normalizeAndValidateAdmins` and `validateStartupConfig` plus `-doctor` / `-doctor-json` subprocess smoke tests cover parts of `main`
 
 ### Detailed File Coverage
 Statement percentages below are from the merged profile (`go tool cover -func=coverage`). Listed files are either high-signal (≥40% and larger sources) or important entrypoints even when lower.
@@ -214,10 +219,11 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 | `client/render.go` | 80.0% | client | TUI rendering helpers |
 | `client/crypto/keystore.go` | 79.5% | client/crypto | Keystore management, raw encrypt/decrypt |
 | `shared/crypto.go` | 79.4% | shared | Cryptographic operations |
+| `server/db.go` | 75.8% | server | Database operations |
 | `config/config.go` | 73.2% | config | Configuration management |
-| `server/db.go` | 72.7% | server | Database operations |
 | `client/notification_manager.go` | 67.5% | client | Desktop / notification integration |
 | `client/config/interactive_ui.go` | 66.9% | client/config | Interactive configuration UI |
+| `plugin/host/host.go` | 63.2% | plugin/host | Plugin subprocess lifecycle and IPC |
 | `server/logger.go` | 61.4% | server | Logging functionality |
 | `server/message_state.go` | 59.2% | server | Reactions, read receipts, channel prefs |
 | `server/db_dialect.go` | 58.5% | server | SQL dialect helpers |
@@ -230,8 +236,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 | `internal/doctor/doctor.go` | 37.4% | internal/doctor | Doctor orchestration and reporting |
 | `server/config_ui.go` | 36.0% | server | Server configuration UI |
 | `server/admin_web.go` | 33.3% | server | Admin web interface |
-| `plugin/manager/manager.go` | 26.8% | plugin/manager | Plugin management |
-| `plugin/host/host.go` | 21.1% | plugin/host | Plugin hosting |
+| `plugin/manager/manager.go` | 32.1% | plugin/manager | Plugin management |
 | `server/admin_panel.go` | 15.9% | server | Admin panel functionality |
 | `server/client.go` | 14.4% | server | Client management, message type routing |
 | `cmd/server/main.go` | 13.7% | cmd/server | Server main application |
@@ -239,10 +244,10 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 | `client/main.go` | 6.7% | client | Client main application |
 
 ### Areas for Future Testing
-- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 35.3%)
+- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 35.4%)
 - **Client Package**: WebSocket communication, full TUI integration (current: 23.1%)
-- **Plugin Host**: Live plugin execution, WebSocket communication (current: 21.1%)
-- **Plugin Manager**: Installation paths, store/registry edge cases (current: 26.8%)
+- **Plugin Host**: Broader command/response paths and failure modes beyond the minimal IPC test plugin (current: 63.2%)
+- **Plugin Manager**: Store download, checksum, and install edge cases (current: 32.1%)
 - **Server Main**: Full `main` execution, HTTP/TLS serving, admin panel integration (current: 13.7% statement coverage for `cmd/server/main.go`)
 - **File Transfer**: File upload/download functionality
 - **Plugin License**: License validation and enforcement (current: 85.4%)
@@ -254,6 +259,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 - Creates fresh schema for each test
 - Tests both encrypted and plaintext messages
 - Verifies message ordering and retrieval
+- **Postgres / MySQL (CI)**: `server/db_ci_smoke_test.go` runs `InitDB` + `CreateSchema` against real servers when `MARCHAT_CI_POSTGRES_URL` / `MARCHAT_CI_MYSQL_URL` are set (see `.github/workflows/go.yml`)
 
 ### Cryptographic Tests
 - Tests ChaCha20-Poly1305 encrypt/decrypt for text payloads (`shared/crypto_test.go`)
@@ -278,15 +284,16 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 ### Plugin Manager Tests
 - Tests `validatePluginName` for allowed names and rejection of traversal, invalid characters, length, and casing
 - Tests `loadPluginState` when the state file is missing, corrupted, or valid JSON with a nil `enabled` map
+- Tests discovery auto-start, `DisablePlugin` / `EnablePlugin`, and `ExecuteCommand` with a minimal built plugin (`manager_lifecycle_test.go`)
 
 ## Continuous Integration
 
 The test suite is designed to run in CI/CD environments:
 
-- **Fast Execution**: Most tests complete in under 1 second
-- **No External Dependencies**: Uses only Go standard library and SQLite
-- **Parallel Safe**: Tests can run concurrently
-- **Deterministic**: No flaky tests or race conditions
+- **Default job** (`.github/workflows/go.yml` `build`): `go test -race ./...` on Ubuntu (SQLite only for DB tests; CI DB smoke tests skip without env).
+- **Database smoke job** (`database-smoke`): Postgres 16 and MySQL 8 services, then `go test -race ./server -run 'Test(Postgres|MySQL)InitDBAndSchemaSmoke'` with `MARCHAT_CI_POSTGRES_URL` / `MARCHAT_CI_MYSQL_URL` set.
+- **Parallel Safe**: Standard tests avoid shared mutable global state; subprocess tests serialize via their own `go run` invocations.
+- **Deterministic**: Doctor subprocess tests set `MARCHAT_DOCTOR_NO_NETWORK=1` to avoid GitHub API flakiness.
 
 ## Adding New Tests
 
@@ -377,11 +384,13 @@ When adding new functionality to Marchat:
 
 ## Test Metrics
 
-- **Top-level tests**: ~315 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 6 more (`cd plugin/sdk && go test -list . ./...`).
-- **Test files**: 33 `_test.go` files in the repo tree (including `plugin/sdk/plugin_test.go`).
+- **Top-level tests**: ~325 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 6 more (`cd plugin/sdk && go test -list . ./...`).
+- **Test files**: 37 `_test.go` files in the repo tree (including `plugin/sdk/plugin_test.go`).
 - **Packages (`go list ./...`)**: 14 in the main module; `plugin/sdk` is a nested module with its own `go.mod`.
-- **Coverage by Package** (statement %, merged profile): 86.8% (`shared`), 85.4% (`plugin/license`), 79.5% (`client/crypto`), 73.2% (`config`), 57.0% (`client/config`), 50.2% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 35.3% (`server`), 26.8% (`plugin/manager`), 23.1% (`client`), 21.1% (`plugin/host`), 13.7% (`cmd/server`)
-- **Overall Coverage**: **35.7%** across main-module packages (profile file `coverage` or `coverage.out`)
+- **Coverage by Package** (statement %, merged profile): 86.8% (`shared`), 85.4% (`plugin/license`), 79.5% (`client/crypto`), 73.2% (`config`), 63.2% (`plugin/host`), 57.0% (`client/config`), 50.2% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 35.4% (`server`), 32.1% (`plugin/manager`), 23.1% (`client`), 13.7% (`cmd/server`)
+- **Overall Coverage**: **37.3%** across main-module packages (profile file `coverage` or `coverage.out`; regenerate with `go test -coverprofile=coverage ./...` then `go tool cover -func=coverage`)
+- **Lines of code (approx.)**: non-test `.go` lines per package directory, same totals as the **Current Coverage Status** table (e.g. `server` 7153, `client` 5499); re-count with:  
+  `python -c "import os; ..."` walking the tree and skipping `*_test.go`, or equivalent `find` + `wc -l`.
 - **Execution Time**: on the order of a few seconds for `go test ./...` on a typical dev machine
 - **Reliability**: deterministic; use `go test -race ./...` where supported (see CI)
 

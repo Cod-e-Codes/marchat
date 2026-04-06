@@ -14,6 +14,7 @@ func TestDetectDriver(t *testing.T) {
 		{"/tmp/marchat.db", "sqlite", DialectSQLite},
 		{"postgres://user:pass@localhost:5432/marchat?sslmode=disable", "pgx", DialectPostgres},
 		{"mysql:user:pass@tcp(localhost:3306)/marchat", "mysql", DialectMySQL},
+		{"mysql://user:pass@tcp(localhost:3306)/marchat", "mysql", DialectMySQL},
 	}
 
 	for _, tc := range cases {

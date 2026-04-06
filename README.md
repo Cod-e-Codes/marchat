@@ -733,7 +733,7 @@ Profiles stored in platform-appropriate locations:
 
 ## Testing
 
-Foundational test suite covering core functionality, cryptography, and plugins.
+Foundational test suite covering core functionality, cryptography, and plugins. CI (`.github/workflows/go.yml`) runs the full suite with the race detector and a separate **database-smoke** job against Postgres and MySQL (see [TESTING.md](TESTING.md)).
 
 ### Running Tests
 ```bash
@@ -752,21 +752,21 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 
 | Package | Coverage | Size | Status |
 |---------|----------|------|--------|
-| `shared` | 86.8% | 203 LOC | High |
-| `plugin/license` | 85.4% | 198 LOC | High |
-| `client/crypto` | 79.5% | 282 LOC | High |
-| `config` | 73.2% | 277 LOC | High |
-| `client/config` | 57.0% | 1679 LOC | Medium |
-| `internal/doctor` | 50.2% | 666 LOC | Medium |
-| `plugin/store` | 47.0% | 490 LOC | Medium |
-| `cmd/license` | 42.2% | 140 LOC | Medium |
-| `server` | 35.3% | 6273 LOC | Low |
-| `plugin/manager` | 26.8% | 626 LOC | Low |
-| `client` | 23.1% | 4950 LOC | Low |
-| `plugin/host` | 21.1% | 533 LOC | Low |
-| `cmd/server` | 13.7% | 424 LOC | Low |
+| `shared` | 86.8% | 244 LOC | High |
+| `plugin/license` | 85.4% | 241 LOC | High |
+| `client/crypto` | 79.5% | 347 LOC | High |
+| `config` | 73.2% | 330 LOC | High |
+| `plugin/host` | 63.2% | 617 LOC | Medium |
+| `client/config` | 57.0% | 1988 LOC | Medium |
+| `internal/doctor` | 50.2% | 737 LOC | Medium |
+| `plugin/store` | 47.0% | 552 LOC | Medium |
+| `cmd/license` | 42.2% | 160 LOC | Medium |
+| `server` | 35.4% | 7153 LOC | Low |
+| `plugin/manager` | 32.1% | 747 LOC | Low |
+| `client` | 23.1% | 5499 LOC | Low |
+| `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 35.7%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 37.3%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 
