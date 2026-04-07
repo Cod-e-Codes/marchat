@@ -527,7 +527,10 @@ func (h *PluginHost) handlePluginOutput(instance *PluginInstance) {
 		var response sdk.PluginResponse
 		if err := decoder.Decode(&response); err != nil {
 			if err == io.EOF {
-				// Plugin stdout closed
+				break
+			}
+			if strings.Contains(err.Error(), "file already closed") ||
+				strings.Contains(err.Error(), "read/write on closed pipe") {
 				break
 			}
 			log.Printf("Failed to decode plugin %s response: %v", instance.Name, err)
