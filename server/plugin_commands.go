@@ -293,6 +293,11 @@ func (h *PluginCommandHandler) SendMessageToPlugins(msg shared.Message) {
 		Content:   msg.Content,
 		CreatedAt: msg.CreatedAt,
 		Type:      string(msg.Type),
+		Channel:   msg.Channel,
+		Encrypted: msg.Encrypted,
+		MessageID: msg.MessageID,
+		Recipient: msg.Recipient,
+		Edited:    msg.Edited,
 	}
 
 	h.manager.SendMessage(pluginMsg)
@@ -315,5 +320,10 @@ func ConvertPluginMessage(pluginMsg sdk.Message) shared.Message {
 		Content:   pluginMsg.Content,
 		CreatedAt: pluginMsg.CreatedAt,
 		Type:      shared.MessageType(pluginMsg.Type),
+		Channel:   pluginMsg.Channel,
+		Encrypted: pluginMsg.Encrypted,
+		MessageID: pluginMsg.MessageID,
+		Recipient: pluginMsg.Recipient,
+		Edited:    pluginMsg.Edited,
 	}
 }

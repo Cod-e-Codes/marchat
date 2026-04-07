@@ -37,10 +37,11 @@ The plugin ecosystem consists of several interconnected components:
 
 **Features**:
 - Plugin interface with lifecycle methods
-- Message processing and response system
+- Message processing and response system with extended context (channel, encryption status, message ID, recipient, edited flag)
 - Command registration and execution
 - Configuration management
 - Manifest validation
+- Backwards-compatible JSON wire format (new `omitempty` fields are silently ignored by older plugins)
 
 ### 2. Plugin Host (`plugin/host/`)
 
@@ -145,7 +146,27 @@ The plugin ecosystem consists of several interconnected components:
 }
 ```
 
-### Message Types
+### Message Data (type "message")
+
+When the hub sends a `"message"` request, the `data` payload is an `sdk.Message` object:
+
+```json
+{
+  "sender": "alice",
+  "content": "hello world",
+  "created_at": "2025-07-24T15:04:00Z",
+  "type": "text",
+  "channel": "general",
+  "encrypted": false,
+  "message_id": 42,
+  "recipient": "",
+  "edited": false
+}
+```
+
+Zero-value fields (`channel` empty, `encrypted` false, `message_id` 0, etc.) are omitted from JSON via `omitempty`. Plugins compiled against older SDK versions silently ignore new keys.
+
+### Request Types
 
 1. **init**: Plugin initialization with configuration
 2. **message**: Incoming chat message processing
@@ -169,11 +190,15 @@ type MyPlugin struct {
 }
 
 func (p *MyPlugin) OnMessage(msg sdk.Message) ([]sdk.Message, error) {
+    if msg.Encrypted {
+        return nil, nil // content is opaque ciphertext
+    }
     if strings.HasPrefix(msg.Content, "hello") {
         return []sdk.Message{{
             Sender:    "MyBot",
             Content:   "Hello back!",
             CreatedAt: time.Now(),
+            Channel:   msg.Channel, // reply in the same channel
         }}, nil
     }
     return nil, nil

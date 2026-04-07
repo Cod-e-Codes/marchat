@@ -29,12 +29,22 @@ type Config struct {
 	Settings  map[string]string `json:"settings"`
 }
 
-// Message represents a chat message
+// Message represents a chat message.
+//
+// Fields added after the initial SDK release (Channel, Encrypted, MessageID,
+// Recipient, Edited) use omitempty and are backwards-compatible: older plugins
+// that were compiled against the 4-field struct silently ignore the extra JSON
+// keys on input and omit them on output.
 type Message struct {
 	Sender    string    `json:"sender"`
 	Content   string    `json:"content"`
 	CreatedAt time.Time `json:"created_at"`
 	Type      string    `json:"type,omitempty"`
+	Channel   string    `json:"channel,omitempty"`
+	Encrypted bool      `json:"encrypted,omitempty"`
+	MessageID int64     `json:"message_id,omitempty"`
+	Recipient string    `json:"recipient,omitempty"`
+	Edited    bool      `json:"edited,omitempty"`
 }
 
 // PluginCommand represents a command that a plugin can register

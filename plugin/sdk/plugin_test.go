@@ -2,6 +2,7 @@ package sdk
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -74,6 +75,112 @@ func TestMessageEmptyFields(t *testing.T) {
 
 	if !msg.CreatedAt.IsZero() {
 		t.Error("Expected zero CreatedAt for empty message")
+	}
+}
+
+func TestMessageExtendedFields(t *testing.T) {
+	msg := Message{
+		Sender:    "alice",
+		Content:   "hello",
+		CreatedAt: time.Now(),
+		Type:      "text",
+		Channel:   "dev",
+		Encrypted: true,
+		MessageID: 42,
+		Recipient: "bob",
+		Edited:    true,
+	}
+
+	if msg.Channel != "dev" {
+		t.Errorf("Expected channel 'dev', got %s", msg.Channel)
+	}
+	if !msg.Encrypted {
+		t.Error("Expected Encrypted to be true")
+	}
+	if msg.MessageID != 42 {
+		t.Errorf("Expected MessageID 42, got %d", msg.MessageID)
+	}
+	if msg.Recipient != "bob" {
+		t.Errorf("Expected recipient 'bob', got %s", msg.Recipient)
+	}
+	if !msg.Edited {
+		t.Error("Expected Edited to be true")
+	}
+}
+
+func TestMessageExtendedFieldsJSONRoundTrip(t *testing.T) {
+	now := time.Now().Truncate(time.Second)
+	msg := Message{
+		Sender:    "alice",
+		Content:   "encrypted payload",
+		CreatedAt: now,
+		Type:      "text",
+		Channel:   "general",
+		Encrypted: true,
+		MessageID: 99,
+		Recipient: "bob",
+		Edited:    true,
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+
+	var got Message
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Failed to unmarshal: %v", err)
+	}
+
+	if got.Channel != msg.Channel {
+		t.Errorf("Channel: want %q, got %q", msg.Channel, got.Channel)
+	}
+	if got.Encrypted != msg.Encrypted {
+		t.Errorf("Encrypted: want %v, got %v", msg.Encrypted, got.Encrypted)
+	}
+	if got.MessageID != msg.MessageID {
+		t.Errorf("MessageID: want %d, got %d", msg.MessageID, got.MessageID)
+	}
+	if got.Recipient != msg.Recipient {
+		t.Errorf("Recipient: want %q, got %q", msg.Recipient, got.Recipient)
+	}
+	if got.Edited != msg.Edited {
+		t.Errorf("Edited: want %v, got %v", msg.Edited, got.Edited)
+	}
+}
+
+func TestMessageExtendedFieldsOmitEmpty(t *testing.T) {
+	msg := Message{
+		Sender:    "bot",
+		Content:   "hi",
+		CreatedAt: time.Now(),
+	}
+
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("Failed to marshal: %v", err)
+	}
+
+	raw := string(data)
+	for _, key := range []string{`"channel"`, `"encrypted"`, `"message_id"`, `"recipient"`, `"edited"`} {
+		if strings.Contains(raw, key) {
+			t.Errorf("Zero-value field %s should be omitted from JSON, got: %s", key, raw)
+		}
+	}
+}
+
+func TestMessageBackwardsCompatUnknownFieldsIgnored(t *testing.T) {
+	jsonWithExtra := `{"sender":"hub","content":"test","created_at":"2025-01-01T00:00:00Z","channel":"dev","encrypted":true,"message_id":7,"recipient":"bob","edited":true,"some_future_field":"ignored"}`
+
+	var msg Message
+	if err := json.Unmarshal([]byte(jsonWithExtra), &msg); err != nil {
+		t.Fatalf("Unmarshal should ignore unknown fields: %v", err)
+	}
+	if msg.Channel != "dev" {
+		t.Errorf("Channel: want dev, got %s", msg.Channel)
+	}
+	if msg.MessageID != 7 {
+		t.Errorf("MessageID: want 7, got %d", msg.MessageID)
 	}
 }
 

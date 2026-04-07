@@ -241,7 +241,7 @@ Sensitive values (like `admin_key`) are passed only during handshake and are not
 
 ## Notes on Extensibility
 
-The protocol is intentionally JSON-based. **Plugins** extend the server through a managed plugin host (separate processes, JSON IPC); chat messages with `type` `"text"` can be forwarded to plugins for automation, while `:`-prefixed lines and `admin_command` messages participate in the command pipeline (including built-in admin commands where authorized). Clients and tools should use the `type` field and optional structured fields (`message_id`, `channel`, `reaction`, etc.) to interpret each payload.
+The protocol is intentionally JSON-based. **Plugins** extend the server through a managed plugin host (separate processes, JSON IPC); chat messages with `type` `"text"` can be forwarded to plugins for automation, while `:`-prefixed lines and `admin_command` messages participate in the command pipeline (including built-in admin commands where authorized). The plugin SDK's `Message` struct mirrors the core wire fields (`sender`, `content`, `created_at`, `type`, `channel`, `encrypted`, `message_id`, `recipient`, `edited`) so plugins receive full message context. All extended fields use `omitempty`, making the wire format backwards-compatible with older compiled plugins. Clients and tools should use the `type` field and optional structured fields (`message_id`, `channel`, `reaction`, etc.) to interpret each payload.
 
 ---
 

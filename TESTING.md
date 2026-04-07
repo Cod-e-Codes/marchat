@@ -52,7 +52,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `server/config_test.go` | Server configuration | Server configuration logic and validation |
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations |
 | `server/health_test.go` | Server health monitoring | Health checks, system metrics, HTTP endpoints, concurrent access |
-| `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, JSON serialization, validation |
+| `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, extended fields (channel, encrypted, message_id, recipient, edited), JSON serialization, omitempty validation, backwards-compat unknown-field handling |
 | `plugin/host/host_test.go` | Plugin Host | Plugin lifecycle, communication, enable/disable |
 | `plugin/host/plugin_lifecycle_test.go` | Plugin Host subprocess IPC | Minimal JSON plugin built with `go build`, `StartPlugin` / `StopPlugin`, `ExecuteCommand`, double-start guard |
 | `plugin/store/store_test.go` | Plugin Store | Registry management, platform resolution, filtering |
@@ -174,12 +174,12 @@ go test -cover ./...
 | `plugin/license` | 87.1% | High | 203 | Small |
 | `client/crypto` | 80.3% | High | 320 | Small |
 | `config` | 73.2% | High | 285 | Small |
-| `plugin/host` | 63.0% | Medium | 533 | Medium |
+| `plugin/host` | 62.5% | Medium | 536 | Medium |
 | `client/config` | 57.3% | Medium | 1683 | Medium |
 | `internal/doctor` | 49.8% | Medium | 661 | Medium |
 | `plugin/store` | 47.0% | Medium | 490 | Medium |
 | `cmd/license` | 42.2% | Medium | 140 | Small |
-| `server` | 36.1% | Low | 6298 | Large |
+| `server` | 36.1% | Low | 6310 | Large |
 | `plugin/manager` | 32.1% | Low | 626 | Medium |
 | `client` | 23.0% | Low | 4966 | Large |
 | `cmd/server` | 13.7% | Low | 424 | Medium |
@@ -195,7 +195,7 @@ go test -cover ./...
 - **Config Package**: Configuration loading, validation, environment variables (73.2%)
 
 ### Medium Coverage (40-70%)
-- **Plugin Host Package**: Load/start/stop lifecycle, JSON IPC with a minimal test plugin, `ExecuteCommand` (63.0%)
+- **Plugin Host Package**: Load/start/stop lifecycle, JSON IPC with a minimal test plugin, `ExecuteCommand` (62.5%)
 - **Client Config Package**: Configuration management, path utilities, keystore migration, interactive UI (57.3%)
 - **Doctor Package**: Server/client diagnostics, env checks, update metadata, DB probes (49.8%)
 - **Plugin Store**: Registry management, platform resolution, filtering, caching (47.0%)
@@ -224,7 +224,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 | `config/config.go` | 73.2% | config | Configuration management |
 | `client/notification_manager.go` | 67.5% | client | Desktop / notification integration |
 | `client/config/interactive_ui.go` | 66.9% | client/config | Interactive configuration UI |
-| `plugin/host/host.go` | 63.2% | plugin/host | Plugin subprocess lifecycle and IPC |
+| `plugin/host/host.go` | 62.5% | plugin/host | Plugin subprocess lifecycle and IPC |
 | `server/logger.go` | 61.4% | server | Logging functionality |
 | `server/message_state.go` | 59.2% | server | Reactions, read receipts, channel prefs |
 | `server/db_dialect.go` | 58.5% | server | SQL dialect helpers |
@@ -247,7 +247,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 ### Areas for Future Testing
 - **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 36.1%)
 - **Client Package**: WebSocket communication, full TUI integration (current: 23.0%)
-- **Plugin Host**: Broader command/response paths and failure modes beyond the minimal IPC test plugin (current: 63.2%)
+- **Plugin Host**: Broader command/response paths and failure modes beyond the minimal IPC test plugin (current: 62.5%)
 - **Plugin Manager**: Store download, checksum, and install edge cases (current: 32.1%)
 - **Server Main**: Full `main` execution, HTTP/TLS serving, admin panel integration (current: 13.7% statement coverage for `cmd/server/main.go`)
 - **File Transfer**: File upload/download functionality
@@ -385,10 +385,10 @@ When adding new functionality to Marchat:
 
 ## Test Metrics
 
-- **Top-level tests**: 334 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 6 more (`cd plugin/sdk && go test -list . ./...`).
+- **Top-level tests**: 334 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 10 more (`cd plugin/sdk && go test -list . ./...`).
 - **Test files**: 38 `_test.go` files in the repo tree (including `plugin/sdk/plugin_test.go`).
 - **Packages (`go list ./...`)**: 14 in the main module; `plugin/sdk` is a nested module with its own `go.mod`.
-- **Coverage by Package** (statement %, merged profile): 88.1% (`shared`), 87.1% (`plugin/license`), 80.3% (`client/crypto`), 73.2% (`config`), 63.0% (`plugin/host`), 57.3% (`client/config`), 49.8% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 36.1% (`server`), 32.1% (`plugin/manager`), 23.0% (`client`), 13.7% (`cmd/server`)
+- **Coverage by Package** (statement %, merged profile): 88.1% (`shared`), 87.1% (`plugin/license`), 80.3% (`client/crypto`), 73.2% (`config`), 62.5% (`plugin/host`), 57.3% (`client/config`), 49.8% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 36.1% (`server`), 32.1% (`plugin/manager`), 23.0% (`client`), 13.7% (`cmd/server`)
 - **Overall Coverage**: **37.7%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell avoid `-coverprofile=*.out`--see note above)
 - **Lines of code (approx.)**: non-test `.go` lines per package directory, same totals as the **Current Coverage Status** table (e.g. `server` 6298, `client` 4966); re-count with:  
   `python -c "import os; ..."` walking the tree and skipping `*_test.go`, or equivalent `find` + `wc -l`.

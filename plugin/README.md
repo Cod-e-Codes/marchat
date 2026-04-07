@@ -65,18 +65,55 @@ type Plugin interface {
 }
 ```
 
+### Message Type
+
+The `sdk.Message` struct carries chat context from the hub to plugins and back:
+
+```go
+type Message struct {
+    Sender    string    `json:"sender"`
+    Content   string    `json:"content"`
+    CreatedAt time.Time `json:"created_at"`
+    Type      string    `json:"type,omitempty"`
+    Channel   string    `json:"channel,omitempty"`
+    Encrypted bool      `json:"encrypted,omitempty"`
+    MessageID int64     `json:"message_id,omitempty"`
+    Recipient string    `json:"recipient,omitempty"`
+    Edited    bool      `json:"edited,omitempty"`
+}
+```
+
+| Field | Description |
+|-------|-------------|
+| `Sender` | Username of the message author |
+| `Content` | Message text (opaque ciphertext when `Encrypted` is true) |
+| `CreatedAt` | Timestamp |
+| `Type` | `"text"`, `"file"`, `"dm"`, etc. (matches `shared.MessageType` values) |
+| `Channel` | Channel the message belongs to (empty = default `general`) |
+| `Encrypted` | `true` when content is E2E encrypted; plugins should skip parsing |
+| `MessageID` | Server-assigned ID (useful for reactions, edits) |
+| `Recipient` | Target user for DMs (empty = broadcast) |
+| `Edited` | `true` if the message was edited after send |
+
+**Backwards compatibility**: All extended fields use `omitempty`. Plugins compiled against older SDK versions silently ignore unknown JSON keys and omit them on output — no recompile required.
+
 ### Message Processing
 
 Plugins receive messages and can respond with additional messages:
 
 ```go
 func (p *MyPlugin) OnMessage(msg sdk.Message) ([]sdk.Message, error) {
+    // Skip encrypted messages the plugin cannot read
+    if msg.Encrypted {
+        return nil, nil
+    }
     // Process incoming message
     if strings.HasPrefix(msg.Content, "hello") {
         response := sdk.Message{
             Sender:    "MyBot",
             Content:   "Hello back!",
             CreatedAt: time.Now(),
+            Channel:   msg.Channel, // reply in the same channel
         }
         return []sdk.Message{response}, nil
     }
