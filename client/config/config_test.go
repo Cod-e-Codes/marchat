@@ -157,7 +157,22 @@ func TestGetConfigDir(t *testing.T) {
 	}
 }
 
+func restoreMARCHATConfigDir(t *testing.T, prev string, had bool) {
+	t.Helper()
+	t.Cleanup(func() {
+		if had {
+			_ = os.Setenv("MARCHAT_CONFIG_DIR", prev)
+		} else {
+			_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+		}
+	})
+}
+
 func TestGetConfigPath(t *testing.T) {
+	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
+	restoreMARCHATConfigDir(t, prev, had)
+	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
 	configPath, err := GetConfigPath()
 	if err != nil {
 		t.Fatalf("Failed to get config path: %v", err)
@@ -175,9 +190,27 @@ func TestGetConfigPath(t *testing.T) {
 	}
 }
 
+func TestGetConfigPathRespectsMARCHAT_CONFIG_DIR(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("MARCHAT_CONFIG_DIR", tmpDir)
+
+	configPath, err := GetConfigPath()
+	if err != nil {
+		t.Fatalf("GetConfigPath: %v", err)
+	}
+	want := filepath.Join(tmpDir, "config.json")
+	if configPath != want {
+		t.Fatalf("GetConfigPath() = %q, want %q", configPath, want)
+	}
+}
+
 func TestGetKeystorePath(t *testing.T) {
 	// Test with no legacy keystore
 	tmpDir := t.TempDir()
+	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
+	restoreMARCHATConfigDir(t, prev, had)
+	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
 	originalDir, _ := os.Getwd()
 	defer func() {
 		if err := os.Chdir(originalDir); err != nil {
@@ -203,6 +236,10 @@ func TestGetKeystorePath(t *testing.T) {
 func TestGetKeystorePathWithLegacy(t *testing.T) {
 	// Test with legacy keystore in current directory
 	tmpDir := t.TempDir()
+	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
+	restoreMARCHATConfigDir(t, prev, had)
+	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
 	originalDir, _ := os.Getwd()
 	defer func() {
 		if err := os.Chdir(originalDir); err != nil {
@@ -235,6 +272,10 @@ func TestGetKeystorePathWithLegacy(t *testing.T) {
 
 func TestMigrateKeystoreToNewLocation(t *testing.T) {
 	tmpDir := t.TempDir()
+	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
+	restoreMARCHATConfigDir(t, prev, had)
+	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
 	originalDir, _ := os.Getwd()
 	defer func() {
 		if err := os.Chdir(originalDir); err != nil {
@@ -287,6 +328,10 @@ func TestMigrateKeystoreToNewLocation(t *testing.T) {
 
 func TestMigrateKeystoreAlreadyExists(t *testing.T) {
 	tmpDir := t.TempDir()
+	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
+	restoreMARCHATConfigDir(t, prev, had)
+	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
 	originalDir, _ := os.Getwd()
 	defer func() {
 		if err := os.Chdir(originalDir); err != nil {

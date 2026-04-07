@@ -697,8 +697,12 @@ func GetConfigDir() (string, error) {
 	return configDir, nil
 }
 
-// GetConfigPath returns the full path to the config file
+// GetConfigPath returns the full path to the config file using the same directory
+// rules as ResolveClientConfigDir (MARCHAT_CONFIG_DIR when set, otherwise GetConfigDir).
 func GetConfigPath() (string, error) {
+	if os.Getenv("MARCHAT_CONFIG_DIR") != "" {
+		return filepath.Join(ResolveClientConfigDir(), "config.json"), nil
+	}
 	configDir, err := GetConfigDir()
 	if err != nil {
 		return "", err
