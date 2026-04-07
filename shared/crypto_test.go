@@ -108,6 +108,30 @@ func TestEncryptDecryptTextMessage(t *testing.T) {
 	}
 }
 
+func TestEncryptMessageNilSessionKey(t *testing.T) {
+	_, err := EncryptMessage(nil, []byte("hello"))
+	if err == nil {
+		t.Fatal("expected error for nil session key")
+	}
+	if err.Error() != "session key is nil" {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestDecryptMessageNilArgs(t *testing.T) {
+	sessionKey := testSessionKey(t)
+
+	_, err := DecryptMessage(sessionKey, nil)
+	if err == nil {
+		t.Fatal("expected error for nil encrypted message")
+	}
+
+	_, err = DecryptMessage(nil, &EncryptedMessage{IsEncrypted: true})
+	if err == nil {
+		t.Fatal("expected error for nil session key")
+	}
+}
+
 func TestDecryptMessageInvalidData(t *testing.T) {
 	sessionKey := testSessionKey(t)
 

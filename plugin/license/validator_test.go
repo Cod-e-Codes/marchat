@@ -388,6 +388,80 @@ func TestIsLicenseValid(t *testing.T) {
 			t.Error("Expected license to be invalid")
 		}
 	})
+
+	t.Run("plugin name mismatch on file path", func(t *testing.T) {
+		// Generate a license for "other-plugin" but place it in "target-plugin"'s directory.
+		expiresAt := time.Now().Add(24 * time.Hour)
+		lic, err := GenerateLicense("other-plugin", "customer123", expiresAt, privateKey)
+		if err != nil {
+			t.Fatalf("Failed to generate license: %v", err)
+		}
+
+		pluginDir := filepath.Join(cacheDir, "..", "plugins", "target-plugin")
+		if err := os.MkdirAll(pluginDir, 0755); err != nil {
+			t.Fatalf("Failed to create plugin dir: %v", err)
+		}
+		data, _ := json.MarshalIndent(lic, "", "  ")
+		if err := os.WriteFile(filepath.Join(pluginDir, "target-plugin.license"), data, 0644); err != nil {
+			t.Fatalf("Failed to write license: %v", err)
+		}
+
+		// Create a validator that looks in this test directory.
+		v2, err := NewLicenseValidator(publicKey, cacheDir)
+		if err != nil {
+			t.Fatalf("Failed to create validator: %v", err)
+		}
+
+		// Override working directory so "plugins/target-plugin/" resolves.
+		origDir, _ := os.Getwd()
+		_ = os.Chdir(filepath.Join(cacheDir, ".."))
+		defer func() { _ = os.Chdir(origDir) }()
+
+		valid, err := v2.IsLicenseValid("target-plugin")
+		if valid {
+			t.Error("Expected license to be rejected due to plugin name mismatch")
+		}
+		if err == nil {
+			t.Error("Expected error for plugin name mismatch, got nil")
+		}
+		if err != nil && !contains(err.Error(), "mismatch") {
+			t.Errorf("Expected mismatch error, got: %v", err)
+		}
+	})
+
+	t.Run("expired license file returns error", func(t *testing.T) {
+		expiresAt := time.Now().Add(-24 * time.Hour)
+		lic, err := GenerateLicense("expired-file-plugin", "customer123", expiresAt, privateKey)
+		if err != nil {
+			t.Fatalf("Failed to generate license: %v", err)
+		}
+
+		pluginDir := filepath.Join(cacheDir, "..", "plugins", "expired-file-plugin")
+		if err := os.MkdirAll(pluginDir, 0755); err != nil {
+			t.Fatalf("Failed to create plugin dir: %v", err)
+		}
+		data, _ := json.MarshalIndent(lic, "", "  ")
+		if err := os.WriteFile(filepath.Join(pluginDir, "expired-file-plugin.license"), data, 0644); err != nil {
+			t.Fatalf("Failed to write license: %v", err)
+		}
+
+		v2, err := NewLicenseValidator(publicKey, cacheDir)
+		if err != nil {
+			t.Fatalf("Failed to create validator: %v", err)
+		}
+
+		origDir, _ := os.Getwd()
+		_ = os.Chdir(filepath.Join(cacheDir, ".."))
+		defer func() { _ = os.Chdir(origDir) }()
+
+		valid, err := v2.IsLicenseValid("expired-file-plugin")
+		if valid {
+			t.Error("Expected expired license to be invalid")
+		}
+		if err == nil {
+			t.Error("Expected error for expired license, got nil")
+		}
+	})
 }
 
 func TestGenerateLicense(t *testing.T) {

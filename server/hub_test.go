@@ -439,6 +439,78 @@ func TestHubConcurrentBanOperations(t *testing.T) {
 	}
 }
 
+func TestBroadcastUserListNonBlocking(t *testing.T) {
+	hub := NewHub("", "", "", nil)
+
+	// Create a client with a tiny send buffer that we intentionally fill.
+	stalled := &Client{username: "stalled", send: make(chan interface{}, 1)}
+	healthy := &Client{username: "healthy", send: make(chan interface{}, 10)}
+
+	hub.clientsMutex.Lock()
+	hub.clients[stalled] = true
+	hub.clients[healthy] = true
+	hub.clientsMutex.Unlock()
+
+	// Fill the stalled client's buffer so the next send would block.
+	stalled.send <- "filler"
+
+	// broadcastUserList must not block even though stalled's buffer is full.
+	done := make(chan struct{})
+	go func() {
+		hub.broadcastUserList()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("broadcastUserList blocked on full send channel")
+	}
+
+	if len(healthy.send) != 1 {
+		t.Errorf("healthy client should have received user list, got %d messages", len(healthy.send))
+	}
+}
+
+func TestKickUserNonBlocking(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+
+	// Create a client with a full send buffer.
+	client := &Client{
+		username: "victim",
+		send:     make(chan interface{}, 1),
+		conn:     nil, // conn.Close will be skipped via nil check in test
+	}
+	client.send <- "filler"
+
+	hub.clientsMutex.Lock()
+	hub.clients[client] = true
+	hub.clientsMutex.Unlock()
+
+	// kickUser must not block even though the buffer is full.
+	done := make(chan struct{})
+	go func() {
+		defer func() {
+			_ = recover() // conn is nil in test; tolerate nil pointer in conn.Close
+			close(done)
+		}()
+		hub.kickUser("victim", "test")
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatal("kickUser blocked on full send channel")
+	}
+}
+
 func TestChannelManagement(t *testing.T) {
 	hub := NewHub("", "", "", nil)
 

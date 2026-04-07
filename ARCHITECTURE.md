@@ -78,8 +78,8 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 
 #### Core Structures
 
-- **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered
-- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing
+- **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered. All sends to `client.send` use non-blocking `select/default` to prevent deadlocks when a client's write buffer is full; stalled clients are dropped or the message is logged and skipped.
+- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer.
 - **`AdminPanel`**: Terminal-based administrative interface for server management
 - **`WebAdminServer`**: Web-based administrative interface with session authentication
 - **`HealthChecker`**: System health monitoring with metrics collection
@@ -93,7 +93,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - Message editing, deletion, pinning, and search
 - Typing indicator and read receipt broadcasting
 - Reaction broadcasting
-- User management including ban, kick, and allow operations
+- User management including ban, kick, and allow operations (ban/kick state is committed under `banMutex`, then the lock is released before the actual disconnect to avoid holding the mutex across a channel send)
 - Plugin command execution and management
 - Database backup and maintenance operations (SQLite `VACUUM INTO` uses proper string quoting so backup paths containing `'` remain safe)
 - System metrics collection and health monitoring

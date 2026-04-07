@@ -567,7 +567,7 @@ func (h *PluginHost) handlePluginResponse(instance *PluginInstance, response sdk
 				log.Printf("Failed to unmarshal plugin message: %v", err)
 				return
 			}
-			// Send message to chat
+			msg.Sender = instance.Name
 			select {
 			case h.messageChan <- msg:
 			default:

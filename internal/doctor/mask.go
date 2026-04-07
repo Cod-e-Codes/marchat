@@ -20,12 +20,7 @@ func FormatEnvValue(key, value string) string {
 		return "(not set)"
 	}
 	if isSecretEnv(key) {
-		n := len(value)
-		suf := ""
-		if n >= 4 {
-			suf = value[n-4:]
-		}
-		return fmt.Sprintf("(set, len=%d, suffix=****%s)", n, suf)
+		return fmt.Sprintf("(set, len=%d)", len(value))
 	}
 	if len(value) > 120 {
 		return value[:117] + "..."

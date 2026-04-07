@@ -883,12 +883,16 @@ func (h *Hub) broadcastUserList() {
 			usernames = append(usernames, client.username)
 		}
 	}
-	sort.Strings(usernames) // Sort alphabetically
+	sort.Strings(usernames)
 	userList := UserList{Users: usernames}
 	payload, _ := json.Marshal(userList)
 	msg := WSMessage{Type: "userlist", Data: payload}
 	for client := range h.clients {
-		client.send <- msg
+		select {
+		case client.send <- msg:
+		default:
+			log.Printf("Dropping user list update for client %s (send buffer full)", client.username)
+		}
 	}
 	h.clientsMutex.RUnlock()
 }
@@ -1044,25 +1048,40 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 			hub.joinChannel(client, persistedChannel)
 		}
 
-		// Send personalized recent messages to new client
+		// Start writePump before enqueuing history so the channel has a
+		// consumer.  Without this, replaying messages + reactions + receipts
+		// into the 256-capacity channel can block the handler goroutine
+		// indefinitely when total items exceed the buffer.
+		go client.writePump()
+
 		msgs, _ := GetRecentMessagesForUser(db, username, 50, banGapsHistory)
 		messageIDs := make([]int64, 0, len(msgs))
 		for _, msg := range msgs {
-			client.send <- msg
+			select {
+			case client.send <- msg:
+			default:
+				log.Printf("Dropping history message for new client %s (send buffer full)", username)
+			}
 			if msg.MessageID > 0 {
 				messageIDs = append(messageIDs, msg.MessageID)
 			}
 		}
 		for _, reactionMsg := range LoadReactionsForMessages(db, messageIDs) {
-			client.send <- reactionMsg
+			select {
+			case client.send <- reactionMsg:
+			default:
+				log.Printf("Dropping reaction replay for new client %s (send buffer full)", username)
+			}
 		}
 		for _, receiptMsg := range LoadReadReceiptsForMessages(db, username, messageIDs) {
-			client.send <- receiptMsg
+			select {
+			case client.send <- receiptMsg:
+			default:
+				log.Printf("Dropping read receipt replay for new client %s (send buffer full)", username)
+			}
 		}
 		hub.broadcastUserList()
 
-		// Start read/write pumps
-		go client.writePump()
 		go client.readPump()
 	}
 }

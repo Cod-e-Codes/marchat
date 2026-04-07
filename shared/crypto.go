@@ -34,6 +34,9 @@ type SessionKey struct {
 
 // EncryptMessage encrypts a message using ChaCha20-Poly1305.
 func EncryptMessage(sessionKey *SessionKey, plaintext []byte) (*EncryptedMessage, error) {
+	if sessionKey == nil {
+		return nil, errors.New("session key is nil")
+	}
 	aead, err := chacha20poly1305.New(sessionKey.Key)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create AEAD: %w", err)
@@ -56,6 +59,12 @@ func EncryptMessage(sessionKey *SessionKey, plaintext []byte) (*EncryptedMessage
 
 // DecryptMessage decrypts a message using ChaCha20-Poly1305.
 func DecryptMessage(sessionKey *SessionKey, encrypted *EncryptedMessage) ([]byte, error) {
+	if encrypted == nil {
+		return nil, errors.New("encrypted message is nil")
+	}
+	if sessionKey == nil {
+		return nil, errors.New("session key is nil")
+	}
 	if !encrypted.IsEncrypted {
 		return nil, errors.New("message is not encrypted")
 	}

@@ -347,6 +347,39 @@ func TestGetEnvIntWithDefault(t *testing.T) {
 	}
 }
 
+func TestConfigDirUpdatedFromDotEnv(t *testing.T) {
+	tempDir := t.TempDir()
+	targetDir := filepath.Join(t.TempDir(), "custom-config")
+
+	// Ensure the env is clean
+	originalConfigDir := os.Getenv("MARCHAT_CONFIG_DIR")
+	os.Unsetenv("MARCHAT_CONFIG_DIR")
+	defer func() {
+		if originalConfigDir != "" {
+			os.Setenv("MARCHAT_CONFIG_DIR", originalConfigDir)
+		} else {
+			os.Unsetenv("MARCHAT_CONFIG_DIR")
+		}
+	}()
+
+	// Write a .env in tempDir that sets MARCHAT_CONFIG_DIR to a different path
+	envContent := "MARCHAT_CONFIG_DIR=" + targetDir + "\n" +
+		"MARCHAT_ADMIN_KEY=test-key\n" +
+		"MARCHAT_USERS=user1\n"
+	if err := os.WriteFile(filepath.Join(tempDir, ".env"), []byte(envContent), 0644); err != nil {
+		t.Fatalf("Failed to write .env: %v", err)
+	}
+
+	cfg, err := LoadConfig(tempDir)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+
+	if cfg.ConfigDir != targetDir {
+		t.Errorf("Expected ConfigDir %q (from .env), got %q", targetDir, cfg.ConfigDir)
+	}
+}
+
 // TestSessionSecretGeneratedRandomly checks that SessionSecret is a 64 char long generated hex when not provided
 func TestSessionSecretGeneratedRandomly(t *testing.T) {
 	os.Setenv("MARCHAT_PORT", "8080")

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log"
 	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -432,25 +433,34 @@ func (m *model) listenWebSocket() tea.Cmd {
 	}
 }
 
-func (m *model) renderMessagesContent() string {
-	var content strings.Builder
-	for _, msg := range m.messages {
-		content.WriteString(msg.Content)
-		content.WriteString(" ")
-	}
-	return content.String()
-}
+var ansiEscRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
 func (m *model) findURLAtClickPosition(clickX, clickY int) string {
-	allURLs := urlRegex.FindAllString(m.renderMessagesContent(), -1)
-	if len(allURLs) == 0 {
+	content := m.viewport.View()
+	lines := strings.Split(content, "\n")
+
+	adjustedY := clickY - 3
+	if adjustedY < 0 || adjustedY >= len(lines) {
 		return ""
 	}
 
-	adjustedY := clickY - 3
+	line := ansiEscRegex.ReplaceAllString(lines[adjustedY], "")
 
-	if adjustedY >= 0 && adjustedY < m.viewport.Height && clickX >= 0 && clickX < m.viewport.Width {
-		return allURLs[0]
+	adjustedX := clickX - userListWidth - 1
+	if adjustedX < 0 || adjustedX >= len(line) {
+		return ""
+	}
+
+	matches := urlRegex.FindAllStringIndex(line, -1)
+	for _, loc := range matches {
+		if adjustedX >= loc[0] && adjustedX < loc[1] {
+			return line[loc[0]:loc[1]]
+		}
+	}
+
+	urls := urlRegex.FindAllString(line, -1)
+	if len(urls) > 0 {
+		return urls[0]
 	}
 
 	return ""

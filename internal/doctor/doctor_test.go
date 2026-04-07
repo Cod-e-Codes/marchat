@@ -22,8 +22,11 @@ func TestFormatEnvValue(t *testing.T) {
 		t.Fatalf("plain: got %q", got)
 	}
 	got := FormatEnvValue("MARCHAT_ADMIN_KEY", "supersecret")
-	if !strings.Contains(got, "len=11") || !strings.Contains(got, "****cret") {
+	if !strings.Contains(got, "len=11") {
 		t.Fatalf("secret mask unexpected: %q", got)
+	}
+	if strings.Contains(got, "cret") {
+		t.Fatalf("secret suffix leaked in output: %q", got)
 	}
 }
 

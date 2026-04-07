@@ -757,21 +757,21 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 
 | Package | Coverage | Size | Status |
 |---------|----------|------|--------|
-| `shared` | 86.8% | 244 LOC | High |
-| `plugin/license` | 85.4% | 241 LOC | High |
-| `client/crypto` | 80.3% | 386 LOC | High |
-| `config` | 73.2% | 330 LOC | High |
-| `plugin/host` | 63.2% | 617 LOC | Medium |
-| `client/config` | 57.0% | 1988 LOC | Medium |
-| `internal/doctor` | 50.2% | 737 LOC | Medium |
-| `plugin/store` | 47.0% | 552 LOC | Medium |
-| `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 35.4% | 7153 LOC | Low |
-| `plugin/manager` | 32.1% | 747 LOC | Low |
-| `client` | 23.1% | 5499 LOC | Low |
-| `cmd/server` | 13.7% | 484 LOC | Low |
+| `shared` | 88.1% | 212 LOC | High |
+| `plugin/license` | 87.1% | 203 LOC | High |
+| `client/crypto` | 80.3% | 320 LOC | High |
+| `config` | 73.2% | 285 LOC | High |
+| `plugin/host` | 63.0% | 533 LOC | Medium |
+| `client/config` | 57.3% | 1683 LOC | Medium |
+| `internal/doctor` | 49.8% | 661 LOC | Medium |
+| `plugin/store` | 47.0% | 490 LOC | Medium |
+| `cmd/license` | 42.2% | 140 LOC | Medium |
+| `server` | 36.1% | 6298 LOC | Low |
+| `plugin/manager` | 32.1% | 626 LOC | Low |
+| `client` | 23.0% | 4966 LOC | Low |
+| `cmd/server` | 13.7% | 424 LOC | Low |
 
-**Overall: 37.4%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 37.7%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

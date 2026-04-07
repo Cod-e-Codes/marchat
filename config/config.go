@@ -87,6 +87,15 @@ func LoadConfigWithoutValidation(configDir string) (*Config, error) {
 		return nil, fmt.Errorf("failed to load .env file: %w", err)
 	}
 
+	// Re-read MARCHAT_CONFIG_DIR after .env load: godotenv.Overload may have
+	// injected a new value that the initial os.Getenv above did not see.
+	if envConfigDir := os.Getenv("MARCHAT_CONFIG_DIR"); envConfigDir != "" && envConfigDir != cfg.ConfigDir {
+		cfg.ConfigDir = envConfigDir
+		if err := ensureConfigDir(cfg.ConfigDir); err != nil {
+			return nil, fmt.Errorf("failed to create config directory from .env: %w", err)
+		}
+	}
+
 	// Load configuration from environment variables
 	if err := cfg.loadFromEnv(); err != nil {
 		return nil, fmt.Errorf("failed to load environment configuration: %w", err)

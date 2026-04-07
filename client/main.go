@@ -156,7 +156,7 @@ type model struct {
 	wg      sync.WaitGroup
 
 	reconnectDelay time.Duration               // for exponential backoff
-	receivedFiles  map[string]*shared.FileMeta // filename -> filemeta for saving
+	receivedFiles  map[string]*shared.FileMeta // "sender/filename" -> filemeta for saving
 
 	// E2E Encryption
 	keystore *crypto.KeyStore
@@ -641,7 +641,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.receivedFiles == nil {
 					m.receivedFiles = make(map[string]*shared.FileMeta)
 				}
-				m.receivedFiles[v.File.Filename] = v.File
+				m.receivedFiles[v.Sender+"/"+v.File.Filename] = v.File
 			}
 		}
 
@@ -1183,6 +1183,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 								return m, m.listenWebSocket()
 							}
 							m.banner = "File sent: " + filename
+						} else {
+							m.banner = "[ERROR] Not connected to server"
 						}
 						m.textarea.SetValue("")
 						return m, m.listenWebSocket()
@@ -1192,12 +1194,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if strings.HasPrefix(text, ":savefile ") {
 				filename := strings.TrimSpace(strings.TrimPrefix(text, ":savefile "))
-				if m.receivedFiles == nil || m.receivedFiles[filename] == nil {
-					m.banner = "[ERROR] No files received yet."
+				var file *shared.FileMeta
+				if m.receivedFiles != nil {
+					for _, f := range m.receivedFiles {
+						if f.Filename == filename {
+							file = f
+						}
+					}
+				}
+				if file == nil {
+					m.banner = "[ERROR] No file with that name received."
 					m.textarea.SetValue("")
 					return m, nil
 				}
-				file := m.receivedFiles[filename]
 				// Check for duplicate filenames and append suffix if needed
 				saveName := file.Filename
 				base := saveName

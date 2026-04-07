@@ -171,19 +171,24 @@ func (lv *LicenseValidator) cacheLicense(license *License) error {
 	return nil
 }
 
-// IsLicenseValid checks if a license is valid for a plugin
+// IsLicenseValid checks if a license is valid for a plugin.
+// Returns (false, nil) when no license file exists; returns (false, err) when a
+// license was found but failed validation (signature, expiry, or name mismatch).
 func (lv *LicenseValidator) IsLicenseValid(pluginName string) (bool, error) {
-	// First try cached license
 	if _, err := lv.ValidateCachedLicense(pluginName); err == nil {
 		return true, nil
 	}
 
-	// Look for license file in plugin directory
 	licensePath := filepath.Join("plugins", pluginName, pluginName+".license")
 	if _, err := os.Stat(licensePath); err == nil {
-		if _, err := lv.ValidateLicense(licensePath); err == nil {
-			return true, nil
+		license, err := lv.ValidateLicense(licensePath)
+		if err != nil {
+			return false, fmt.Errorf("license validation failed for %s: %w", pluginName, err)
 		}
+		if license.PluginName != pluginName {
+			return false, fmt.Errorf("license plugin name mismatch: expected %s, got %s", pluginName, license.PluginName)
+		}
+		return true, nil
 	}
 
 	return false, nil

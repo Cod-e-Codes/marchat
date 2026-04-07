@@ -80,10 +80,12 @@ func (h *Hub) ReleaseUsername(username string) {
 	h.clientsMutex.Unlock()
 }
 
-// BanUser adds a user to the permanent ban list
+// BanUser adds a user to the permanent ban list.
+// The ban state is recorded under banMutex, then the lock is released before
+// kicking the connected client so that a blocked send channel cannot hold
+// banMutex and stall all other ban/kick callers.
 func (h *Hub) BanUser(username string, adminUsername string) {
 	h.banMutex.Lock()
-	defer h.banMutex.Unlock()
 
 	lowerUsername := strings.ToLower(username)
 
@@ -114,7 +116,8 @@ func (h *Hub) BanUser(username string, adminUsername string) {
 		}
 	}
 
-	// Kick the user if they're currently connected
+	h.banMutex.Unlock()
+
 	h.kickUser(username, "You have been permanently banned by an administrator")
 }
 
@@ -177,7 +180,8 @@ func (h *Hub) IsUserBanned(username string) bool {
 	return false
 }
 
-// kickUser forcibly disconnects a user by username
+// kickUser forcibly disconnects a user by username.
+// Uses a non-blocking send so the caller never stalls on a full channel.
 func (h *Hub) kickUser(username string, reason string) {
 	h.clientsMutex.RLock()
 	var target *Client
@@ -196,28 +200,32 @@ func (h *Hub) kickUser(username string, reason string) {
 
 	log.Printf("[ADMIN] Kicking user '%s' (IP: %s) - Reason: %s", username, target.ipAddr, reason)
 
-	// Send kick message to the user
 	kickMsg := shared.Message{
 		Sender:    "System",
 		Content:   "You have been kicked by an administrator: " + reason,
 		CreatedAt: time.Now(),
 		Type:      shared.TextMessage,
 	}
-	target.send <- kickMsg
+	select {
+	case target.send <- kickMsg:
+	default:
+		log.Printf("[ADMIN] Could not deliver kick message to %s (send buffer full)", username)
+	}
 
-	// Close the connection
 	target.conn.Close()
 }
 
-// KickUser temporarily bans a user for 24 hours
+// KickUser temporarily bans a user for 24 hours.
+// Like BanUser, the lock is released before the actual disconnect to avoid
+// holding banMutex across a potentially blocking channel send.
 func (h *Hub) KickUser(username string, adminUsername string) {
 	h.banMutex.Lock()
-	defer h.banMutex.Unlock()
 
 	lowerUsername := strings.ToLower(username)
 
 	// Don't override permanent bans with temporary kicks
 	if _, isPermanentlyBanned := h.bans[lowerUsername]; isPermanentlyBanned {
+		h.banMutex.Unlock()
 		log.Printf("[ADMIN] Cannot kick '%s' - user is permanently banned", username)
 		return
 	}
@@ -247,7 +255,8 @@ func (h *Hub) KickUser(username string, adminUsername string) {
 		}
 	}
 
-	// Disconnect the user if they're currently connected
+	h.banMutex.Unlock()
+
 	h.kickUser(username, "You have been kicked by an administrator (24 hour temporary ban)")
 }
 
