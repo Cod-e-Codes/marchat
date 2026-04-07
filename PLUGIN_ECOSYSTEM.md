@@ -166,6 +166,8 @@ When the hub sends a `"message"` request, the `data` payload is an `sdk.Message`
 
 Zero-value fields (`channel` empty, `encrypted` false, `message_id` 0, etc.) are omitted from JSON via `omitempty`. Plugins compiled against older SDK versions silently ignore new keys.
 
+**Routing behavior**: Only messages with `type` `"text"` are forwarded to plugins by the hub. Plugin replies that omit `type` are broadcast to clients but **not** re-forwarded to plugins (prevents loops). Set `Type: "text"` on outbound `sdk.Message` to opt into plugin-to-plugin chaining. Encrypted messages are delivered with `Encrypted: true` and opaque `Content`; plugins should check the flag before parsing.
+
 ### Request Types
 
 1. **init**: Plugin initialization with configuration

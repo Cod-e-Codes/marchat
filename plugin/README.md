@@ -97,6 +97,13 @@ type Message struct {
 
 **Backwards compatibility**: All extended fields use `omitempty`. Plugins compiled against older SDK versions silently ignore unknown JSON keys and omit them on output — no recompile required.
 
+**Message routing rules**:
+
+- The hub only forwards messages with `type` set to `"text"` to plugins. Other types (typing, reactions, etc.) are not delivered.
+- Plugin replies that **omit** `type` (or set it to anything other than `"text"`) are broadcast to clients but are **not** re-forwarded to other plugins. This prevents accidental infinite loops.
+- To opt into **plugin-to-plugin chaining**, set `Type: "text"` on outbound `sdk.Message` explicitly. Use with care — the echo plugin, for example, should not do this or it will loop.
+- **Encrypted messages**: The hub does not filter encrypted messages before forwarding to plugins. Plugins receive them with `Encrypted: true` and opaque `Content`. Plugins that parse `Content` should check `msg.Encrypted` and skip or handle accordingly.
+
 ### Message Processing
 
 Plugins receive messages and can respond with additional messages:
