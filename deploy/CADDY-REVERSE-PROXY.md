@@ -278,7 +278,7 @@ If the shell or IDE exports a **stale `MARCHAT_*`**, the server used to keep the
 | **`remote error: tls: internal error`** on connect | Caddyfile must use **named hosts** + **`tls internal`**; recreate Caddy volumes if certs were issued under bad config; use **`wss://localhost:8443`**. |
 | **Reconnect loop / dial failures** | Client debug log: **Windows** `%APPDATA%\marchat\marchat-client-debug.log`; **Linux** `~/.config/marchat/marchat-client-debug.log`; **macOS** `~/Library/Application Support/marchat/marchat-client-debug.log` (unless **`MARCHAT_CONFIG_DIR`** is set). |
 | **Invalid admin key** | Server must use same key as client; with **Overload**, **`config/.env`** overrides stale shell env after **server restart**. |
-| **Keystore decrypt error** | Wrong **`--keystore-passphrase`** or old **`keystore.dat`**; backup/remove file and recreate with correct passphrase + **`MARCHAT_GLOBAL_E2E_KEY`**. |
+| **Keystore decrypt error** | Wrong **`--keystore-passphrase`**, corrupted file, or (on older clients) path-dependent keystore salt if **`keystore.dat`** moved; use a current client build (embedded salt + auto-migration). If **`MARCHAT_GLOBAL_E2E_KEY`** is set, the client uses the env key and does not update the file—unset it to use the on-disk key again. Backup/remove **`keystore.dat`** only if you intend to recreate the keystore (you will need the same global key via env or peer copy). |
 | **Caddy cannot reach server** | Server on **8080**, Docker **`host.docker.internal`** (Compose **`extra_hosts`**). |
 
 ---

@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"bytes"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -277,6 +278,69 @@ func TestKeyStoreDecryptMessageNoSessionKey(t *testing.T) {
 	_, err := ks.DecryptMessage(encrypted, "global")
 	if err == nil {
 		t.Error("Expected error when decrypting without session key")
+	}
+}
+
+func TestKeyStoreLegacyPathSaltMigratedAndPathIndependent(t *testing.T) {
+	originalKey := os.Getenv("MARCHAT_GLOBAL_E2E_KEY")
+	os.Unsetenv("MARCHAT_GLOBAL_E2E_KEY")
+	defer func() {
+		if originalKey != "" {
+			os.Setenv("MARCHAT_GLOBAL_E2E_KEY", originalKey)
+		}
+	}()
+
+	tmpDir := t.TempDir()
+	path1 := filepath.Join(tmpDir, "first.dat")
+	keyBytes := make([]byte, 32)
+	for i := range keyBytes {
+		keyBytes[i] = byte(i + 1)
+	}
+	sk := &shared.SessionKey{
+		Key:       keyBytes,
+		CreatedAt: time.Unix(1700000000, 0),
+		KeyID:     "test-key-id",
+	}
+	payload, err := json.Marshal(struct {
+		GlobalKey *shared.SessionKey `json:"global_key"`
+		Version   string             `json:"version"`
+	}{GlobalKey: sk, Version: "2.0"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pass := "unit-test-pass"
+	dk := deriveKeyFromPassphrase([]byte(pass), path1)
+	enc, err := encryptData(dk, payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path1, enc, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	ks := NewKeyStore(path1)
+	if err := ks.Load(pass); err != nil {
+		t.Fatalf("load legacy: %v", err)
+	}
+	raw, err := os.ReadFile(path1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(raw) < keystoreHeaderLen || !bytes.HasPrefix(raw, []byte(keystoreMagic)) || raw[8] != keystoreFormatV3 {
+		t.Fatalf("expected v3 header after migrate")
+	}
+
+	path2 := filepath.Join(tmpDir, "moved.dat")
+	if err := os.Rename(path1, path2); err != nil {
+		t.Fatal(err)
+	}
+	ks2 := NewKeyStore(path2)
+	if err := ks2.Load(pass); err != nil {
+		t.Fatalf("load after path change: %v", err)
+	}
+	got := ks2.GetGlobalKey()
+	if got == nil || string(got.Key) != string(keyBytes) {
+		t.Fatal("global key mismatch after move")
 	}
 }
 

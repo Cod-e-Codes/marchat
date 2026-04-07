@@ -133,9 +133,10 @@ Common types and utilities used across client and server components.
 Chat end-to-end encryption uses a **global symmetric key** shared by all clients (via `MARCHAT_GLOBAL_E2E_KEY` or manual distribution), not per-user key exchange on the wire.
 
 - **ChaCha20-Poly1305**: Authenticated encryption for message and file confidentiality and integrity
-- **Global E2E**: One 32-byte key per deployment; the client stores it in the passphrase-protected keystore (`EncryptMessage` / `DecryptMessage` in `shared`, orchestrated by `client/crypto/keystore.go`)
-- **Keystore file**: Encrypted with **AES-GCM**; passphrase stretched with **PBKDF2** (see `client/crypto/keystore.go`)
+- **Global E2E**: One 32-byte key per deployment; the client normally stores it in the passphrase-protected keystore (`EncryptMessage` / `DecryptMessage` in `shared`, orchestrated by `client/crypto/keystore.go`). If **`MARCHAT_GLOBAL_E2E_KEY`** is set, the client uses that key in memory for the process; it does **not** rewrite `keystore.dat` (see **README.md** → E2E Encryption).
+- **Keystore file**: Wrapped with **AES-GCM**; passphrase stretched with **PBKDF2** (SHA-256, 100k iterations). Current files embed a **random salt** in the file header so unlocking does not depend on the absolute path. Legacy files used the keystore path as PBKDF2 salt and are **migrated** to the embedded-salt format on first successful load (`client/crypto/keystore.go`).
 - **File transfer**: Raw byte encryption/decryption via `EncryptRaw`/`DecryptRaw` in the keystore using the same global key
+- **Key distribution UX**: Auto-generated global keys are stored in the encrypted keystore; the client does **not** print the raw key to stdout (see **README.md** / **SECURITY.md**).
 
 ### Plugin System (`plugin/`)
 
@@ -269,7 +270,7 @@ See [PROTOCOL.md](PROTOCOL.md) for the full message format specification.
 ### Encryption Flow
 
 1. **Key setup**: Operator shares a 32-byte key (e.g. `openssl rand -base64 32` as `MARCHAT_GLOBAL_E2E_KEY`) or the first client generates one and operators copy it to peers
-2. **Local storage**: Client holds the key in `keystore.dat` protected by `--keystore-passphrase`
+2. **Local storage**: Client holds the key in `keystore.dat` protected by `--keystore-passphrase` (embedded-salt file format; see **README.md**). Optionally `MARCHAT_GLOBAL_E2E_KEY` supplies the key in memory for that run without updating the file.
 3. **Message encryption**: Inner JSON payload is sealed with ChaCha20-Poly1305; nonce ‖ ciphertext is base64-encoded into `content` with `encrypted: true` (see **PROTOCOL.md**)
 4. **Transport**: Standard WebSocket JSON; server does not decrypt
 5. **Storage**: Server persists opaque ciphertext in the database
@@ -369,7 +370,7 @@ The web-based interface provides the same functionality through a browser:
 ### Encryption
 
 - **End-to-end (chat)**: Client-side ChaCha20-Poly1305 with a **shared global symmetric key**; the server never holds the plaintext key
-- **Keystore**: PBKDF2-derived key from the keystore passphrase protects `keystore.dat` (AES-GCM)
+- **Keystore**: PBKDF2 (passphrase + per-file salt) protects `keystore.dat` (AES-GCM payload). Embedded salt makes the file portable across path changes; `MARCHAT_GLOBAL_E2E_KEY` overrides the in-memory key without updating the file.
 - **Authenticated encryption**: ChaCha20-Poly1305 for chat and file payloads at the application layer
 
 ### Input Validation

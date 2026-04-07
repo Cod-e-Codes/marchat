@@ -203,7 +203,7 @@ go build -o marchat-client ./client
 | `MARCHAT_DB_PATH` | No | `./config/marchat.db` | Database path/DSN. Supports SQLite file path, `postgres://...`, or `mysql:...` |
 | `MARCHAT_TLS_CERT_FILE` | No | - | TLS certificate (enables wss://) |
 | `MARCHAT_TLS_KEY_FILE` | No | - | TLS private key |
-| `MARCHAT_GLOBAL_E2E_KEY` | No | - | Base64 32-byte global encryption key |
+| `MARCHAT_GLOBAL_E2E_KEY` | No | - | Base64 32-byte global E2E key (server and/or client). On the **client**, if set, it **overrides** the key from `keystore.dat` for that run only; the keystore file is **not** updated. See [E2E Encryption](#e2e-encryption). |
 | `MARCHAT_MAX_FILE_BYTES` | No | `1048576` | Max file size in bytes (1MB default) |
 | `MARCHAT_MAX_FILE_MB` | No | `1` | Max file size in MB (alternative to bytes) |
 | `MARCHAT_ALLOWED_USERS` | No | - | Username allowlist (comma-separated) |
@@ -521,12 +521,12 @@ export MARCHAT_GLOBAL_E2E_KEY="your-generated-key"
 
 **Option 2: Auto-Generate**
 ```bash
-# Client generates and displays new key
+# Client generates a key and saves it to the encrypted keystore (raw key is not printed)
 ./marchat-client --e2e --keystore-passphrase your-pass --username alice --server ws://localhost:8080/ws
 
-# Output shows:
+# Output shows Key ID only, e.g.:
 # [INFO] Generated new global E2E key (ID: RsLi9ON0...)
-# [TIP] Set MARCHAT_GLOBAL_E2E_KEY=fF+HkmGArkPNsdb+... to share this key across clients
+# [TIP] The key is not printed ... (copy keystore.dat + passphrase, or pre-share MARCHAT_GLOBAL_E2E_KEY)
 ```
 
 ### Expected Output
@@ -541,10 +541,15 @@ E2E encryption enabled with keystore: config/keystore.dat
 
 ### Security Features
 - **Server Privacy**: Server cannot read encrypted message bodies when E2E is used
-- **Local Keystore**: Global key stored in a passphrase-protected file (PBKDF2 + AES-GCM)
+- **Local Keystore**: Global key stored in a passphrase-protected file (PBKDF2 + AES-GCM); see **Keystore file format** below
+- **No raw key on stdout**: Auto-generated global keys are not echoed in full (reduces exposure via logs, scrollback, or screen capture); only a Key ID is shown in `[INFO]`.
 - **Validation**: Automatic encryption/decryption round-trip test on startup
 
-**Note**: Keystore encryption was upgraded from SHA256 to PBKDF2 for enhanced security. Existing keystores encrypted with the old method will need to be re-initialized.
+### Keystore file format and `MARCHAT_GLOBAL_E2E_KEY`
+
+- **On-disk format (current)**: `keystore.dat` is a small binary file: a fixed **magic** and **version**, a **random 16-byte salt** stored in the file, then **AES-GCM** ciphertext of the JSON payload (including the global ChaCha20-Poly1305 key). The passphrase is stretched with **PBKDF2** (SHA-256, 100k iterations) using that embedded salt. This means the same passphrase unlocks the file even if the absolute path to `keystore.dat` changes (for example after moving the file or when the client resolves a different config directory). Older files that derived PBKDF2 salt from the **keystore path** are still supported: on first successful unlock they are **rewritten** in the new format.
+- **Environment variable vs file**: If **`MARCHAT_GLOBAL_E2E_KEY`** is set in the client process, that key is used for encryption/decryption for **this run**. The on-disk keystore is **not** modified. You will see **`[INFO] Using global E2E key from environment variable`**. If you later **unset** the variable, the client uses the key from `keystore.dat` again—so the effective key can appear to “change back” even though the file was never updated. To persist a shared key in the file, run **without** the env var once. When the client **auto-generates** a key, it **does not** print the raw base64 material (only a Key ID); share the key with other clients by copying **`keystore.dat`** and the **same passphrase**, or by agreeing on **`MARCHAT_GLOBAL_E2E_KEY`** beforehand (e.g. **`openssl rand -base64 32`** on a trusted machine).
+- **Legacy note**: Keystore wrapping was previously upgraded to PBKDF2 (replacing an older derivation). Very old keystores from that era may still need re-initialization if they cannot be decrypted.
 
 ## Plugin System
 
@@ -708,8 +713,8 @@ Profiles stored in platform-appropriate locations:
 | Ban history gaps not working | Ensure `MARCHAT_BAN_HISTORY_GAPS=true` (disabled by default) and `ban_history` table exists |
 | TLS certificate errors | Use `--skip-tls-verify` for dev with self-signed certs |
 | Plugin installation fails | Verify `MARCHAT_PLUGIN_REGISTRY_URL` is accessible and valid JSON |
-| E2E encryption errors | Ensure `--e2e` flag and keystore passphrase provided, check debug logs |
-| Global E2E key errors | Verify key is valid base64-encoded 32-byte key: `openssl rand -base64 32` |
+| E2E encryption errors | Ensure `--e2e` and keystore passphrase; see **[E2E Encryption](#e2e-encryption)** (keystore format, env var vs file). Check debug logs. |
+| Global E2E key errors | Verify key is valid base64-encoded 32-byte key: `openssl rand -base64 32`. Remember: **`MARCHAT_GLOBAL_E2E_KEY` overrides** the keystore for that session without saving to disk. |
 | Blank encrypted messages | Fixed in v0.3.0-beta.5+ - ensure latest version |
 | Username already taken | Use admin `:forcedisconnect <user>` or wait 5min for auto-cleanup |
 | Stale connections | Server auto-cleans every 5min, or admin use `:cleanup` |
@@ -754,7 +759,7 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 |---------|----------|------|--------|
 | `shared` | 86.8% | 244 LOC | High |
 | `plugin/license` | 85.4% | 241 LOC | High |
-| `client/crypto` | 79.5% | 347 LOC | High |
+| `client/crypto` | 80.3% | 386 LOC | High |
 | `config` | 73.2% | 330 LOC | High |
 | `plugin/host` | 63.2% | 617 LOC | Medium |
 | `client/config` | 57.0% | 1988 LOC | Medium |
@@ -766,7 +771,7 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `client` | 23.1% | 5499 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 37.3%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 37.4%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

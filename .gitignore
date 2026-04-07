@@ -13,6 +13,7 @@
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
 coverage
+mergedcoverage
 
 # HTML coverage report generate by Go tests
 coverage.html

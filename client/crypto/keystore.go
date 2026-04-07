@@ -1,6 +1,7 @@
 package crypto
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/rand"
@@ -21,12 +22,24 @@ import (
 	"github.com/Cod-e-Codes/marchat/shared"
 )
 
+// v3 keystore file: magic (8) || format byte (1) || PBKDF2 salt (16) || AES-GCM (nonce||ciphertext).
+// Legacy v2 files are raw AES-GCM with a key derived using the keystore path as salt (see load).
+const (
+	keystoreMagic     = "marchatk" // 8 bytes
+	keystoreFormatV3  = byte(3)
+	keystoreSaltLen   = 16
+	keystoreHeaderLen = 8 + 1 + keystoreSaltLen
+)
+
 // KeyStore manages cryptographic keys for the client (global encryption only)
 type KeyStore struct {
 	mu           sync.RWMutex
 	globalKey    *shared.SessionKey // Global key for public channels
 	keystorePath string
 	passphrase   []byte
+	// kdfSalt is the PBKDF2 salt for the on-disk format; set when loading v3 or after first save.
+	// nil after loading legacy v2 until save migrates the file to v3.
+	kdfSalt []byte
 }
 
 // NewKeyStore creates a new key store
@@ -119,8 +132,9 @@ func (ks *KeyStore) initializeGlobalKey() error {
 		}
 
 		fmt.Printf("[INFO] Generated new global E2E key (ID: %s)\n", ks.globalKey.KeyID)
-		fmt.Printf("[TIP] Set MARCHAT_GLOBAL_E2E_KEY=%s to share this key across clients\n",
-			base64.StdEncoding.EncodeToString(ks.globalKey.Key))
+		fmt.Printf("[TIP] The key is not printed (protects against logs and terminal history). It is stored in your encrypted keystore. " +
+			"Other clients: copy keystore.dat and use the same passphrase, or set the same MARCHAT_GLOBAL_E2E_KEY everywhere " +
+			"(e.g. openssl rand -base64 32 on a trusted machine) before first use.\n")
 
 		// Save the newly generated key to disk
 		if err := ks.save(); err != nil {
@@ -228,14 +242,26 @@ func (ks *KeyStore) save() error {
 		return fmt.Errorf("failed to marshal keystore: %w", err)
 	}
 
-	// Derive encryption key from passphrase
-	key := deriveKeyFromPassphrase(ks.passphrase, ks.keystorePath)
+	if len(ks.kdfSalt) != keystoreSaltLen {
+		ks.kdfSalt = make([]byte, keystoreSaltLen)
+		if _, err := io.ReadFull(rand.Reader, ks.kdfSalt); err != nil {
+			return fmt.Errorf("failed to generate keystore salt: %w", err)
+		}
+	}
+
+	key := pbkdf2DerivedKey(ks.passphrase, ks.kdfSalt)
 
 	// Encrypt the data
-	encryptedData, err := encryptData(key, data)
+	encryptedPayload, err := encryptData(key, data)
 	if err != nil {
 		return fmt.Errorf("failed to encrypt keystore: %w", err)
 	}
+
+	out := make([]byte, 0, keystoreHeaderLen+len(encryptedPayload))
+	out = append(out, keystoreMagic...)
+	out = append(out, keystoreFormatV3)
+	out = append(out, ks.kdfSalt...)
+	out = append(out, encryptedPayload...)
 
 	// Ensure directory exists
 	dir := filepath.Dir(ks.keystorePath)
@@ -244,7 +270,7 @@ func (ks *KeyStore) save() error {
 	}
 
 	// Write to file
-	if err := os.WriteFile(ks.keystorePath, encryptedData, 0600); err != nil {
+	if err := os.WriteFile(ks.keystorePath, out, 0600); err != nil {
 		return fmt.Errorf("failed to write keystore: %w", err)
 	}
 
@@ -259,13 +285,24 @@ func (ks *KeyStore) load() error {
 		return fmt.Errorf("failed to read keystore: %w", err)
 	}
 
-	// Derive decryption key from passphrase
-	key := deriveKeyFromPassphrase(ks.passphrase, ks.keystorePath)
-
-	// Decrypt the data
-	data, err := decryptData(key, encryptedData)
-	if err != nil {
-		return fmt.Errorf("failed to decrypt keystore: %w", err)
+	var data []byte
+	if len(encryptedData) >= keystoreHeaderLen &&
+		bytes.HasPrefix(encryptedData, []byte(keystoreMagic)) &&
+		encryptedData[8] == keystoreFormatV3 {
+		ks.kdfSalt = append([]byte(nil), encryptedData[9:keystoreHeaderLen]...)
+		key := pbkdf2DerivedKey(ks.passphrase, ks.kdfSalt)
+		data, err = decryptData(key, encryptedData[keystoreHeaderLen:])
+		if err != nil {
+			return fmt.Errorf("failed to decrypt keystore: %w", err)
+		}
+	} else {
+		// Legacy: key was derived from full keystore path; decrypt fails if path resolution differs.
+		ks.kdfSalt = nil
+		key := deriveKeyFromPassphrase(ks.passphrase, ks.keystorePath)
+		data, err = decryptData(key, encryptedData)
+		if err != nil {
+			return fmt.Errorf("failed to decrypt keystore: %w", err)
+		}
 	}
 
 	var keystoreData struct {
@@ -279,24 +316,27 @@ func (ks *KeyStore) load() error {
 
 	ks.globalKey = keystoreData.GlobalKey
 
+	// Legacy files used the keystore path as PBKDF2 salt; rewrite once so unlocking no longer
+	// depends on how GetKeystorePath or filepath.Abs resolves.
+	if ks.kdfSalt == nil {
+		if err := ks.save(); err != nil {
+			return fmt.Errorf("failed to migrate keystore to portable format: %w", err)
+		}
+	}
+
 	return nil
 }
 
-// deriveKeyFromPassphrase derives a 32-byte key from a passphrase using PBKDF2.
-// This provides secure key derivation that is resistant to brute-force attacks.
-// The keystorePath is used as a salt to ensure different keystores produce different keys
-// even with the same passphrase.
-func deriveKeyFromPassphrase(passphrase []byte, keystorePath string) []byte {
-	// Use the keystore path as salt for deterministic but unique key derivation
-	// This ensures different keystore files produce different keys even with same passphrase
-	salt := []byte(keystorePath)
-
-	// PBKDF2 with SHA256, 100,000 iterations, 32-byte key length
-	// 100k iterations provides good security while remaining reasonably fast
+// pbkdf2DerivedKey derives a 32-byte key from a passphrase using PBKDF2 (100k SHA-256 iterations).
+func pbkdf2DerivedKey(passphrase, salt []byte) []byte {
 	const iterations = 100000
 	const keyLen = 32
-
 	return pbkdf2.Key(passphrase, salt, iterations, keyLen, sha256.New)
+}
+
+// deriveKeyFromPassphrase derives a key for legacy v2 keystores only (salt = keystore path string).
+func deriveKeyFromPassphrase(passphrase []byte, keystorePath string) []byte {
+	return pbkdf2DerivedKey(passphrase, []byte(keystorePath))
 }
 
 // encryptData encrypts data using AES-GCM
