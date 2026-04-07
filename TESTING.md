@@ -245,8 +245,8 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 | `client/main.go` | 6.7% | client | Client main application |
 
 ### Areas for Future Testing
-- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 35.4%)
-- **Client Package**: WebSocket communication, full TUI integration (current: 23.1%)
+- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 36.1%)
+- **Client Package**: WebSocket communication, full TUI integration (current: 23.0%)
 - **Plugin Host**: Broader command/response paths and failure modes beyond the minimal IPC test plugin (current: 63.2%)
 - **Plugin Manager**: Store download, checksum, and install edge cases (current: 32.1%)
 - **Server Main**: Full `main` execution, HTTP/TLS serving, admin panel integration (current: 13.7% statement coverage for `cmd/server/main.go`)

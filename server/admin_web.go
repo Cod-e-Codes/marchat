@@ -357,8 +357,10 @@ func NewWebAdminServer(hub *Hub, db *sql.DB, cfg *config.Config) *WebAdminServer
 		loginAttempts: make(map[string]*loginAttempt),
 	}
 
-	// Generate session secret
-	if err := server.generateSessionSecret(); err != nil {
+	// Use configured session secret when available, otherwise generate a random one
+	if cfg.SessionSecret != "" {
+		server.sessionSecret = []byte(cfg.SessionSecret)
+	} else if err := server.generateSessionSecret(); err != nil {
 		log.Printf("Warning: Failed to generate session secret: %v", err)
 	}
 

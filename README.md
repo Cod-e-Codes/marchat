@@ -128,10 +128,13 @@ Runs a guided wizard **only when** `MARCHAT_ADMIN_KEY` or `MARCHAT_USERS` is not
 
 ## Database Schema
 
-Key tables for message tracking and moderation:
-- **messages**: Core message storage with `message_id`
-- **user_message_state**: Per-user message history state
+Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQL):
+- **messages**: Core message storage with `message_id`, encryption fields, edit/delete/pin flags
+- **user_message_state**: Per-user message history state and last-seen timestamp
 - **ban_history**: Ban/unban event tracking for history gaps
+- **message_reactions**: Durable emoji reactions (unique per message + user + emoji)
+- **user_channels**: Last channel per user, persisted across reconnects
+- **read_receipts**: Per-user read receipt state tracking
 
 ## Installation
 
@@ -331,9 +334,9 @@ Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text 
 >
 > **Notifications**: See [NOTIFICATIONS.md](NOTIFICATIONS.md) for full notification system documentation including desktop notifications, quiet hours, and focus mode.
 
-### Plugin Commands (Admin Only)
+### Plugin Commands
 
-Text commands and hotkeys for plugin management. See [Plugin Management hotkeys](#plugin-management-admin) for keyboard shortcuts.
+Plugin **management** (install, uninstall, enable, disable) is admin-only. Plugin **chat commands** (e.g. `:echo`, `:weather`) are available to all users unless the plugin manifest sets `AdminOnly: true`. See [Plugin Management hotkeys](#plugin-management-admin) for keyboard shortcuts.
 
 | Command | Description | Hotkey |
 |---------|-------------|--------|
