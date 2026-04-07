@@ -766,12 +766,12 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `plugin/license` | 87.1% | 203 LOC | High |
 | `client/crypto` | 80.3% | 320 LOC | High |
 | `config` | 73.2% | 285 LOC | High |
-| `plugin/host` | 62.5% | 536 LOC | Medium |
+| `plugin/host` | 62.5% | 539 LOC | Medium |
 | `client/config` | 57.3% | 1683 LOC | Medium |
 | `internal/doctor` | 49.8% | 661 LOC | Medium |
 | `plugin/store` | 47.0% | 490 LOC | Medium |
 | `cmd/license` | 42.2% | 140 LOC | Medium |
-| `server` | 36.1% | 6310 LOC | Low |
+| `server` | 36.1% | 6303 LOC | Low |
 | `plugin/manager` | 32.1% | 626 LOC | Low |
 | `client` | 23.0% | 4966 LOC | Low |
 | `cmd/server` | 13.7% | 424 LOC | Low |

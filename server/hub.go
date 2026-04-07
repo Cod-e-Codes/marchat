@@ -402,14 +402,7 @@ func (h *Hub) Run() {
 	// Start plugin message handler goroutine
 	go func() {
 		for msg := range h.pluginManager.GetMessageChannel() {
-			// Route plugin messages through the broadcast channel for safe access
-			sharedMsg := shared.Message{
-				Sender:    msg.Sender,
-				Content:   msg.Content,
-				CreatedAt: msg.CreatedAt,
-				Type:      shared.TextMessage,
-			}
-			h.broadcast <- sharedMsg
+			h.broadcast <- ConvertPluginMessage(msg)
 		}
 	}()
 

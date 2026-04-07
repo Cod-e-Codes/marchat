@@ -244,9 +244,11 @@ func (h *PluginHost) StartPlugin(name string) error {
 		return fmt.Errorf("failed to initialize plugin %s: %w", name, err)
 	}
 
-	// Start communication goroutines
+	// Start communication goroutines.
+	// Stderr is captured as a function arg so StopPlugin can safely nil the
+	// struct field without racing the goroutine's first read.
 	go h.handlePluginOutput(instance)
-	go h.handlePluginErrors(instance)
+	go h.handlePluginErrors(instance, instance.Stderr)
 
 	log.Printf("Plugin %s started successfully", name)
 	return nil
@@ -542,9 +544,10 @@ func (h *PluginHost) handlePluginOutput(instance *PluginInstance) {
 	}
 }
 
-// handlePluginErrors handles stderr from a plugin
-func (h *PluginHost) handlePluginErrors(instance *PluginInstance) {
-	scanner := json.NewDecoder(instance.Stderr)
+// handlePluginErrors handles stderr from a plugin.
+// stderr is passed explicitly to avoid racing StopPlugin's nil-out of the field.
+func (h *PluginHost) handlePluginErrors(instance *PluginInstance, stderr io.Reader) {
+	scanner := json.NewDecoder(stderr)
 	for {
 		var logEntry struct {
 			Level   string `json:"level"`

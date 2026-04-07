@@ -174,12 +174,12 @@ go test -cover ./...
 | `plugin/license` | 87.1% | High | 203 | Small |
 | `client/crypto` | 80.3% | High | 320 | Small |
 | `config` | 73.2% | High | 285 | Small |
-| `plugin/host` | 62.5% | Medium | 536 | Medium |
+| `plugin/host` | 62.5% | Medium | 539 | Medium |
 | `client/config` | 57.3% | Medium | 1683 | Medium |
 | `internal/doctor` | 49.8% | Medium | 661 | Medium |
 | `plugin/store` | 47.0% | Medium | 490 | Medium |
 | `cmd/license` | 42.2% | Medium | 140 | Small |
-| `server` | 36.1% | Low | 6310 | Large |
+| `server` | 36.1% | Low | 6303 | Large |
 | `plugin/manager` | 32.1% | Low | 626 | Medium |
 | `client` | 23.0% | Low | 4966 | Large |
 | `cmd/server` | 13.7% | Low | 424 | Medium |
