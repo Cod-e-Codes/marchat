@@ -265,7 +265,7 @@ The repository’s `config/` directory holds **server** runtime files and the **
 
 ### Diagnostics (`-doctor`)
 
-Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, masked `MARCHAT_*` env, sanity checks). **Server** doctor lists `MARCHAT_*` **after** loading the resolved config directory’s **`.env`** (same as the running server), so values are not limited to what your shell exported. **Client** doctor only shows variables present in the client process (it does not read the server’s `config/.env`). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, and attempts a DB ping. On a **color-capable terminal** (stdout is a TTY), the text report uses **ANSI colors** aligned with the server pre-TUI banner; set **`NO_COLOR`** or redirect to a file/pipe for **plain** output. Use **`-doctor-json`** for machine-readable output (never colorized). If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, redacted `MARCHAT_*` secrets as length-only, other env values as shown, sanity checks). **Server** doctor lists `MARCHAT_*` **after** loading the resolved config directory’s **`.env`** (same as the running server), so values are not limited to what your shell exported. **Client** doctor only shows variables present in the client process (it does not read the server’s `config/.env`). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, and attempts a DB ping. On a **color-capable terminal** (stdout is a TTY), the text report uses **ANSI colors** aligned with the server pre-TUI banner; set **`NO_COLOR`** or redirect to a file/pipe for **plain** output. Use **`-doctor-json`** for machine-readable output (never colorized). If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 ## Admin Commands
 
@@ -699,42 +699,44 @@ Profiles stored in platform-appropriate locations:
 
 | Issue | Solution |
 |-------|----------|
-| Wrong config folder / paths | Run `marchat-client -doctor` or `marchat-server -doctor`; see **Client vs server config locations** |
-| Connection failed | Verify `ws://` or `wss://` protocol in URL |
-| `wss://localhost:8443` reconnect loop / connection refused | Ensure Caddy is up: `docker compose -f docker-compose.proxy.yml up -d`, or use `ws://127.0.0.1:8080/ws` without the proxy ([reverse proxy guide](deploy/CADDY-REVERSE-PROXY.md)) |
-| Admin commands not working | Check `--admin` flag and correct `--admin-key` |
-| Clipboard issues (Linux) | Install xclip: `sudo apt install xclip` |
-| Port in use | Change port: `export MARCHAT_PORT=8081` |
-| Database migration fails | Check file permissions, backup before source build |
-| PostgreSQL connection fails | Verify URL format: `postgres://user:pass@host:5432/db?sslmode=disable`; test with `psql` using same creds |
-| MySQL connection fails | Verify DSN prefix `mysql:` and DSN body `user:pass@tcp(host:3306)/db?parseTime=true`; test with `mysql` CLI |
-| SQL syntax error after backend switch | Ensure tables were created by the current server version and restart after changing `MARCHAT_DB_PATH` |
-| Message history missing | Expected after updates - user states reset for ban/unban improvements |
-| Ban history gaps not working | Ensure `MARCHAT_BAN_HISTORY_GAPS=true` (disabled by default) and `ban_history` table exists |
-| TLS certificate errors | Use `--skip-tls-verify` for dev with self-signed certs |
-| Plugin installation fails | Verify `MARCHAT_PLUGIN_REGISTRY_URL` is accessible and valid JSON |
-| E2E encryption errors | Ensure `--e2e` and keystore passphrase; see **[E2E Encryption](#e2e-encryption)** (keystore format, env var vs file). Check debug logs. |
-| Global E2E key errors | Verify key is valid base64-encoded 32-byte key: `openssl rand -base64 32`. Remember: **`MARCHAT_GLOBAL_E2E_KEY` overrides** the keystore for that session without saving to disk. |
-| Blank encrypted messages | Fixed in v0.3.0-beta.5+ - ensure latest version |
-| Username already taken | Use admin `:forcedisconnect <user>` or wait 5min for auto-cleanup |
-| Stale connections | Server auto-cleans every 5min, or admin use `:cleanup` |
-| Client frozen at startup | Fixed in latest - `--quick-start` uses proper UI |
-| Multi-line input not working | Use `Alt+Enter` or `Ctrl+J`; `Shift+Enter` is not supported in most Windows terminals |
+| Wrong config folder / paths | Run `./marchat-client -doctor` or `./marchat-server -doctor` (add `-doctor-json` for scripts; set `NO_COLOR` for plain text). See **Client vs server config locations**. **Server:** if you set `MARCHAT_CONFIG_DIR` only in `config/.env`, restart after saving—the loader re-reads it after `Overload`. |
+| Connection failed | Use `ws://` or `wss://` and the path your server uses (default HTTP handler is **`/ws`**—e.g. `ws://host:8080/ws`). |
+| `wss://localhost:8443` reconnect loop / connection refused | Ensure Caddy (or your proxy) is up: `docker compose -f docker-compose.proxy.yml up -d`, or connect directly with `ws://127.0.0.1:8080/ws` ([reverse proxy guide](deploy/CADDY-REVERSE-PROXY.md)). |
+| Admin commands not working | Client must use **`--admin`** and **`--admin-key`** matching the server’s `MARCHAT_ADMIN_KEY`; username must be listed in `MARCHAT_USERS`. |
+| Clipboard issues (Linux) | Install a clipboard tool (e.g. `sudo apt install xclip` or `xsel`). |
+| Port in use | Set `MARCHAT_PORT` (e.g. `8081`) in the environment or `config/.env` and restart the server. |
+| Database migration fails | Check file permissions; back up the database before upgrades; run the **same** server binary version that created the schema. |
+| PostgreSQL connection fails | Verify URL format: `postgres://user:pass@host:5432/db?sslmode=disable`; test with `psql` using the same credentials. |
+| MySQL connection fails | Verify DSN prefix `mysql:` and body `user:pass@tcp(host:3306)/db?parseTime=true`; test with the `mysql` CLI. |
+| SQL syntax error after backend switch | Ensure tables were created by the current server version and restart after changing `MARCHAT_DB_PATH`. |
+| Message history looks incomplete | History depends on **channel**, **per-user message state**, and server filters. **Ban/unban** and related flows can reset stored state so scrollback differs from the raw DB. |
+| Ban history gaps not working | Set `MARCHAT_BAN_HISTORY_GAPS=true` (default off). The server creates the **`ban_history`** table when using a database backend that runs marchat migrations. |
+| TLS certificate errors | For dev/self-signed certs, pass **`--skip-tls-verify`** on the client (or enable **Skip TLS verify** in the profile / interactive setup). |
+| Plugin installation fails | Check registry URL (`MARCHAT_PLUGIN_REGISTRY_URL`), network access, and JSON validity; commercial plugins need a valid license for the **plugin name** (see **PLUGIN_ECOSYSTEM.md**). |
+| E2E encryption errors | Use **`--e2e`** and the keystore passphrase; see **[E2E Encryption](#e2e-encryption)** (keystore path, `MARCHAT_GLOBAL_E2E_KEY` vs file). Client and server must share the same global key material. |
+| Global E2E key errors | Key must be **base64** encoding **32 raw bytes** (`openssl rand -base64 32`). **`MARCHAT_GLOBAL_E2E_KEY`** overrides the in-memory key for that process and is **not** written to the keystore file. |
+| `:savefile` picks the wrong payload when names collide | Received files are stored per sender internally, but `:savefile <name>` matches **basename only**. If two users sent the same filename, which copy is saved is **not deterministic**—ask for distinct names or avoid duplicate basenames until disambiguation is exposed in the UI. |
+| Send file / nothing happens | Check the footer (**Connected** vs **Disconnected**). If disconnected, `:sendfile` should report **Not connected to server**; reconnect, then retry (including **Alt+F** after a connection is up). |
+| Username already taken | A live or **stale** session may still hold the name. Admin: **`:forcedisconnect <user>`**. Otherwise the server’s **~5 minute** WebSocket ping sweep removes broken clients (or run **`:cleanup`**). |
+| Stale / ghost sessions | Same as above: wait for the ping sweep, run `:cleanup`, or `:forcedisconnect`. |
+| Multi-line input not working | Use **Alt+Enter** or **Ctrl+J** in the input (plain **Enter** sends). **Shift+Enter** is unreliable on many Windows terminals. |
+| Doctor / CI noise | For automated checks, use `-doctor-json`. Secret values are redacted to length only (no suffix). |
 
 ### Stale Connection Management
 
-**Automatic:** Server detects and removes stale connections every 5 minutes using WebSocket ping.
+**Automatic:** The hub runs **`CleanupStaleConnections`** about every **5 minutes**: it sends a WebSocket **ping** per client; failures remove the client and free the username.
 
-**Manual (Admin):**
-```bash
-:cleanup                    # Clean all stale connections
-:forcedisconnect username   # Force disconnect specific user
+**Manual (admin, from the client):**
+
+```text
+:cleanup                    # Run stale check now for all clients
+:forcedisconnect <user>     # Drop a specific connected user
 ```
 
-**Common scenarios:**
-- Client crash/Ctrl+C: Auto-cleaned within 5 minutes
-- Network interruption: Removed on next cleanup cycle
-- Immediate reconnect: Admin uses `:forcedisconnect`
+**Typical cases:**
+- Abrupt client exit: may linger until the next ping sweep or `:cleanup`.
+- Half-open TCP: same; `:forcedisconnect` clears it immediately if the server still lists the user.
+- Immediate reclaim of a name: use `:forcedisconnect` (do not rely on the sweep if you need instant reuse).
 
 ## Testing
 
