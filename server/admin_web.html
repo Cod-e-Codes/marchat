@@ -3,651 +3,837 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marchat Admin Panel</title>
+    <title>Marchat Admin</title>
     <style>
         :root {
-            --primary-color: #7D56F4;
-            --secondary-color: #FF75B7;
-            --success-color: #00FFA3;
-            --warning-color: #FFA500;
-            --error-color: #FF4444;
-            --accent-color: #FFD700;
-            --bg-dark: #1a1a1a;
-            --bg-darker: #0d0d0d;
-            --text-light: #ffffff;
-            --text-muted: #888;
-            --border-color: #333;
+            --bg-body: #0c0e14;
+            --bg-sidebar: #11131c;
+            --bg-card: #161923;
+            --bg-card-hover: #1c1f2e;
+            --bg-input: #1c1f2e;
+            --bg-table-header: #1a1d2a;
+            --bg-table-row-hover: rgba(99, 102, 241, 0.06);
+            --bg-badge: rgba(99, 102, 241, 0.12);
+
+            --border: #252839;
+            --border-light: #2d3148;
+
+            --primary: #6366f1;
+            --primary-hover: #818cf8;
+            --primary-muted: rgba(99, 102, 241, 0.15);
+
+            --success: #22c55e;
+            --success-muted: rgba(34, 197, 94, 0.12);
+
+            --warning: #f59e0b;
+            --warning-muted: rgba(245, 158, 11, 0.12);
+
+            --danger: #ef4444;
+            --danger-muted: rgba(239, 68, 68, 0.12);
+
+            --text: #e2e8f0;
+            --text-secondary: #94a3b8;
+            --text-tertiary: #64748b;
+
+            --radius: 10px;
+            --radius-sm: 6px;
+            --radius-lg: 14px;
+
+            --sidebar-w: 240px;
+            --topbar-h: 64px;
         }
-        
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
-            color: var(--text-light);
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sans-serif;
+            background: var(--bg-body);
+            color: var(--text);
+            line-height: 1.5;
+            -webkit-font-smoothing: antialiased;
         }
-        
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        
-        .header {
-            text-align: center;
-            margin-bottom: 30px;
-            padding: 20px;
-            background: rgba(125, 86, 244, 0.1);
-            border-radius: 12px;
-            border: 1px solid var(--primary-color);
-        }
-        
-        .header h1 {
-            color: var(--primary-color);
-            font-size: 2.5rem;
-            margin-bottom: 10px;
-            text-shadow: 0 0 20px rgba(125, 86, 244, 0.5);
-        }
-        
-        .header .subtitle {
-            color: var(--secondary-color);
-            font-style: italic;
-        }
-        
-        .tabs {
-            display: flex;
-            justify-content: center;
-            margin-bottom: 30px;
-            background: var(--bg-darker);
-            border-radius: 8px;
-            padding: 4px;
-            border: 1px solid var(--border-color);
-        }
-        
-        .tab {
-            padding: 12px 24px;
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.3s ease;
-            font-size: 14px;
-            font-weight: 500;
-        }
-        
-        .tab:hover {
-            color: var(--primary-color);
-            background: rgba(125, 86, 244, 0.1);
-        }
-        
-        .tab.active {
-            color: var(--primary-color);
-            background: rgba(125, 86, 244, 0.2);
-            font-weight: 700;
-        }
-        
-        .content {
-            display: none;
-            animation: fadeIn 0.3s ease-in-out;
-        }
-        
-        .content.active {
-            display: block;
-        }
-        
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        /* Login Page Styles */
+
+        /* ── Login ────────────────────────────────────── */
         .login-container {
             display: flex;
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+            background: var(--bg-body);
         }
-        
+
         .login-box {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 16px;
-            padding: 40px;
-            border: 1px solid var(--border-color);
-            backdrop-filter: blur(10px);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
             width: 100%;
-            max-width: 400px;
+            max-width: 380px;
+            padding: 40px 32px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
         }
-        
-        .login-header {
-            text-align: center;
-            margin-bottom: 30px;
-        }
-        
+
+        .login-header { text-align: center; margin-bottom: 32px; }
+
         .login-header h1 {
-            color: var(--primary-color);
-            margin-bottom: 8px;
-            font-size: 2rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
         }
-        
-        .login-header p {
-            color: var(--text-muted);
-            font-size: 1rem;
-        }
-        
-        .login-form {
-            display: flex;
-            flex-direction: column;
-            gap: 20px;
-        }
-        
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-        
+
+        .login-header p { color: var(--text-secondary); font-size: 0.875rem; }
+
+        .login-form { display: flex; flex-direction: column; gap: 20px; }
+
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+
         .form-group label {
-            color: var(--text-light);
+            font-size: 0.8125rem;
             font-weight: 500;
+            color: var(--text-secondary);
         }
-        
+
         .form-group input {
-            padding: 12px 16px;
-            border: 1px solid var(--border-color);
-            border-radius: 8px;
-            background: rgba(255, 255, 255, 0.05);
-            color: var(--text-light);
-            font-size: 1rem;
-            transition: border-color 0.3s ease;
+            padding: 10px 14px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 0.875rem;
+            transition: border-color 0.15s;
         }
-        
+
         .form-group input:focus {
             outline: none;
-            border-color: var(--primary-color);
-            box-shadow: 0 0 0 2px rgba(125, 86, 244, 0.2);
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px var(--primary-muted);
         }
-        
+
         .login-btn {
-            padding: 12px 24px;
-            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
-            color: white;
+            padding: 10px 20px;
+            background: var(--primary);
+            color: #fff;
             border: none;
-            border-radius: 8px;
-            font-size: 1rem;
+            border-radius: var(--radius-sm);
+            font-size: 0.875rem;
             font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            transition: background 0.15s;
         }
-        
-        .login-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 16px rgba(125, 86, 244, 0.4);
-        }
-        
-        .login-btn:active {
-            transform: translateY(0);
-        }
-        
+
+        .login-btn:hover { background: var(--primary-hover); }
+
         .error-message {
-            color: var(--error-color);
+            color: var(--danger);
             text-align: center;
-            padding: 8px;
-            background: rgba(255, 68, 68, 0.1);
-            border: 1px solid var(--error-color);
-            border-radius: 6px;
-            font-size: 0.9rem;
+            padding: 10px 14px;
+            background: var(--danger-muted);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            border-radius: var(--radius-sm);
+            font-size: 0.8125rem;
         }
-        
-        .logout-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            padding: 8px 16px;
-            background: rgba(255, 68, 68, 0.2);
-            color: var(--error-color);
-            border: 1px solid var(--error-color);
-            border-radius: 6px;
+
+        /* ── Layout ───────────────────────────────────── */
+        .admin-layout {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* ── Sidebar ──────────────────────────────────── */
+        .sidebar {
+            width: var(--sidebar-w);
+            background: var(--bg-sidebar);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            z-index: 40;
+            transition: transform 0.25s ease;
+        }
+
+        .sidebar-brand {
+            height: var(--topbar-h);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            border-bottom: 1px solid var(--border);
+            font-weight: 700;
+            font-size: 1.125rem;
+            letter-spacing: -0.02em;
+            color: var(--text);
+            gap: 10px;
+        }
+
+        .sidebar-brand svg { flex-shrink: 0; }
+
+        .sidebar-nav {
+            flex: 1;
+            padding: 12px 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 14px;
+            border-radius: var(--radius-sm);
+            color: var(--text-secondary);
+            font-size: 0.8125rem;
+            font-weight: 500;
             cursor: pointer;
-            font-size: 0.9rem;
-            transition: background-color 0.3s ease;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            transition: background 0.12s, color 0.12s;
         }
-        
+
+        .nav-item:hover {
+            background: var(--primary-muted);
+            color: var(--text);
+        }
+
+        .nav-item.active {
+            background: var(--primary-muted);
+            color: var(--primary-hover);
+        }
+
+        .nav-item svg {
+            width: 18px;
+            height: 18px;
+            flex-shrink: 0;
+            opacity: 0.7;
+        }
+
+        .nav-item.active svg { opacity: 1; }
+
+        .sidebar-footer {
+            padding: 12px 10px;
+            border-top: 1px solid var(--border);
+        }
+
+        .logout-btn {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            padding: 9px 14px;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: none;
+            color: var(--text-tertiary);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.12s, color 0.12s;
+        }
+
         .logout-btn:hover {
-            background: rgba(255, 68, 68, 0.3);
+            background: var(--danger-muted);
+            color: var(--danger);
         }
-        
+
+        /* ── Main area ────────────────────────────────── */
+        .main-area {
+            margin-left: var(--sidebar-w);
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        .topbar {
+            height: var(--topbar-h);
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 28px;
+            position: sticky;
+            top: 0;
+            background: rgba(12, 14, 20, 0.85);
+            backdrop-filter: blur(12px);
+            z-index: 30;
+        }
+
+        .topbar-title {
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+        }
+
+        .topbar-actions { display: flex; gap: 8px; align-items: center; }
+
+        .content-area {
+            flex: 1;
+            padding: 24px 28px 40px;
+        }
+
+        .content { display: none; animation: fadeUp 0.2s ease; }
+        .content.active { display: block; }
+
+        @keyframes fadeUp {
+            from { opacity: 0; transform: translateY(6px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ── Cards ────────────────────────────────────── */
         .card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             padding: 24px;
             margin-bottom: 20px;
-            border: 1px solid var(--border-color);
-            backdrop-filter: blur(10px);
         }
-        
-        .card h3 {
-            color: var(--accent-color);
-            margin-bottom: 16px;
-            font-size: 1.4rem;
+
+        .card-title {
+            font-size: 0.9375rem;
+            font-weight: 600;
+            margin-bottom: 18px;
+            color: var(--text);
         }
-        
+
+        /* ── Stats grid ───────────────────────────────── */
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 12px;
         }
-        
+
         .stat-item {
-            background: rgba(125, 86, 244, 0.1);
-            padding: 16px;
-            border-radius: 8px;
-            border: 1px solid var(--primary-color);
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px 18px;
         }
-        
+
         .stat-label {
-            color: var(--text-muted);
-            font-size: 0.9rem;
-            margin-bottom: 4px;
+            font-size: 0.75rem;
+            font-weight: 500;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
         }
-        
+
         .stat-value {
-            color: var(--text-light);
-            font-size: 1.5rem;
-            font-weight: bold;
+            font-size: 1.375rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            color: var(--text);
         }
-        
-        .table-container {
+
+        /* ── Tables ───────────────────────────────────── */
+        .table-wrap {
             overflow-x: auto;
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
         }
-        
+
         table {
             width: 100%;
             border-collapse: collapse;
-            background: rgba(255, 255, 255, 0.02);
         }
-        
+
         th, td {
-            padding: 12px 16px;
+            padding: 10px 16px;
             text-align: left;
-            border-bottom: 1px solid var(--border-color);
+            font-size: 0.8125rem;
+            white-space: nowrap;
         }
-        
+
         th {
-            background: rgba(125, 86, 244, 0.1);
-            color: var(--accent-color);
+            background: var(--bg-table-header);
+            color: var(--text-tertiary);
             font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.6875rem;
+            letter-spacing: 0.05em;
+            border-bottom: 1px solid var(--border);
             position: sticky;
             top: 0;
         }
-        
-        tr:hover {
-            background: rgba(255, 255, 255, 0.05);
+
+        td { border-bottom: 1px solid var(--border); }
+
+        tr:last-child td { border-bottom: none; }
+
+        tr:hover td { background: var(--bg-table-row-hover); }
+
+        /* ── Badges / status ──────────────────────────── */
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 100px;
+            font-size: 0.6875rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
         }
-        
-        .status-online {
-            color: var(--success-color);
-            font-weight: bold;
+
+        .badge::before {
+            content: '';
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
         }
-        
-        .status-offline {
-            color: var(--text-muted);
-        }
-        
-        .status-banned {
-            color: var(--error-color);
-            font-weight: bold;
-        }
-        
-        .status-kicked {
-            color: var(--warning-color);
-            font-weight: bold;
-        }
-        
+
+        .badge-online { background: var(--success-muted); color: var(--success); }
+        .badge-online::before { background: var(--success); }
+
+        .badge-offline { background: rgba(100, 116, 139, 0.12); color: var(--text-tertiary); }
+        .badge-offline::before { background: var(--text-tertiary); }
+
+        .badge-banned { background: var(--danger-muted); color: var(--danger); }
+        .badge-banned::before { background: var(--danger); }
+
+        .badge-kicked { background: var(--warning-muted); color: var(--warning); }
+        .badge-kicked::before { background: var(--warning); }
+
+        .status-online { color: var(--success); }
+        .status-offline { color: var(--text-tertiary); }
+        .status-banned { color: var(--danger); font-weight: 600; }
+        .status-kicked { color: var(--warning); font-weight: 600; }
+
+        /* ── Buttons ──────────────────────────────────── */
         .btn {
-            padding: 8px 16px;
-            border: none;
-            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 14px;
+            border: 1px solid transparent;
+            border-radius: var(--radius-sm);
+            font-size: 0.75rem;
+            font-weight: 500;
             cursor: pointer;
-            font-size: 12px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            margin: 2px;
+            transition: background 0.12s, border-color 0.12s, color 0.12s;
+            white-space: nowrap;
         }
-        
-        .btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-        }
-        
+
         .btn-primary {
-            background: var(--primary-color);
-            color: white;
+            background: var(--primary);
+            color: #fff;
         }
-        
+        .btn-primary:hover { background: var(--primary-hover); }
+
         .btn-success {
-            background: var(--success-color);
-            color: var(--bg-dark);
+            background: var(--success-muted);
+            color: var(--success);
+            border-color: rgba(34, 197, 94, 0.2);
         }
-        
+        .btn-success:hover { background: rgba(34, 197, 94, 0.2); }
+
         .btn-warning {
-            background: var(--warning-color);
-            color: var(--bg-dark);
+            background: var(--warning-muted);
+            color: var(--warning);
+            border-color: rgba(245, 158, 11, 0.2);
         }
-        
+        .btn-warning:hover { background: rgba(245, 158, 11, 0.2); }
+
         .btn-danger {
-            background: var(--error-color);
-            color: white;
+            background: var(--danger-muted);
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.2);
         }
-        
-        .btn-secondary {
-            background: var(--text-muted);
-            color: white;
+        .btn-danger:hover { background: rgba(239, 68, 68, 0.2); }
+
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border-color: var(--border);
         }
-        
-        .log-entry {
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            font-family: monospace;
-            font-size: 0.9rem;
+        .btn-ghost:hover {
+            background: var(--bg-card-hover);
+            color: var(--text);
         }
-        
-        .log-entry:last-child {
-            border-bottom: none;
+
+        .btn-group { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+
+        .btn-icon {
+            padding: 7px 10px;
         }
-        
-        .log-level-error {
-            color: var(--error-color);
-        }
-        
-        .log-level-warn {
-            color: var(--warning-color);
-        }
-        
-        .log-level-info {
-            color: var(--success-color);
-        }
-        
-        .message {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 12px 20px;
-            border-radius: 6px;
-            color: white;
-            font-weight: 500;
-            z-index: 1000;
-            transform: translateX(400px);
+
+        .refresh-icon {
             transition: transform 0.3s ease;
         }
-        
-        .message.show {
-            transform: translateX(0);
+        .spinning .refresh-icon {
+            animation: spin 0.8s linear infinite;
         }
-        
-        .message-success {
-            background: var(--success-color);
-            color: var(--bg-dark);
-        }
-        
-        .message-error {
-            background: var(--error-color);
-        }
-        
-        .message-info {
-            background: var(--primary-color);
-        }
-        
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: var(--text-muted);
-        }
-        
-        .spinner {
-            border: 3px solid var(--border-color);
-            border-top: 3px solid var(--primary-color);
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 16px;
-        }
-        
+
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
         }
-        
-        .chart-container {
-            height: 200px;
-            margin: 16px 0;
-            background: rgba(255,255,255,0.02);
-            border-radius: 8px;
-            padding: 16px;
-            border: 1px solid var(--border-color);
-        }
-        
-        .metric-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 16px;
-        }
-        
-        .metric-summary {
-            margin-bottom: 12px;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .metric-summary div {
-            margin: 4px 0;
-            font-size: 0.9rem;
-            color: #ccc;
-        }
-        
-        .metric-chart {
-            background: rgba(0,0,0,0.2);
-            border-radius: 6px;
-            overflow: hidden;
-        }
-        
-        .metric-header {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 12px;
-            background: rgba(255,255,255,0.05);
-            font-size: 0.8rem;
-            font-weight: 600;
-            color: #aaa;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-        }
-        
-        .metric-data {
-            max-height: 200px;
-            overflow-y: auto;
-            padding: 4px 0;
-        }
-        
-        .metric-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 6px 12px;
-            font-size: 0.85rem;
-            border-bottom: 1px solid rgba(255,255,255,0.05);
-        }
-        
-        .metric-row:last-child {
-            border-bottom: none;
-        }
-        
-        .metric-time {
-            color: #888;
-            font-family: 'Courier New', monospace;
-        }
-        
-        .metric-value {
-            color: #4CAF50;
-            font-weight: 500;
-        }
-        
-        .no-data {
-            padding: 20px;
-            text-align: center;
-            color: #666;
-            font-style: italic;
-        }
-        
+
+        /* ── Config sections ──────────────────────────── */
         .config-section {
-            margin-bottom: 24px;
-            padding: 16px;
-            background: rgba(255,255,255,0.02);
-            border-radius: 8px;
-            border: 1px solid var(--border-color);
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+            margin-bottom: 16px;
         }
-        
+
         .config-section h4 {
-            color: var(--secondary-color);
-            margin-bottom: 12px;
-            font-size: 1.1rem;
+            padding: 12px 18px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text);
+            background: var(--bg-table-header);
+            border-bottom: 1px solid var(--border);
         }
-        
+
         .config-item {
             display: flex;
             justify-content: space-between;
-            padding: 8px 0;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
+            align-items: center;
+            padding: 10px 18px;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.8125rem;
         }
-        
-        .config-item:last-child {
-            border-bottom: none;
-        }
-        
-        .config-label {
-            color: var(--text-muted);
-        }
-        
+
+        .config-item:last-child { border-bottom: none; }
+
+        .config-label { color: var(--text-secondary); }
+
         .config-value {
-            color: var(--text-light);
+            color: var(--text);
             font-weight: 500;
+            font-variant-numeric: tabular-nums;
         }
-        
+
+        /* ── Logs ─────────────────────────────────────── */
+        .log-entry {
+            display: flex;
+            gap: 12px;
+            padding: 8px 14px;
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.75rem;
+            line-height: 1.6;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .log-entry:last-child { border-bottom: none; }
+
+        .log-level {
+            font-weight: 600;
+            min-width: 50px;
+            text-transform: uppercase;
+        }
+
+        .log-level-error { color: var(--danger); }
+        .log-level-warn { color: var(--warning); }
+        .log-level-info { color: var(--success); }
+
+        .log-time { color: var(--text-tertiary); min-width: 80px; }
+        .log-comp { color: var(--primary-hover); min-width: 80px; }
+        .log-msg { color: var(--text-secondary); }
+
+        /* ── Plugins ──────────────────────────────────── */
         .plugin-item {
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            padding: 12px;
-            background: rgba(255,255,255,0.02);
-            border-radius: 6px;
+            gap: 16px;
+            padding: 14px 18px;
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
             margin-bottom: 8px;
-            border: 1px solid var(--border-color);
+            transition: border-color 0.12s;
         }
-        
-        .plugin-info {
-            flex-grow: 1;
-        }
-        
+
+        .plugin-item:hover { border-color: var(--border-light); }
+
+        .plugin-info { flex: 1; min-width: 0; }
+
         .plugin-name {
             font-weight: 600;
-            color: var(--text-light);
+            font-size: 0.875rem;
+            color: var(--text);
         }
-        
+
         .plugin-version {
-            font-size: 0.8rem;
-            color: var(--text-muted);
+            font-size: 0.75rem;
+            color: var(--text-tertiary);
         }
-        
-        .plugin-status {
-            margin: 0 16px;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            font-weight: 500;
+
+        .plugin-badge {
+            padding: 3px 10px;
+            border-radius: 100px;
+            font-size: 0.6875rem;
+            font-weight: 600;
         }
-        
-        .plugin-status.active {
-            background: var(--success-color);
-            color: var(--bg-dark);
+
+        .plugin-badge.active { background: var(--success-muted); color: var(--success); }
+        .plugin-badge.inactive { background: var(--warning-muted); color: var(--warning); }
+        .plugin-badge.available { background: var(--bg-badge); color: var(--primary-hover); }
+
+        .plugin-actions { display: flex; gap: 4px; flex-shrink: 0; }
+
+        /* ── Metrics ──────────────────────────────────── */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 16px;
         }
-        
-        .plugin-status.inactive {
-            background: var(--warning-color);
-            color: var(--bg-dark);
+
+        .metric-card {
+            background: var(--bg-input);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
         }
-        
-        .plugin-actions {
+
+        .metric-card-header {
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-card-title {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .metric-summary {
             display: flex;
-            gap: 4px;
+            gap: 18px;
         }
-        
-        .refresh-btn {
+
+        .metric-summary-item {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        .metric-summary-value {
+            font-weight: 700;
+            color: var(--text);
+            font-variant-numeric: tabular-nums;
+        }
+
+        .metric-table-header {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 18px;
+            background: var(--bg-table-header);
+            font-size: 0.6875rem;
+            font-weight: 600;
+            color: var(--text-tertiary);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-data {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 7px 18px;
+            font-size: 0.8125rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .metric-row:last-child { border-bottom: none; }
+
+        .metric-time {
+            color: var(--text-tertiary);
+            font-family: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+            font-size: 0.75rem;
+        }
+
+        .metric-value {
+            color: var(--success);
+            font-weight: 600;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .no-data {
+            padding: 24px;
+            text-align: center;
+            color: var(--text-tertiary);
+            font-size: 0.8125rem;
+        }
+
+        /* ── Toast ────────────────────────────────────── */
+        .toast {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 60px;
-            height: 60px;
+            bottom: 24px;
+            right: 24px;
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            font-size: 0.8125rem;
+            font-weight: 500;
+            z-index: 1000;
+            transform: translateY(100px);
+            opacity: 0;
+            transition: transform 0.25s ease, opacity 0.25s ease;
+            max-width: 420px;
+            border: 1px solid transparent;
+        }
+
+        .toast.show { transform: translateY(0); opacity: 1; }
+
+        .message-success {
+            background: var(--success-muted);
+            color: var(--success);
+            border-color: rgba(34, 197, 94, 0.2);
+        }
+
+        .message-error {
+            background: var(--danger-muted);
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.2);
+        }
+
+        .message-info {
+            background: var(--primary-muted);
+            color: var(--primary-hover);
+            border-color: rgba(99, 102, 241, 0.2);
+        }
+
+        /* ── Confirm modal ────────────────────────────── */
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(4px);
+            z-index: 100;
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-backdrop.open { display: flex; }
+
+        .modal {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            width: 100%;
+            max-width: 400px;
+            animation: fadeUp 0.2s ease;
+        }
+
+        .modal h3 {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .modal p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+
+        .modal-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+        /* ── Loading ──────────────────────────────────── */
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            gap: 12px;
+            color: var(--text-tertiary);
+            font-size: 0.8125rem;
+        }
+
+        .spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--primary);
             border-radius: 50%;
-            background: var(--primary-color);
-            border: none;
-            color: white;
-            font-size: 20px;
+            animation: spin 0.7s linear infinite;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: var(--text-tertiary);
+            font-size: 0.875rem;
+        }
+
+        /* ── Mobile toggle ────────────────────────────── */
+        .mobile-toggle {
+            display: none;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            background: var(--bg-card);
+            color: var(--text);
             cursor: pointer;
-            box-shadow: 0 4px 12px rgba(125, 86, 244, 0.3);
-            transition: all 0.3s ease;
-            z-index: 999;
         }
-        
-        .refresh-btn:hover {
-            transform: scale(1.1);
-            box-shadow: 0 6px 20px rgba(125, 86, 244, 0.4);
+
+        .sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 35;
         }
-        
-        .refresh-btn.spinning {
-            animation: spin 1s linear infinite;
-        }
-        
-        @media (max-width: 768px) {
-            .container {
-                padding: 10px;
+
+        /* ── Responsive ───────────────────────────────── */
+        @media (max-width: 800px) {
+            .sidebar {
+                transform: translateX(-100%);
             }
-            
-            .tabs {
-                flex-wrap: wrap;
-            }
-            
-            .tab {
-                flex: 1;
-                min-width: 100px;
-                padding: 8px 12px;
-                font-size: 12px;
-            }
-            
+
+            .sidebar.open { transform: translateX(0); }
+
+            .sidebar-overlay.open { display: block; }
+
+            .main-area { margin-left: 0; }
+
+            .mobile-toggle { display: flex; }
+
+            .content-area { padding: 16px; }
+
+            .topbar { padding: 0 16px; }
+
             .stats-grid {
-                grid-template-columns: 1fr;
+                grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
             }
-            
-            .metric-grid {
-                grid-template-columns: 1fr;
+
+            .metric-grid { grid-template-columns: 1fr; }
+
+            .config-item {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 2px;
             }
-            
-            table {
-                font-size: 0.8rem;
-            }
-            
-            th, td {
-                padding: 8px 12px;
-            }
+
+            table { font-size: 0.75rem; }
+            th, td { padding: 8px 12px; }
         }
+
+        /* ── Scrollbar ────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: var(--border-light); }
     </style>
 </head>
 <body>
@@ -655,204 +841,268 @@
     <div id="loginPage" class="login-container">
         <div class="login-box">
             <div class="login-header">
-                <h1>Marchat Admin Panel</h1>
+                <h1>marchat admin</h1>
                 <p>Enter admin key to continue</p>
             </div>
             <form id="loginForm" class="login-form">
                 <div class="form-group">
-                    <label for="adminKey">Admin Key:</label>
-                    <input type="password" id="adminKey" name="adminKey" required 
+                    <label for="adminKey">Admin Key</label>
+                    <input type="password" id="adminKey" name="adminKey" required
                            placeholder="Enter your admin key" autocomplete="off">
                 </div>
-                <button type="submit" class="login-btn">Login</button>
+                <button type="submit" class="login-btn">Sign in</button>
                 <div id="loginError" class="error-message" style="display: none;"></div>
             </form>
         </div>
     </div>
 
     <!-- Main Admin Panel -->
-    <div id="adminPanel" class="container" style="display: none;">
-        <div class="header">
-            <h1>Marchat Admin Panel</h1>
-            <div class="subtitle">Real-time server management and monitoring</div>
-            <button id="logoutBtn" class="logout-btn">Logout</button>
-        </div>
-        
-        <div class="tabs">
-            <button class="tab active" data-tab="overview">Overview</button>
-            <button class="tab" data-tab="users">Users</button>
-            <button class="tab" data-tab="system">System</button>
-            <button class="tab" data-tab="logs">Logs</button>
-            <button class="tab" data-tab="plugins">Plugins</button>
-            <button class="tab" data-tab="metrics">Metrics</button>
-        </div>
-        
-        <!-- Overview Tab -->
-        <div id="overview-content" class="content active">
-            <div class="card">
-                <h3>System Status</h3>
-                <div class="stats-grid" id="overview-stats">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading system data...
+    <div id="adminPanel" class="admin-layout" style="display: none;">
+
+        <!-- Sidebar overlay for mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-brand">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                marchat
+            </div>
+            <nav class="sidebar-nav">
+                <button class="nav-item tab active" data-tab="overview">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                    Overview
+                </button>
+                <button class="nav-item tab" data-tab="users">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    Users
+                </button>
+                <button class="nav-item tab" data-tab="system">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    System
+                </button>
+                <button class="nav-item tab" data-tab="logs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                    Logs
+                </button>
+                <button class="nav-item tab" data-tab="plugins">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="5"/><path d="M12 8v8"/><path d="M8 12h8"/></svg>
+                    Plugins
+                </button>
+                <button class="nav-item tab" data-tab="metrics">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                    Metrics
+                </button>
+            </nav>
+            <div class="sidebar-footer">
+                <button id="logoutBtn" class="logout-btn">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    Sign out
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main content -->
+        <div class="main-area">
+            <header class="topbar">
+                <div style="display:flex;align-items:center;gap:12px;">
+                    <button class="mobile-toggle" id="menuToggle">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <span class="topbar-title" id="pageTitle">Overview</span>
+                </div>
+                <div class="topbar-actions">
+                    <button class="btn btn-ghost btn-icon" onclick="refreshData()" id="refresh-btn" title="Refresh">
+                        <svg class="refresh-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-area">
+                <!-- Overview Tab -->
+                <div id="overview-content" class="content active">
+                    <div class="card">
+                        <div class="card-title">Server Status</div>
+                        <div class="stats-grid" id="overview-stats">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Configuration</div>
+                        <div id="overview-config">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-title">Database</div>
+                        <div id="overview-database">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="card">
-                <h3>Live Configuration</h3>
-                <div id="overview-config">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading configuration...
+
+                <!-- Users Tab -->
+                <div id="users-content" class="content">
+                    <div class="card">
+                        <div class="card-title">User Management</div>
+                        <div class="table-wrap">
+                            <table id="users-table">
+                                <thead>
+                                    <tr>
+                                        <th>Username</th>
+                                        <th>Status</th>
+                                        <th>IP Address</th>
+                                        <th>Messages</th>
+                                        <th>Admin</th>
+                                        <th>Last Seen</th>
+                                        <th>Connected</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td colspan="8"><div class="loading"><div class="spinner"></div>Loading users...</div></td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
-            </div>
-            
-            <div class="card">
-                <h3>Database Information</h3>
-                <div id="overview-database">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading database info...
+
+                <!-- System Tab -->
+                <div id="system-content" class="content">
+                    <div class="card">
+                        <div class="card-title">System Management</div>
+                        <div class="btn-group">
+                            <button class="btn btn-warning" onclick="confirmAction('Clear the message database? This cannot be undone.', () => performSystemAction('clear_db'))">Clear Database</button>
+                            <button class="btn btn-primary" onclick="performSystemAction('backup_db')">Backup Database</button>
+                            <button class="btn btn-ghost" onclick="performSystemAction('show_stats')">Show Stats</button>
+                            <button class="btn btn-success" onclick="performSystemAction('force_gc')">Force GC</button>
+                        </div>
+                        <div id="system-details">
+                            <div class="loading"><div class="spinner"></div>Loading...</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Users Tab -->
-        <div id="users-content" class="content">
-            <div class="card">
-                <h3>User Management</h3>
-                <div class="table-container">
-                    <table id="users-table">
-                        <thead>
-                            <tr>
-                                <th>Username</th>
-                                <th>Status</th>
-                                <th>IP Address</th>
-                                <th>Messages</th>
-                                <th>Admin</th>
-                                <th>Last Seen</th>
-                                <th>Connected</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td colspan="8">
-                                    <div class="loading">
-                                        <div class="spinner"></div>
-                                        Loading users...
-                                    </div>
-                                </td>
-                            </tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-        
-        <!-- System Tab -->
-        <div id="system-content" class="content">
-            <div class="card">
-                <h3>System Management</h3>
-                <div class="btn-group" style="margin-bottom: 20px;">
-                    <button class="btn btn-warning" onclick="performSystemAction('clear_db')">Clear Database</button>
-                    <button class="btn btn-primary" onclick="performSystemAction('backup_db')">Backup Database</button>
-                    <button class="btn btn-secondary" onclick="performSystemAction('show_stats')">Show Stats</button>
-                    <button class="btn btn-success" onclick="performSystemAction('force_gc')">Force GC</button>
-                </div>
-                <div id="system-details">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading system details...
+
+                <!-- Logs Tab -->
+                <div id="logs-content" class="content">
+                    <div class="card">
+                        <div class="card-title">System Logs</div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="exportLogs()">Export Logs</button>
+                        </div>
+                        <div id="logs-container" style="max-height: 500px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius);">
+                            <div class="loading"><div class="spinner"></div>Loading logs...</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Logs Tab -->
-        <div id="logs-content" class="content">
-            <div class="card">
-                <h3>System Logs</h3>
-                <div class="btn-group" style="margin-bottom: 20px;">
-                    <button class="btn btn-primary" onclick="exportLogs()">Export Logs</button>
-                </div>
-                <div id="logs-container" style="max-height: 500px; overflow-y: auto;">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading logs...
+
+                <!-- Plugins Tab -->
+                <div id="plugins-content" class="content">
+                    <div class="card">
+                        <div class="card-title">Plugin Management</div>
+                        <div class="btn-group">
+                            <button class="btn btn-primary" onclick="refreshPluginStore()">Refresh Store</button>
+                        </div>
+                        <div id="plugins-container">
+                            <div class="loading"><div class="spinner"></div>Loading plugins...</div>
+                        </div>
                     </div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Plugins Tab -->
-        <div id="plugins-content" class="content">
-            <div class="card">
-                <h3>Plugin Management</h3>
-                <div class="btn-group" style="margin-bottom: 20px;">
-                    <button class="btn btn-primary" onclick="refreshPluginStore()">Refresh Store</button>
-                </div>
-                <div id="plugins-container">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading plugins...
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Metrics Tab -->
-        <div id="metrics-content" class="content">
-            <div class="card">
-                <h3>Performance Metrics</h3>
-                <div class="btn-group" style="margin-bottom: 20px;">
-                    <button class="btn btn-warning" onclick="performMetricsAction('reset')">Reset Metrics</button>
-                    <button class="btn btn-primary" onclick="performMetricsAction('export_logs')">Export Logs</button>
-                </div>
-                <div id="metrics-data">
-                    <div class="loading">
-                        <div class="spinner"></div>
-                        Loading metrics...
+
+                <!-- Metrics Tab -->
+                <div id="metrics-content" class="content">
+                    <div class="card">
+                        <div class="card-title">Performance Metrics</div>
+                        <div class="btn-group">
+                            <button class="btn btn-warning" onclick="confirmAction('Reset all metrics data?', () => performMetricsAction('reset'))">Reset Metrics</button>
+                            <button class="btn btn-primary" onclick="performMetricsAction('export_logs')">Export Logs</button>
+                        </div>
+                        <div id="metrics-data">
+                            <div class="loading"><div class="spinner"></div>Loading metrics...</div>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    
-    <button class="refresh-btn" onclick="refreshData()" id="refresh-btn">Refresh</button>
-    
-    <div id="message" class="message"></div>
-    
+
+    <!-- Toast -->
+    <div id="message" class="toast"></div>
+
+    <!-- Confirm modal -->
+    <div class="modal-backdrop" id="confirmModal">
+        <div class="modal">
+            <h3 id="confirmTitle">Are you sure?</h3>
+            <p id="confirmMessage">This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn btn-ghost" onclick="closeConfirm()">Cancel</button>
+                <button class="btn btn-danger" id="confirmBtn" onclick="executeConfirm()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let adminKey = '';
         let refreshInterval;
         let currentTab = 'overview';
         let csrfToken = '';
-        
-        // Initialize the admin panel
+        let pendingConfirmAction = null;
+
+        const tabTitles = {
+            overview: 'Overview',
+            users: 'Users',
+            system: 'System',
+            logs: 'Logs',
+            plugins: 'Plugins',
+            metrics: 'Metrics'
+        };
+
         document.addEventListener('DOMContentLoaded', async function() {
-            // Check if user is already authenticated
             if (await checkAuth()) {
                 showAdminPanel();
             } else {
                 showLoginPage();
             }
-            
-            // Set up login form
+
             document.getElementById('loginForm').addEventListener('submit', handleLogin);
-            
-            // Set up logout button
             document.getElementById('logoutBtn').addEventListener('click', handleLogout);
-            
-            // Set up tab switching
+
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.addEventListener('click', () => switchTab(tab.dataset.tab));
             });
+
+            document.getElementById('menuToggle').addEventListener('click', toggleSidebar);
+            document.getElementById('sidebarOverlay').addEventListener('click', closeSidebar);
         });
-        
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarOverlay').classList.toggle('open');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarOverlay').classList.remove('open');
+        }
+
+        function confirmAction(message, action) {
+            document.getElementById('confirmMessage').textContent = message;
+            document.getElementById('confirmModal').classList.add('open');
+            pendingConfirmAction = action;
+        }
+
+        function closeConfirm() {
+            document.getElementById('confirmModal').classList.remove('open');
+            pendingConfirmAction = null;
+        }
+
+        function executeConfirm() {
+            if (pendingConfirmAction) {
+                pendingConfirmAction();
+            }
+            closeConfirm();
+        }
+
         async function checkAuth() {
             try {
                 const response = await fetch('/admin/api/check-session', {
@@ -862,46 +1112,35 @@
                 const result = await response.json();
                 return result.authenticated === true;
             } catch (error) {
-                console.error('Auth check failed:', error);
                 return false;
             }
         }
-        
+
         function showLoginPage() {
             document.getElementById('loginPage').style.display = 'flex';
             document.getElementById('adminPanel').style.display = 'none';
         }
-        
+
         async function showAdminPanel() {
             document.getElementById('loginPage').style.display = 'none';
-            document.getElementById('adminPanel').style.display = 'block';
-            
-            // Fetch CSRF token for state-changing operations
+            document.getElementById('adminPanel').style.display = 'flex';
             await fetchCSRFToken();
-            
-            // Initial data load
             refreshData();
-            
-            // Set up auto-refresh every 5 seconds
             refreshInterval = setInterval(refreshData, 5000);
         }
-        
+
         async function handleLogin(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
             const key = formData.get('adminKey');
-            
+
             try {
                 const response = await fetch('/admin/api/login', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
+                    headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ key: key })
                 });
-                
                 const result = await response.json();
-                
                 if (result.success) {
                     showAdminPanel();
                 } else {
@@ -911,19 +1150,19 @@
                 showLoginError('Login failed. Please try again.');
             }
         }
-        
+
         function handleLogout() {
-            // Clear session cookie
             document.cookie = 'admin_session=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+            if (refreshInterval) clearInterval(refreshInterval);
             showLoginPage();
         }
-        
+
         function showLoginError(message) {
             const errorEl = document.getElementById('loginError');
             errorEl.textContent = message;
             errorEl.style.display = 'block';
         }
-        
+
         async function fetchCSRFToken() {
             try {
                 const response = await fetch('/admin/api/csrf-token', {
@@ -938,42 +1177,38 @@
                 console.error('Failed to fetch CSRF token:', error);
             }
         }
-        
+
         function switchTab(tabName) {
             currentTab = tabName;
-            
-            // Update tab buttons
+            closeSidebar();
+
             document.querySelectorAll('.tab').forEach(tab => {
                 tab.classList.toggle('active', tab.dataset.tab === tabName);
             });
-            
-            // Update content
+
             document.querySelectorAll('.content').forEach(content => {
                 content.classList.toggle('active', content.id === tabName + '-content');
             });
-            
-            // Load data for the active tab
+
+            document.getElementById('pageTitle').textContent = tabTitles[tabName] || tabName;
             loadTabData(tabName);
         }
-        
+
         async function apiCall(endpoint, method = 'GET', data = null) {
             const options = {
                 method: method,
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                credentials: 'include' // Include cookies for session auth
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include'
             };
-            
-            // Add CSRF token for state-changing operations
+
             if ((method === 'POST' || method === 'PUT' || method === 'DELETE') && csrfToken) {
                 options.headers['X-CSRF-Token'] = csrfToken;
             }
-            
+
             if (data) {
                 options.body = JSON.stringify(data);
             }
-            
+
             try {
                 const response = await fetch('/admin/api/' + endpoint, options);
                 if (!response.ok) {
@@ -986,11 +1221,11 @@
                 throw error;
             }
         }
-        
+
         async function refreshData() {
             const refreshBtn = document.getElementById('refresh-btn');
             refreshBtn.classList.add('spinning');
-            
+
             try {
                 await loadTabData(currentTab);
                 await apiCall('refresh');
@@ -1000,45 +1235,32 @@
                 refreshBtn.classList.remove('spinning');
             }
         }
-        
+
         async function loadTabData(tabName) {
             switch (tabName) {
-                case 'overview':
-                    await loadOverview();
-                    break;
-                case 'users':
-                    await loadUsers();
-                    break;
-                case 'system':
-                    await loadSystem();
-                    break;
-                case 'logs':
-                    await loadLogs();
-                    break;
-                case 'plugins':
-                    await loadPlugins();
-                    break;
-                case 'metrics':
-                    await loadMetrics();
-                    break;
+                case 'overview': await loadOverview(); break;
+                case 'users':    await loadUsers();    break;
+                case 'system':   await loadSystem();   break;
+                case 'logs':     await loadLogs();     break;
+                case 'plugins':  await loadPlugins();  break;
+                case 'metrics':  await loadMetrics();  break;
             }
         }
-        
+
         async function loadOverview() {
             try {
                 const data = await apiCall('overview');
                 displayOverview(data);
             } catch (error) {
-                document.getElementById('overview-stats').innerHTML = '<div class="error">Failed to load overview data</div>';
+                document.getElementById('overview-stats').innerHTML = '<div class="empty-state">Failed to load overview data</div>';
             }
         }
-        
+
         function displayOverview(data) {
             const stats = data.system_stats;
             const config = data.config;
             const database = data.database;
-            
-            // System stats
+
             document.getElementById('overview-stats').innerHTML = `
                 <div class="stat-item">
                     <div class="stat-label">Status</div>
@@ -1073,182 +1295,138 @@
                     <div class="stat-value">${stats.goroutine_count}</div>
                 </div>
             `;
-            
-            // Configuration
+
             document.getElementById('overview-config').innerHTML = `
                 <div class="config-section">
                     <div class="config-item">
-                        <span class="config-label">Port:</span>
+                        <span class="config-label">Port</span>
                         <span class="config-value">${config.port}</span>
                     </div>
                     <div class="config-item">
-                        <span class="config-label">TLS:</span>
-                        <span class="config-value ${config.tls_enabled ? 'status-online' : 'status-offline'}">
-                            ${config.tls_enabled ? 'Enabled' : 'Disabled'}
-                        </span>
+                        <span class="config-label">TLS</span>
+                        <span class="config-value"><span class="badge ${config.tls_enabled ? 'badge-online' : 'badge-offline'}">${config.tls_enabled ? 'Enabled' : 'Disabled'}</span></span>
                     </div>
                     <div class="config-item">
-                        <span class="config-label">Max File Size:</span>
+                        <span class="config-label">Max File Size</span>
                         <span class="config-value">${config.max_file_size}</span>
                     </div>
                     <div class="config-item">
-                        <span class="config-label">Log Level:</span>
+                        <span class="config-label">Log Level</span>
                         <span class="config-value">${config.log_level}</span>
                     </div>
                     <div class="config-item">
-                        <span class="config-label">Ban History Gaps:</span>
+                        <span class="config-label">Ban History Gaps</span>
                         <span class="config-value">${config.ban_history_gaps}</span>
                     </div>
                     <div class="config-item">
-                        <span class="config-label">Admin Users:</span>
+                        <span class="config-label">Admin Users</span>
                         <span class="config-value">${config.admin_count}</span>
                     </div>
                 </div>
             `;
-            
-            // Database
+
             document.getElementById('overview-database').innerHTML = `
                 <div class="config-section">
                     <div class="config-item">
-                        <span class="config-label">Database Path:</span>
+                        <span class="config-label">Database Path</span>
                         <span class="config-value">${database.path}</span>
                     </div>
                     <div class="config-item">
-                        <span class="config-label">Config Directory:</span>
+                        <span class="config-label">Config Directory</span>
                         <span class="config-value">${database.config_dir}</span>
                     </div>
                 </div>
             `;
         }
-        
+
         async function loadUsers() {
             try {
                 const users = await apiCall('users');
                 displayUsers(users);
             } catch (error) {
-                document.querySelector('#users-table tbody').innerHTML = '<tr><td colspan="8">Failed to load users</td></tr>';
+                document.querySelector('#users-table tbody').innerHTML = '<tr><td colspan="8"><div class="empty-state">Failed to load users</div></td></tr>';
             }
         }
-        
+
+        function statusBadge(status) {
+            const s = status.toLowerCase();
+            return `<span class="badge badge-${s}">${status}</span>`;
+        }
+
         function displayUsers(users) {
             const tbody = document.querySelector('#users-table tbody');
-            
+
             if (users.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8">No users found</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8"><div class="empty-state">No users found</div></td></tr>';
                 return;
             }
-            
+
             tbody.innerHTML = users.map(user => `
                 <tr>
-                    <td>${user.username}</td>
-                    <td><span class="status-${user.status.toLowerCase()}">${user.status}</span></td>
-                    <td>${user.ip}</td>
+                    <td><strong>${user.username}</strong></td>
+                    <td>${statusBadge(user.status)}</td>
+                    <td style="font-variant-numeric:tabular-nums">${user.ip}</td>
                     <td>${user.messages}</td>
-                    <td>${user.is_admin ? 'Yes' : 'No'}</td>
-                    <td>${user.last_seen ? new Date(user.last_seen).toLocaleString() : 'N/A'}</td>
-                    <td>${user.connected_at && user.status === 'Online' ? new Date(user.connected_at).toLocaleString() : 'N/A'}</td>
+                    <td>${user.is_admin ? '<span class="badge badge-online">Admin</span>' : '<span style="color:var(--text-tertiary)">No</span>'}</td>
+                    <td>${user.last_seen ? new Date(user.last_seen).toLocaleString() : '<span style="color:var(--text-tertiary)">N/A</span>'}</td>
+                    <td>${user.connected_at && user.status === 'Online' ? new Date(user.connected_at).toLocaleString() : '<span style="color:var(--text-tertiary)">N/A</span>'}</td>
                     <td>
-                        ${!user.is_banned ? 
-                            `<button class="btn btn-danger" onclick="performUserAction('ban', '${user.username}')">Ban</button>` :
-                            `<button class="btn btn-success" onclick="performUserAction('unban', '${user.username}')">Unban</button>`
-                        }
-                        ${!user.is_kicked ?
-                            `<button class="btn btn-warning" onclick="performUserAction('kick', '${user.username}')">Kick</button>` :
-                            `<button class="btn btn-success" onclick="performUserAction('allow', '${user.username}')">Allow</button>`
-                        }
+                        <div style="display:flex;gap:4px">
+                            ${!user.is_banned ?
+                                `<button class="btn btn-danger" onclick="confirmAction('Ban user ${user.username}?', () => performUserAction('ban', '${user.username}'))">Ban</button>` :
+                                `<button class="btn btn-success" onclick="performUserAction('unban', '${user.username}')">Unban</button>`
+                            }
+                            ${!user.is_kicked ?
+                                `<button class="btn btn-warning" onclick="confirmAction('Kick user ${user.username} for 24h?', () => performUserAction('kick', '${user.username}'))">Kick</button>` :
+                                `<button class="btn btn-success" onclick="performUserAction('allow', '${user.username}')">Allow</button>`
+                            }
+                        </div>
                     </td>
                 </tr>
             `).join('');
         }
-        
+
         async function loadSystem() {
             try {
                 const data = await apiCall('system');
                 displaySystem(data);
             } catch (error) {
-                document.getElementById('system-details').innerHTML = '<div class="error">Failed to load system data</div>';
+                document.getElementById('system-details').innerHTML = '<div class="empty-state">Failed to load system data</div>';
             }
         }
-        
+
         function displaySystem(data) {
             const stats = data.stats;
             const config = data.config;
-            
+
             document.getElementById('system-details').innerHTML = `
                 <div class="config-section">
                     <h4>Live Configuration</h4>
+                    <div class="config-item"><span class="config-label">Server Port</span><span class="config-value">${config.port}</span></div>
+                    <div class="config-item"><span class="config-label">Database</span><span class="config-value">${config.database}</span></div>
+                    <div class="config-item"><span class="config-label">Config Directory</span><span class="config-value">${config.config_dir}</span></div>
+                    <div class="config-item"><span class="config-label">Log Level</span><span class="config-value">${config.log_level}</span></div>
+                    <div class="config-item"><span class="config-label">Max File Size</span><span class="config-value">${config.max_file_size}</span></div>
+                    <div class="config-item"><span class="config-label">Admin Users</span><span class="config-value">${config.admin_users}</span></div>
                     <div class="config-item">
-                        <span class="config-label">Server Port:</span>
-                        <span class="config-value">${config.port}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Database:</span>
-                        <span class="config-value">${config.database}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Config Directory:</span>
-                        <span class="config-value">${config.config_dir}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Log Level:</span>
-                        <span class="config-value">${config.log_level}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Max File Size:</span>
-                        <span class="config-value">${config.max_file_size}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Admin Users:</span>
-                        <span class="config-value">${config.admin_users}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">TLS Status:</span>
-                        <span class="config-value ${config.tls_enabled ? 'status-online' : 'status-offline'}">
-                            ${config.tls_enabled ? 'Enabled' : 'Disabled'}
-                        </span>
+                        <span class="config-label">TLS Status</span>
+                        <span class="config-value"><span class="badge ${config.tls_enabled ? 'badge-online' : 'badge-offline'}">${config.tls_enabled ? 'Enabled' : 'Disabled'}</span></span>
                     </div>
                     ${config.tls_enabled ? `
-                    <div class="config-item">
-                        <span class="config-label">TLS Cert File:</span>
-                        <span class="config-value">${config.tls_cert_file}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">TLS Key File:</span>
-                        <span class="config-value">${config.tls_key_file}</span>
-                    </div>
+                    <div class="config-item"><span class="config-label">TLS Cert File</span><span class="config-value">${config.tls_cert_file}</span></div>
+                    <div class="config-item"><span class="config-label">TLS Key File</span><span class="config-value">${config.tls_key_file}</span></div>
                     ` : ''}
-                    <div class="config-item">
-                        <span class="config-label">Session Secret:</span>
-                        <span class="config-value">${config.session_secret}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Admin Key:</span>
-                        <span class="config-value">${config.admin_key}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Ban History Gaps:</span>
-                        <span class="config-value">${config.ban_history_gaps}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Plugin Registry:</span>
-                        <span class="config-value">${config.plugin_registry}</span>
-                    </div>
+                    <div class="config-item"><span class="config-label">Session Secret</span><span class="config-value">${config.session_secret}</span></div>
+                    <div class="config-item"><span class="config-label">Admin Key</span><span class="config-value">${config.admin_key}</span></div>
+                    <div class="config-item"><span class="config-label">Ban History Gaps</span><span class="config-value">${config.ban_history_gaps}</span></div>
+                    <div class="config-item"><span class="config-label">Plugin Registry</span><span class="config-value">${config.plugin_registry}</span></div>
                 </div>
-                
+
                 <div class="config-section">
                     <h4>Database Statistics</h4>
-                    <div class="config-item">
-                        <span class="config-label">Total Messages:</span>
-                        <span class="config-value">${stats.messages_sent}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Total Users:</span>
-                        <span class="config-value">${stats.total_users}</span>
-                    </div>
-                    <div class="config-item">
-                        <span class="config-label">Active Connections:</span>
-                        <span class="config-value">${stats.active_users}</span>
-                    </div>
+                    <div class="config-item"><span class="config-label">Total Messages</span><span class="config-value">${stats.messages_sent}</span></div>
+                    <div class="config-item"><span class="config-label">Total Users</span><span class="config-value">${stats.total_users}</span></div>
+                    <div class="config-item"><span class="config-label">Active Connections</span><span class="config-value">${stats.active_users}</span></div>
                 </div>
             `;
         }
@@ -1289,19 +1467,21 @@
                 const logs = await apiCall('logs');
                 displayLogs(logs);
             } catch (error) {
-                document.getElementById('logs-container').innerHTML = '<div class="error">Failed to load logs</div>';
+                document.getElementById('logs-container').innerHTML = '<div class="empty-state">Failed to load logs</div>';
             }
         }
 
         function displayLogs(logs) {
             if (!logs || logs.length === 0) {
-                document.getElementById('logs-container').innerHTML = '<div>No logs available</div>';
+                document.getElementById('logs-container').innerHTML = '<div class="empty-state">No logs available</div>';
                 return;
             }
             const html = logs.map(l => `
                 <div class="log-entry">
-                    <span class="log-level-${l.level.toLowerCase()}">[${l.level}]</span>
-                    ${new Date(l.timestamp).toLocaleTimeString()} ${l.component}: ${l.message}
+                    <span class="log-level log-level-${l.level.toLowerCase()}">${l.level}</span>
+                    <span class="log-time">${new Date(l.timestamp).toLocaleTimeString()}</span>
+                    <span class="log-comp">${l.component}</span>
+                    <span class="log-msg">${l.message}</span>
                 </div>
             `).join('');
             document.getElementById('logs-container').innerHTML = html;
@@ -1312,30 +1492,33 @@
                 const plugins = await apiCall('plugins');
                 displayPlugins(plugins);
             } catch (error) {
-                document.getElementById('plugins-container').innerHTML = '<div class="error">Failed to load plugins</div>';
+                document.getElementById('plugins-container').innerHTML = '<div class="empty-state">Failed to load plugins</div>';
             }
         }
 
         function displayPlugins(plugins) {
             if (!plugins || plugins.length === 0) {
-                document.getElementById('plugins-container').innerHTML = '<div>No plugins found</div>';
+                document.getElementById('plugins-container').innerHTML = '<div class="empty-state">No plugins found</div>';
                 return;
             }
-            const html = plugins.map(p => `
+            const html = plugins.map(p => {
+                const statusLower = p.status.toLowerCase();
+                const badgeClass = statusLower === 'active' ? 'active' : (statusLower === 'inactive' ? 'inactive' : 'available');
+                return `
                 <div class="plugin-item">
                     <div class="plugin-info">
                         <div class="plugin-name">${p.name}</div>
                         <div class="plugin-version">v${p.version}</div>
                     </div>
-                    <div class="plugin-status ${p.status.toLowerCase() === 'active' ? 'active' : 'inactive'}">${p.status}</div>
+                    <span class="plugin-badge ${badgeClass}">${p.status}</span>
                     <div class="plugin-actions">
                         <button class="btn btn-success" onclick="pluginAction('enable','${p.name}')">Enable</button>
                         <button class="btn btn-warning" onclick="pluginAction('disable','${p.name}')">Disable</button>
                         <button class="btn btn-primary" onclick="pluginAction('install','${p.name}')">Install</button>
-                        <button class="btn btn-danger" onclick="pluginAction('uninstall','${p.name}')">Uninstall</button>
+                        <button class="btn btn-danger" onclick="confirmAction('Uninstall plugin ${p.name}?', () => pluginAction('uninstall','${p.name}'))">Uninstall</button>
                     </div>
-                </div>
-            `).join('');
+                </div>`;
+            }).join('');
             document.getElementById('plugins-container').innerHTML = html;
         }
 
@@ -1362,7 +1545,7 @@
                 const data = await apiCall('metrics');
                 displayMetrics(data);
             } catch (error) {
-                document.getElementById('metrics-data').innerHTML = '<div class="error">Failed to load metrics</div>';
+                document.getElementById('metrics-data').innerHTML = '<div class="empty-state">Failed to load metrics</div>';
             }
         }
 
@@ -1380,65 +1563,51 @@
                 const time = p.time ? new Date(p.time).toLocaleTimeString() : 'N/A';
                 return `<div class="metric-row"><span class="metric-time">${time}</span><span class="metric-value">${p.count || 0}</span></div>`;
             }).join('');
-            const html = `
+
+            document.getElementById('metrics-data').innerHTML = `
                 <div class="metric-grid">
-                    <div class="config-section">
-                        <h4>Connections</h4>
-                        <div class="metric-summary">
-                            <div>Peak Users: ${data.peak_users || 0}</div>
-                            <div>Total Connections: ${data.total_connections || 0}</div>
-                            <div>Total Disconnects: ${data.total_disconnects || 0}</div>
-                        </div>
-                        <div class="metric-chart">
-                            <div class="metric-header">
-                                <span>Time</span>
-                                <span>Count</span>
+                    <div class="metric-card">
+                        <div class="metric-card-header">
+                            <div class="metric-card-title">Connections</div>
+                            <div class="metric-summary">
+                                <div class="metric-summary-item">Peak <span class="metric-summary-value">${data.peak_users || 0}</span></div>
+                                <div class="metric-summary-item">Total <span class="metric-summary-value">${data.total_connections || 0}</span></div>
+                                <div class="metric-summary-item">Disconnects <span class="metric-summary-value">${data.total_disconnects || 0}</span></div>
                             </div>
-                            <div class="metric-data">${connHistory || '<div class="no-data">No data</div>'}</div>
                         </div>
+                        <div class="metric-table-header"><span>Time</span><span>Count</span></div>
+                        <div class="metric-data">${connHistory || '<div class="no-data">No data yet</div>'}</div>
                     </div>
-                    <div class="config-section">
-                        <h4>Messages</h4>
-                        <div class="metric-summary">
-                            <div>Total Messages: ${data.total_messages || 0}</div>
-                            <div>&nbsp;</div>
-                            <div>&nbsp;</div>
-                        </div>
-                        <div class="metric-chart">
-                            <div class="metric-header">
-                                <span>Time</span>
-                                <span>Count</span>
+                    <div class="metric-card">
+                        <div class="metric-card-header">
+                            <div class="metric-card-title">Messages</div>
+                            <div class="metric-summary">
+                                <div class="metric-summary-item">Total <span class="metric-summary-value">${data.total_messages || 0}</span></div>
                             </div>
-                            <div class="metric-data">${msgHistory || '<div class="no-data">No data</div>'}</div>
                         </div>
+                        <div class="metric-table-header"><span>Time</span><span>Count</span></div>
+                        <div class="metric-data">${msgHistory || '<div class="no-data">No data yet</div>'}</div>
                     </div>
-                    <div class="config-section">
-                        <h4>Memory</h4>
-                        <div class="metric-summary">
-                            <div>Peak Memory: ${(data.peak_memory ? (data.peak_memory/1024/1024).toFixed(1) : 0)} MB</div>
-                            <div>&nbsp;</div>
-                            <div>&nbsp;</div>
-                        </div>
-                        <div class="metric-chart">
-                            <div class="metric-header">
-                                <span>Time</span>
-                                <span>Usage</span>
+                    <div class="metric-card">
+                        <div class="metric-card-header">
+                            <div class="metric-card-title">Memory</div>
+                            <div class="metric-summary">
+                                <div class="metric-summary-item">Peak <span class="metric-summary-value">${(data.peak_memory ? (data.peak_memory/1024/1024).toFixed(1) : 0)} MB</span></div>
                             </div>
-                            <div class="metric-data">${memHistory || '<div class="no-data">No data</div>'}</div>
                         </div>
+                        <div class="metric-table-header"><span>Time</span><span>Usage</span></div>
+                        <div class="metric-data">${memHistory || '<div class="no-data">No data yet</div>'}</div>
                     </div>
                 </div>
             `;
-            document.getElementById('metrics-data').innerHTML = html;
         }
 
         function showMessage(text, type = 'info') {
             const el = document.getElementById('message');
             el.textContent = text;
-            el.className = `message message-${type} show`;
+            el.className = `toast message-${type} show`;
             setTimeout(() => { el.classList.remove('show'); }, 3000);
         }
     </script>
-    </div> <!-- End adminPanel -->
 </body>
 </html>

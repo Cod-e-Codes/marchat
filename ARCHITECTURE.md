@@ -384,13 +384,17 @@ Implementation notes (`server/admin_panel.go`):
 
 ### Web Admin Panel
 
-The web-based interface provides the same functionality through a browser:
+The web-based interface (`admin_web.html`, embedded via `go:embed`) provides the same functionality through a browser with a sidebar-navigation layout:
 
-- **Session Authentication**: Secure login with admin key validation
-- **CSRF Protection**: Cross-site request forgery prevention
-- **Real-time Updates**: Live data refresh without page reloads
-- **RESTful API**: Programmatic access to administrative functions
-- **Responsive Design**: Works across desktop and mobile devices
+- **Sidebar Navigation**: Fixed sidebar with icon+label nav items (Overview, Users, System, Logs, Plugins, Metrics) and a Sign out button; collapses on mobile with a hamburger toggle and overlay
+- **Session Authentication**: Secure login with admin key validation (1-hour HMAC-signed sessions)
+- **CSRF Protection**: Cross-site request forgery prevention on all state-changing POST endpoints
+- **Confirmation Modals**: Destructive actions (Clear Database, Ban, Kick, Uninstall, Reset Metrics) require user confirmation before executing
+- **Real-time Updates**: Live data refresh every 5 seconds without page reloads; manual refresh via top-bar icon button
+- **RESTful API**: Programmatic access to administrative functions (session cookie auth)
+- **Responsive Design**: Sidebar collapses on screens below 800px; stat grids, metric cards, and config tables adapt to available width
+- **Status Badges**: Pill-style badges with dot indicators for online/offline/banned/kicked states and TLS enabled/disabled
+- **Toast Notifications**: Slide-up feedback messages for action results (success/error/info)
 
 ## Security Architecture
 

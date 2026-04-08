@@ -432,11 +432,17 @@ Enable with `--admin-panel` flag, then press `Ctrl+A` to access:
 
 ### Web Admin Panel
 Enable with `--web-panel` flag, access at `http://localhost:8080/admin`:
+- Sidebar-navigation layout (Overview, Users, System, Logs, Plugins, Metrics)
 - Secure session-based login (1-hour expiration)
-- Live dashboard with metrics visualization
-- RESTful API endpoints with `X-Admin-Key` auth
-- CSRF protection on all state-changing operations
-- HttpOnly cookies with SameSite protection
+- Live dashboard with stats cards, configuration, and database info
+- User management table with status badges, ban/kick with confirmation modals
+- System management with config viewer and database statistics
+- Real-time log viewer with level/component/timestamp columns
+- Plugin management with install, enable, disable, uninstall actions
+- Performance metrics with connection, message, and memory history
+- RESTful API endpoints with session cookie auth
+- CSRF protection on all state-changing operations (HttpOnly + SameSite cookies)
+- Responsive design (sidebar collapses on mobile with hamburger menu)
 
 **API Example:**
   ```bash
