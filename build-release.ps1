@@ -41,6 +41,11 @@ $env:GOOS = "darwin"; $env:GOARCH = "amd64"
 go build -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.BuildTime='$BUILD_TIME' -X github.com/Cod-e-Codes/marchat/shared.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/marchat-client-darwin-amd64" ./client
 go build -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.BuildTime='$BUILD_TIME' -X github.com/Cod-e-Codes/marchat/shared.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/marchat-server-darwin-amd64" ./cmd/server
 
+Write-Host "Building for Darwin ARM64 (Apple Silicon)..." -ForegroundColor Yellow
+$env:GOOS = "darwin"; $env:GOARCH = "arm64"
+go build -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.BuildTime='$BUILD_TIME' -X github.com/Cod-e-Codes/marchat/shared.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/marchat-client-darwin-arm64" ./client
+go build -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.BuildTime='$BUILD_TIME' -X github.com/Cod-e-Codes/marchat/shared.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/marchat-server-darwin-arm64" ./cmd/server
+
 Write-Host "Building for Linux ARM64 (use on Termux arm64; GOOS=linux, not android)..." -ForegroundColor Yellow
 $env:GOOS = "linux"; $env:GOARCH = "arm64"
 go build -ldflags "-X github.com/Cod-e-Codes/marchat/shared.ClientVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.ServerVersion=$VERSION -X github.com/Cod-e-Codes/marchat/shared.BuildTime='$BUILD_TIME' -X github.com/Cod-e-Codes/marchat/shared.GitCommit=$GIT_COMMIT" -o "$BUILD_DIR/marchat-client-linux-arm64" ./client
@@ -58,6 +63,9 @@ Compress-Archive -Path "$BUILD_DIR/marchat-client-windows-amd64.exe", "$BUILD_DI
 # Darwin AMD64
 Compress-Archive -Path "$BUILD_DIR/marchat-client-darwin-amd64", "$BUILD_DIR/marchat-server-darwin-amd64" -DestinationPath "$RELEASE_DIR/marchat-$VERSION-darwin-amd64.zip" -Force
 
+# Darwin ARM64 (Apple Silicon)
+Compress-Archive -Path "$BUILD_DIR/marchat-client-darwin-arm64", "$BUILD_DIR/marchat-server-darwin-arm64" -DestinationPath "$RELEASE_DIR/marchat-$VERSION-darwin-arm64.zip" -Force
+
 # Linux ARM64 (Termux / aarch64 Linux)
 Compress-Archive -Path "$BUILD_DIR/marchat-client-linux-arm64", "$BUILD_DIR/marchat-server-linux-arm64" -DestinationPath "$RELEASE_DIR/marchat-$VERSION-linux-arm64.zip" -Force
 
@@ -71,6 +79,7 @@ Write-Host "- marchat-$VERSION-linux-amd64.zip"
 Write-Host "- marchat-$VERSION-linux-arm64.zip"
 Write-Host "- marchat-$VERSION-windows-amd64.zip"
 Write-Host "- marchat-$VERSION-darwin-amd64.zip"
+Write-Host "- marchat-$VERSION-darwin-arm64.zip"
 
 # Build and push Docker image
 Write-Host "Building Docker image for marchat..." -ForegroundColor Yellow
