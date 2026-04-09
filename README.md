@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.11.0--beta.2-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)
+[![Version](https://img.shields.io/badge/version-v0.11.0--beta.3-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.3)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -15,9 +15,9 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ## Latest Updates
 
-### Since v0.11.0-beta.2 (`main`, not yet tagged)
+### v0.11.0-beta.3 (Current)
 
-Summary of everything merged after the **[v0.11.0-beta.2](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)** tag. For the commit list (newest-first), run **`git log v0.11.0-beta.2..HEAD --oneline`**; add **`--reverse`** for oldest-first.
+**Released 2026-04-09.** Changes since **[v0.11.0-beta.2](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)** — compare on GitHub: [`v0.11.0-beta.2...v0.11.0-beta.3`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.2...v0.11.0-beta.3). For the commit list (newest-first): **`git log v0.11.0-beta.2..v0.11.0-beta.3 --oneline`** (append **`--reverse`** for oldest-first).
 
 #### Client and configuration
 - **Profiles**: Dedupe display names on load; default **Profile-N** naming when adding profiles.
@@ -50,7 +50,7 @@ Summary of everything merged after the **[v0.11.0-beta.2](https://github.com/Cod
 #### Toolchain and security
 - **Go 1.25.9** in **`go.mod`**, GitHub Actions, and the **Docker** builder image—cleans **govulncheck**-listed standard-library issues for **Go 1.25.8** (**crypto/tls**, **crypto/x509**, **archive/tar**, **html/template**, etc.). See **SECURITY.md** for scanner notes (including package-level **pgx** advisories with no fixed release yet; no reachable symbols reported by default **`govulncheck ./...`**).
 
-### v0.11.0-beta.2 (latest release)
+### v0.11.0-beta.2
 - **Go 1.25.8** across CI, Docker, and docs; **SECURITY.md** updates (supported versions, edwards25519 note)
 - **UX**: Terminal-native chrome (reaction/message emoji unchanged); **Alt+M** / **`:msginfo`** toggle message metadata; colorized server banner and client pre-TUI (**`NO_COLOR`** respected)
 - **Doctor**: TTY color for text mode; server **`MARCHAT_*`** reflects **`config/.env`**; docs for **`-doctor-json`** / **`NO_COLOR`**
@@ -176,12 +176,12 @@ Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQ
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.2/marchat-v0.11.0-beta.2-linux-amd64.zip
-unzip marchat-v0.11.0-beta.2-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.3/marchat-v0.11.0-beta.3-linux-amd64.zip
+unzip marchat-v0.11.0-beta.3-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.2/marchat-v0.11.0-beta.2-darwin-amd64.zip
-unzip marchat-v0.11.0-beta.2-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.3/marchat-v0.11.0-beta.3-darwin-amd64.zip
+unzip marchat-v0.11.0-beta.3-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -189,11 +189,11 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.11.0-beta.2
+docker pull codecodesxyz/marchat:v0.11.0-beta.3
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.11.0-beta.2
+  codecodesxyz/marchat:v0.11.0-beta.3
 ```
 
 **Docker Compose (local development):**
