@@ -3,3 +3,11 @@
 entrypoint.sh text eol=lf
 Dockerfile text eol=lf
 
+# CI, docs, and Go sources: LF everywhere (avoids CRLF noise on Windows; GitHub Actions expects LF YAML)
+*.yml text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
