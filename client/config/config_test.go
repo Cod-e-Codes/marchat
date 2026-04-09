@@ -168,6 +168,18 @@ func restoreMARCHATConfigDir(t *testing.T, prev string, had bool) {
 	})
 }
 
+// isolateClientUserAppDataForTests points GetConfigDir/ResolveClientConfigDir at directories
+// under root instead of the developer's real profile (APPDATA on Windows, HOME elsewhere).
+func isolateClientUserAppDataForTests(t *testing.T, root string) {
+	t.Helper()
+	switch runtime.GOOS {
+	case "windows":
+		t.Setenv("APPDATA", root)
+	default:
+		t.Setenv("HOME", root)
+	}
+}
+
 func TestGetConfigPath(t *testing.T) {
 	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
 	restoreMARCHATConfigDir(t, prev, had)
@@ -205,11 +217,16 @@ func TestGetConfigPathRespectsMARCHAT_CONFIG_DIR(t *testing.T) {
 }
 
 func TestGetKeystorePath(t *testing.T) {
-	// Test with no legacy keystore
-	tmpDir := t.TempDir()
+	tmpRoot := t.TempDir()
+	isolateClientUserAppDataForTests(t, filepath.Join(tmpRoot, "profile"))
 	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
 	restoreMARCHATConfigDir(t, prev, had)
 	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
+	workDir := filepath.Join(tmpRoot, "work")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatalf("mkdir work: %v", err)
+	}
 
 	originalDir, _ := os.Getwd()
 	defer func() {
@@ -218,7 +235,7 @@ func TestGetKeystorePath(t *testing.T) {
 		}
 	}()
 
-	if err := os.Chdir(tmpDir); err != nil {
+	if err := os.Chdir(workDir); err != nil {
 		t.Fatalf("Failed to change to temp directory: %v", err)
 	}
 
@@ -227,18 +244,26 @@ func TestGetKeystorePath(t *testing.T) {
 		t.Fatalf("Failed to get keystore path: %v", err)
 	}
 
-	// Should return platform-appropriate path
-	if filepath.Base(keystorePath) != "keystore.dat" {
-		t.Errorf("Expected keystore path to end with 'keystore.dat', got '%s'", filepath.Base(keystorePath))
+	want, err := filepath.Abs(filepath.Join(ResolveClientConfigDir(), "keystore.dat"))
+	if err != nil {
+		t.Fatalf("filepath.Abs: %v", err)
+	}
+	if keystorePath != want {
+		t.Errorf("GetKeystorePath() = %q, want %q", keystorePath, want)
 	}
 }
 
 func TestGetKeystorePathWithLegacy(t *testing.T) {
-	// Test with legacy keystore in current directory
-	tmpDir := t.TempDir()
+	tmpRoot := t.TempDir()
+	isolateClientUserAppDataForTests(t, filepath.Join(tmpRoot, "profile"))
 	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
 	restoreMARCHATConfigDir(t, prev, had)
 	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
+	workDir := filepath.Join(tmpRoot, "work")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatalf("mkdir work: %v", err)
+	}
 
 	originalDir, _ := os.Getwd()
 	defer func() {
@@ -247,14 +272,12 @@ func TestGetKeystorePathWithLegacy(t *testing.T) {
 		}
 	}()
 
-	if err := os.Chdir(tmpDir); err != nil {
+	if err := os.Chdir(workDir); err != nil {
 		t.Fatalf("Failed to change to temp directory: %v", err)
 	}
 
-	// Create legacy keystore
 	legacyPath := "keystore.dat"
-	err := os.WriteFile(legacyPath, []byte("legacy keystore"), 0644)
-	if err != nil {
+	if err := os.WriteFile(legacyPath, []byte("legacy keystore"), 0644); err != nil {
 		t.Fatalf("Failed to create legacy keystore: %v", err)
 	}
 
@@ -263,15 +286,122 @@ func TestGetKeystorePathWithLegacy(t *testing.T) {
 		t.Fatalf("Failed to get keystore path: %v", err)
 	}
 
-	// Should return legacy path
-	absLegacyPath, _ := filepath.Abs(legacyPath)
+	absLegacyPath, err := filepath.Abs(legacyPath)
+	if err != nil {
+		t.Fatalf("filepath.Abs: %v", err)
+	}
 	if keystorePath != absLegacyPath {
 		t.Errorf("Expected legacy keystore path %s, got %s", absLegacyPath, keystorePath)
 	}
 }
 
+func TestGetKeystorePathPrefersPrimaryOverLegacyCwd(t *testing.T) {
+	tmpRoot := t.TempDir()
+	isolateClientUserAppDataForTests(t, filepath.Join(tmpRoot, "profile"))
+	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
+	restoreMARCHATConfigDir(t, prev, had)
+	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
+
+	workDir := filepath.Join(tmpRoot, "work")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatalf("mkdir work: %v", err)
+	}
+
+	primaryDir := ResolveClientConfigDir()
+	if err := os.MkdirAll(primaryDir, 0755); err != nil {
+		t.Fatalf("mkdir primary: %v", err)
+	}
+	primaryKS := filepath.Join(primaryDir, "keystore.dat")
+	if err := os.WriteFile(primaryKS, []byte("primary"), 0600); err != nil {
+		t.Fatalf("write primary keystore: %v", err)
+	}
+
+	originalDir, _ := os.Getwd()
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Errorf("restore cwd: %v", err)
+		}
+	}()
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatalf("chdir work: %v", err)
+	}
+	if err := os.WriteFile("keystore.dat", []byte("cwd-decoy"), 0600); err != nil {
+		t.Fatalf("write cwd keystore: %v", err)
+	}
+
+	got, err := GetKeystorePath()
+	if err != nil {
+		t.Fatalf("GetKeystorePath: %v", err)
+	}
+	want, err := filepath.Abs(primaryKS)
+	if err != nil {
+		t.Fatalf("filepath.Abs: %v", err)
+	}
+	if got != want {
+		t.Fatalf("GetKeystorePath() = %q, want %q (must not prefer cwd over profile)", got, want)
+	}
+}
+
+func TestGetKeystorePathUsesUserDirWhenMARCHATOverrideHasNoKeystore(t *testing.T) {
+	tmpRoot := t.TempDir()
+	isolateClientUserAppDataForTests(t, filepath.Join(tmpRoot, "profile"))
+	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
+	restoreMARCHATConfigDir(t, prev, had)
+
+	overrideDir := filepath.Join(tmpRoot, "override")
+	if err := os.MkdirAll(overrideDir, 0755); err != nil {
+		t.Fatalf("mkdir override: %v", err)
+	}
+	t.Setenv("MARCHAT_CONFIG_DIR", overrideDir)
+
+	userDir, err := GetConfigDir()
+	if err != nil {
+		t.Fatalf("GetConfigDir: %v", err)
+	}
+	userKS := filepath.Join(userDir, "keystore.dat")
+	if err := os.WriteFile(userKS, []byte("user-profile-ks"), 0600); err != nil {
+		t.Fatalf("write user keystore: %v", err)
+	}
+
+	workDir := filepath.Join(tmpRoot, "work")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatalf("mkdir work: %v", err)
+	}
+
+	originalDir, _ := os.Getwd()
+	defer func() {
+		if err := os.Chdir(originalDir); err != nil {
+			t.Errorf("restore cwd: %v", err)
+		}
+	}()
+	if err := os.Chdir(workDir); err != nil {
+		t.Fatalf("chdir work: %v", err)
+	}
+	if err := os.WriteFile("keystore.dat", []byte("cwd-decoy"), 0600); err != nil {
+		t.Fatalf("write cwd keystore: %v", err)
+	}
+
+	got, err := GetKeystorePath()
+	if err != nil {
+		t.Fatalf("GetKeystorePath: %v", err)
+	}
+	want, err := filepath.Abs(userKS)
+	if err != nil {
+		t.Fatalf("filepath.Abs: %v", err)
+	}
+	if got != want {
+		t.Fatalf("GetKeystorePath() = %q, want %q", got, want)
+	}
+}
+
 func TestMigrateKeystoreToNewLocation(t *testing.T) {
-	tmpDir := t.TempDir()
+	tmpRoot := t.TempDir()
+	isolateClientUserAppDataForTests(t, filepath.Join(tmpRoot, "profile"))
+	workDir := filepath.Join(tmpRoot, "work")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatalf("mkdir work: %v", err)
+	}
+
 	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
 	restoreMARCHATConfigDir(t, prev, had)
 	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
@@ -283,13 +413,12 @@ func TestMigrateKeystoreToNewLocation(t *testing.T) {
 		}
 	}()
 
-	if err := os.Chdir(tmpDir); err != nil {
+	if err := os.Chdir(workDir); err != nil {
 		t.Fatalf("Failed to change to temp directory: %v", err)
 	}
 
-	// Clean up any existing keystore in the resolved config directory
 	newPath := filepath.Join(ResolveClientConfigDir(), "keystore.dat")
-	os.Remove(newPath) // Ignore error if file doesn't exist
+	_ = os.Remove(newPath) // start without destination keystore
 
 	// Test with no legacy keystore
 	err := MigrateKeystoreToNewLocation()
@@ -327,7 +456,13 @@ func TestMigrateKeystoreToNewLocation(t *testing.T) {
 }
 
 func TestMigrateKeystoreAlreadyExists(t *testing.T) {
-	tmpDir := t.TempDir()
+	tmpRoot := t.TempDir()
+	isolateClientUserAppDataForTests(t, filepath.Join(tmpRoot, "profile"))
+	workDir := filepath.Join(tmpRoot, "work")
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		t.Fatalf("mkdir work: %v", err)
+	}
+
 	prev, had := os.LookupEnv("MARCHAT_CONFIG_DIR")
 	restoreMARCHATConfigDir(t, prev, had)
 	_ = os.Unsetenv("MARCHAT_CONFIG_DIR")
@@ -339,7 +474,7 @@ func TestMigrateKeystoreAlreadyExists(t *testing.T) {
 		}
 	}()
 
-	if err := os.Chdir(tmpDir); err != nil {
+	if err := os.Chdir(workDir); err != nil {
 		t.Fatalf("Failed to change to temp directory: %v", err)
 	}
 

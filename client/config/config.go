@@ -710,13 +710,29 @@ func GetConfigPath() (string, error) {
 	return filepath.Join(configDir, "config.json"), nil
 }
 
-// GetKeystorePath returns the full path to the keystore file
-// Checks old location (current directory) first for backward compatibility
+// GetKeystorePath returns the full path to the keystore file.
+// Resolution order: (1) keystore next to config (ResolveClientConfigDir/keystore.dat);
+// (2) the standard per-user marchat directory from GetConfigDir when that file exists
+// (so an existing keystore is still found if MARCHAT_CONFIG_DIR is set but has no keystore yet);
+// (3) ./keystore.dat in the process working directory (legacy); (4) otherwise the primary
+// path where a new keystore would be created. Legacy cwd is last so a stray keystore in a
+// repo clone does not override the real user profile keystore.
 func GetKeystorePath() (string, error) {
-	// Check if keystore exists in current directory (legacy location)
+	primary := filepath.Join(ResolveClientConfigDir(), "keystore.dat")
+	if _, err := os.Stat(primary); err == nil {
+		return filepath.Abs(primary)
+	}
+
+	userDir, err := GetConfigDir()
+	if err == nil {
+		fallback := filepath.Join(userDir, "keystore.dat")
+		if _, err := os.Stat(fallback); err == nil {
+			return filepath.Abs(fallback)
+		}
+	}
+
 	legacyPath := "keystore.dat"
 	if _, err := os.Stat(legacyPath); err == nil {
-		// Legacy keystore exists, use it
 		abs, err := filepath.Abs(legacyPath)
 		if err != nil {
 			return legacyPath, nil // fallback to relative path
@@ -724,26 +740,11 @@ func GetKeystorePath() (string, error) {
 		return abs, nil
 	}
 
-	// Prefer keystore next to config.json (same rules as ResolveClientConfigDir).
-	primary := filepath.Join(ResolveClientConfigDir(), "keystore.dat")
-	if _, err := os.Stat(primary); err == nil {
-		return filepath.Abs(primary)
-	}
-
-	// Older builds stored the keystore under GetConfigDir() even when running from a repo.
-	userDir, err := GetConfigDir()
-	if err != nil {
-		return filepath.Abs(primary)
-	}
-	fallback := filepath.Join(userDir, "keystore.dat")
-	if _, err := os.Stat(fallback); err == nil {
-		return filepath.Abs(fallback)
-	}
-
 	return filepath.Abs(primary)
 }
 
-// MigrateKeystoreToNewLocation migrates keystore from legacy location to new platform-appropriate location
+// MigrateKeystoreToNewLocation copies ./keystore.dat from the working directory into
+// ResolveClientConfigDir()/keystore.dat when the destination does not exist yet.
 func MigrateKeystoreToNewLocation() error {
 	legacyPath := "keystore.dat"
 

@@ -15,7 +15,42 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ## Latest Updates
 
-### v0.11.0-beta.2 (Current)
+### Since v0.11.0-beta.2 (`main`, not yet tagged)
+
+Summary of everything merged after the **[v0.11.0-beta.2](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)** tag. For the commit list (newest-first), run **`git log v0.11.0-beta.2..HEAD --oneline`**; add **`--reverse`** for oldest-first.
+
+#### Client and configuration
+- **Profiles**: Dedupe display names on load; default **Profile-N** naming when adding profiles.
+- **Paths**: **`GetConfigPath`** honors **`MARCHAT_CONFIG_DIR`** (same resolution idea as **`ResolveClientConfigDir()`**).
+- **Keystore**: Portable **v3** format (random salt in file header); legacy path-based PBKDF2 salt migrates on unlock—see **ARCHITECTURE.md** / **PROTOCOL.md** (very old clients may need a current build to read migrated files).
+- **Keystore location**: **`GetKeystorePath`** prefers the resolved config directory and the standard per-user **`keystore.dat`** before legacy **`./keystore.dat`** in the process working directory, so a stray file in a git clone does not override your real profile key (**README.md** → Client vs server config; **ARCHITECTURE.md**).
+- **Hardening**: Broader client UX and crypto-path fixes alongside server send-path hardening (see commit **`5feb098`** on `main`).
+
+#### Server and web admin
+- **Startup**: Admin list normalization and startup validation refactored into shared helpers (`cmd/server`, **`config`** validation).
+- **Web admin**: Sidebar layout, dark theme, confirmation modals (**`server/admin_web.html`** / related Go).
+- **Sessions**: Web admin prefers **`MARCHAT_SESSION_SECRET`** ( **`MARCHAT_JWT_SECRET`** remains a deprecated alias); assorted doc fixes for current behavior.
+- **Reliability**: Hardened server send paths and related trust/config boundaries (same wave as client fixes above).
+
+#### Plugins
+- **SDK**: **`plugin/sdk`** **`Message`** carries channel, encryption, and DM context for richer plugin chat integration.
+- **Host**: Plugin replies flow through **`ConvertPluginMessage`**; **`StopPlugin`** data race fixed; decode loop exits cleanly on closed pipe (quieter CI logs).
+- **Docs**: Plugin message routing, type chaining, and encrypted delivery (**ARCHITECTURE.md** / **PROTOCOL.md** references where applicable).
+
+#### Documentation and demos
+- **README**: Five current GIF demos with section headings (replaces older demo assets).
+- **E2E narrative**: Docs aligned with the **global ChaCha20-Poly1305** design; unused **X25519** API removed from the tree.
+- **Operations**: Troubleshooting and **`-doctor`** / diagnostics text refreshed to match current flags and env behavior.
+
+#### CI, releases, and local build scripts
+- **Releases**: **`gh release upload`** for matrix **`.zip`** assets and **`gh release edit`** for the Docker Hub blurb; workflow documentation; shell/Docker sources normalized to LF where needed.
+- **CI**: **`database-smoke`** job (Postgres + MySQL) for **`InitDB`** / **`CreateSchema`** / table checks; MySQL DSN uses a **`mysql:`** / **`mysql://`** prefix so driver detection matches SQLite-style paths; expanded server and plugin manager tests.
+- **Scripts**: **`build-release.ps1`** includes a **darwin/arm64** build target.
+
+#### Toolchain and security
+- **Go 1.25.9** in **`go.mod`**, GitHub Actions, and the **Docker** builder image—cleans **govulncheck**-listed standard-library issues for **Go 1.25.8** (**crypto/tls**, **crypto/x509**, **archive/tar**, **html/template**, etc.). See **SECURITY.md** for scanner notes (including package-level **pgx** advisories with no fixed release yet; no reachable symbols reported by default **`govulncheck ./...`**).
+
+### v0.11.0-beta.2 (latest release)
 - **Go 1.25.8** across CI, Docker, and docs; **SECURITY.md** updates (supported versions, edwards25519 note)
 - **UX**: Terminal-native chrome (reaction/message emoji unchanged); **Alt+M** / **`:msginfo`** toggle message metadata; colorized server banner and client pre-TUI (**`NO_COLOR`** respected)
 - **Doctor**: TTY color for text mode; server **`MARCHAT_*`** reflects **`config/.env`**; docs for **`-doctor-json`** / **`NO_COLOR`**
@@ -189,7 +224,7 @@ go build -o marchat-client ./client
 ```
 
 **Prerequisites for source build:**
-- Go 1.25.8 or later ([download](https://go.dev/dl/))
+- Go 1.25.9 or later ([download](https://go.dev/dl/))
 - Linux clipboard support: `sudo apt install xclip` (Ubuntu/Debian) or `sudo yum install xclip` (RHEL/CentOS)
 
 **Terminal colors:** The server startup banner and the client’s pre-chat output (connection, E2E status, profile picker tags such as `[Admin]` / `[E2E]`, and auth prompts) use [lipgloss](https://github.com/charmbracelet/lipgloss) for emphasis. Set **`NO_COLOR=1`** (or **`NO_COLOR`**) in the environment to disable colors on plain stdout/stderr.
@@ -263,6 +298,8 @@ The server loads **`{config directory}/.env`** (for a repo clone, usually **`con
 |------|------------------|----------|
 | **Server** (`.env`, SQLite DB, debug log) | In development from a repo clone: `./config` next to `go.mod`. Otherwise `MARCHAT_CONFIG_DIR` or the user config path (see [ARCHITECTURE.md](ARCHITECTURE.md)). | `MARCHAT_CONFIG_DIR`, `--config-dir` |
 | **Client** (`config.json`, `profiles.json`, keystore, `themes.json`) | Per-user app data (e.g. Windows `%APPDATA%\marchat`, Linux/macOS `~/.config/marchat`). Same when developing from source. | `MARCHAT_CONFIG_DIR` |
+
+**Keystore file:** The client uses `keystore.dat` under `MARCHAT_CONFIG_DIR` or the default app data directory when that file exists; if `MARCHAT_CONFIG_DIR` is set and has no keystore yet, it still uses an existing `keystore.dat` in the standard per-user marchat folder. Only after those checks does it use legacy `./keystore.dat` in the process working directory, so a stray file in a repo clone does not override your real profile keystore.
 
 The repository’s `config/` directory holds **server** runtime files and the **Go package** `github.com/Cod-e-Codes/marchat/config`; it is not the client’s profile folder.
 
@@ -558,6 +595,7 @@ E2E encryption enabled with keystore: config/keystore.dat
 
 - **On-disk format (current)**: `keystore.dat` is a small binary file: a fixed **magic** and **version**, a **random 16-byte salt** stored in the file, then **AES-GCM** ciphertext of the JSON payload (including the global ChaCha20-Poly1305 key). The passphrase is stretched with **PBKDF2** (SHA-256, 100k iterations) using that embedded salt. This means the same passphrase unlocks the file even if the absolute path to `keystore.dat` changes (for example after moving the file or when the client resolves a different config directory). Older files that derived PBKDF2 salt from the **keystore path** are still supported: on first successful unlock they are **rewritten** in the new format.
 - **Environment variable vs file**: If **`MARCHAT_GLOBAL_E2E_KEY`** is set in the client process, that key is used for encryption/decryption for **this run**. The on-disk keystore is **not** modified. You will see **`[INFO] Using global E2E key from environment variable`**. If you later **unset** the variable, the client uses the key from `keystore.dat` again—so the effective key can appear to “change back” even though the file was never updated. To persist a shared key in the file, run **without** the env var once. When the client **auto-generates** a key, it **does not** print the raw base64 material (only a Key ID); share the key with other clients by copying **`keystore.dat`** and the **same passphrase**, or by agreeing on **`MARCHAT_GLOBAL_E2E_KEY`** beforehand (e.g. **`openssl rand -base64 32`** on a trusted machine).
+- **Which file is used**: Same resolution order as in **Client vs server config locations** above (primary config dir → per-user marchat keystore when override is empty → cwd legacy).
 - **Legacy note**: Keystore wrapping was previously upgraded to PBKDF2 (replacing an older derivation). Very old keystores from that era may still need re-initialization if they cannot be decrypted.
 
 ## Plugin System

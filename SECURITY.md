@@ -67,6 +67,8 @@ When the client **auto-generates** a global E2E key, it does **not** print the f
 
 Dependabot may flag **transitive** dependencies that do not expose reachable vulnerable APIs in marchat. For example, **CVE-2026-26958** ([GHSA-fw7p-63qq-7hpr](https://github.com/advisories/GHSA-fw7p-63qq-7hpr)) affects **`filippo.io/edwards25519`** before **v1.1.1** (`MultiScalarMult` receiver initialization). marchat does not use that API; the advisory notes many consumers (including typical **`github.com/go-sql-driver/mysql`** usage) are unaffected. The module is still pinned at **v1.1.1** on **`main`** to pick up the fix. For reachability, run **`govulncheck ./...`** against your build.
 
+**Go toolchain:** Build and release with **Go 1.25.9+** (see **`go.mod`**). Go **1.25.8** and earlier are flagged by **govulncheck** for several standard-library issues fixed in **1.25.9** (for example **GO-2026-4870** / **crypto/tls**, **GO-2026-4947** / **crypto/x509**, **GO-2026-4869** / **archive/tar**). **`github.com/jackc/pgx/v5`** may still appear under **`govulncheck -show verbose`** for package-level advisories with **Fixed in: N/A**; default **`govulncheck ./...`** reports **no reachable** vulnerable call paths in this module at current versions.
+
 ---
 
 ## Questions?

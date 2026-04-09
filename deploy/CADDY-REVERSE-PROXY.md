@@ -23,7 +23,7 @@ marchat-client  --wss-->  localhost:8443  (Docker publishes host 8443 -> contain
 
 ## Prerequisites
 
-- **Go 1.25.8+** (for building from source).
+- **Go 1.25.9+** (for building from source).
 - **Docker** with **Compose v2** (Docker Engine on Linux; **Docker Desktop** on Windows or macOS is fine).
 - **marchat** repo cloned; server config directory **`config/`** exists.
 

@@ -189,7 +189,7 @@ The **Go package** at repository path `config/` loads server settings from the p
 
 #### Client (`client/config/`)
 
-The **client** stores `config.json`, `profiles.json`, keystore (unless legacy `keystore.dat` in cwd), themes, and debug logs under the **per-user application data directory** (e.g. `%APPDATA%\marchat` on Windows, `~/.config/marchat` on Linux), or under `MARCHAT_CONFIG_DIR` when set. This applies both when developing from a clone and when using release binaries. Path helpers in `client/config` share the same resolution: `ResolveClientConfigDir()`, `GetConfigPath()`, and the primary keystore path (`GetKeystorePath`) all honor `MARCHAT_CONFIG_DIR` before falling back to the platform user directory (keystore may still prefer an existing file under the user directory when the override path has no keystore yet).
+The **client** stores `config.json`, `profiles.json`, keystore, themes, and debug logs under the **per-user application data directory** (e.g. `%APPDATA%\marchat` on Windows, `~/.config/marchat` on Linux), or under `MARCHAT_CONFIG_DIR` when set. This applies both when developing from a clone and when using release binaries. Path helpers in `client/config` share the same resolution: `ResolveClientConfigDir()`, `GetConfigPath()`, and the primary keystore path (`GetKeystorePath`) honor `MARCHAT_CONFIG_DIR` first. For the keystore file, `GetKeystorePath` prefers that directory, then an existing `keystore.dat` under the standard user marchat folder (when the override has no keystore yet), and only then a legacy `./keystore.dat` in the process working directory—so a stray repo-local file does not override the real profile keystore.
 
 #### Configuration Sources (server)
 

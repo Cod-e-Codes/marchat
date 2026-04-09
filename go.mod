@@ -1,6 +1,6 @@
 module github.com/Cod-e-Codes/marchat
 
-go 1.25.8
+go 1.25.9
 
 require (
 	github.com/Cod-e-Codes/marchat/plugin/sdk v0.0.0

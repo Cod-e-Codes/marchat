@@ -12,7 +12,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 37.7%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage` or `coverage`) so the argument is not misparsed.
+**Note**: For a narrative of what changed on **`main`** after the current release tag, see **README.md** → **Latest Updates** (section *Since v0.11.0-beta.2* until the next tag). This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 37.7%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage` or `coverage`) so the argument is not misparsed.
 
 **Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. **GitHub Actions** runs an extra **`database-smoke`** job (see `.github/workflows/go.yml`) with Postgres 16 and MySQL 8 service containers: it sets `MARCHAT_CI_POSTGRES_URL` and `MARCHAT_CI_MYSQL_URL` and runs `TestPostgresInitDBAndSchemaSmoke` / `TestMySQLInitDBAndSchemaSmoke` in `server/db_ci_smoke_test.go` (`InitDB` + `CreateSchema` + table checks). Locally, those tests **skip** unless you export the same variables (for MySQL, use a `mysql:` or `mysql://` prefix on the DSN so it is not parsed as a SQLite path). Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
 
@@ -105,7 +105,7 @@ Per-file statement percentages for important paths are listed under [Test Covera
 
 ### Prerequisites
 
-- Go 1.25.8 or later
+- Go 1.25.9 or later
 - SQLite support (built into Go)
 - PowerShell (for Windows test script)
 
