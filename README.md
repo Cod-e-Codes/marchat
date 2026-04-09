@@ -17,12 +17,12 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ### v0.11.0-beta.3 (Current)
 
-**Released 2026-04-09.** Changes since **[v0.11.0-beta.2](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)** — compare on GitHub: [`v0.11.0-beta.2...v0.11.0-beta.3`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.2...v0.11.0-beta.3). For the commit list (newest-first): **`git log v0.11.0-beta.2..v0.11.0-beta.3 --oneline`** (append **`--reverse`** for oldest-first).
+**Released 2026-04-09.** Changes since **[v0.11.0-beta.2](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)**; compare on GitHub: [`v0.11.0-beta.2...v0.11.0-beta.3`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.2...v0.11.0-beta.3). For the commit list (newest-first): **`git log v0.11.0-beta.2..v0.11.0-beta.3 --oneline`** (append **`--reverse`** for oldest-first).
 
 #### Client and configuration
 - **Profiles**: Dedupe display names on load; default **Profile-N** naming when adding profiles.
 - **Paths**: **`GetConfigPath`** honors **`MARCHAT_CONFIG_DIR`** (same resolution idea as **`ResolveClientConfigDir()`**).
-- **Keystore**: Portable **v3** format (random salt in file header); legacy path-based PBKDF2 salt migrates on unlock—see **ARCHITECTURE.md** / **PROTOCOL.md** (very old clients may need a current build to read migrated files).
+- **Keystore**: Portable **v3** format (random salt in file header); legacy path-based PBKDF2 salt migrates on unlock; see **ARCHITECTURE.md** / **PROTOCOL.md** (very old clients may need a current build to read migrated files).
 - **Keystore location**: **`GetKeystorePath`** prefers the resolved config directory and the standard per-user **`keystore.dat`** before legacy **`./keystore.dat`** in the process working directory, so a stray file in a git clone does not override your real profile key (**README.md** → Client vs server config; **ARCHITECTURE.md**).
 - **Hardening**: Broader client UX and crypto-path fixes alongside server send-path hardening (see commit **`5feb098`** on `main`).
 
@@ -48,7 +48,7 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **Scripts**: **`build-release.ps1`** includes a **darwin/arm64** build target.
 
 #### Toolchain and security
-- **Go 1.25.9** in **`go.mod`**, GitHub Actions, and the **Docker** builder image—cleans **govulncheck**-listed standard-library issues for **Go 1.25.8** (**crypto/tls**, **crypto/x509**, **archive/tar**, **html/template**, etc.). See **SECURITY.md** for scanner notes (including package-level **pgx** advisories with no fixed release yet; no reachable symbols reported by default **`govulncheck ./...`**).
+- **Go 1.25.9** in **`go.mod`**, GitHub Actions, and the **Docker** builder image clears **govulncheck**-listed standard-library issues from **Go 1.25.8** (**crypto/tls**, **crypto/x509**, **archive/tar**, **html/template**, etc.). See **SECURITY.md** for scanner notes: container/SBOM scans often flag dependency **presence** in the image/binary; **`govulncheck ./...`** checks **reachability**. Package-level **pgx** findings (for example **CVE-2026-33815** / **CVE-2026-33816**) may persist while advisory **fixed-version** metadata lags; marchat ships **pgx** v5.9.0+ with related upstream protocol fixes, and default **`govulncheck ./...`** reports no reachable vulnerable call paths.
 
 ### v0.11.0-beta.2
 - **Go 1.25.8** across CI, Docker, and docs; **SECURITY.md** updates (supported versions, edwards25519 note)
@@ -594,7 +594,7 @@ E2E encryption enabled with keystore: config/keystore.dat
 ### Keystore file format and `MARCHAT_GLOBAL_E2E_KEY`
 
 - **On-disk format (current)**: `keystore.dat` is a small binary file: a fixed **magic** and **version**, a **random 16-byte salt** stored in the file, then **AES-GCM** ciphertext of the JSON payload (including the global ChaCha20-Poly1305 key). The passphrase is stretched with **PBKDF2** (SHA-256, 100k iterations) using that embedded salt. This means the same passphrase unlocks the file even if the absolute path to `keystore.dat` changes (for example after moving the file or when the client resolves a different config directory). Older files that derived PBKDF2 salt from the **keystore path** are still supported: on first successful unlock they are **rewritten** in the new format.
-- **Environment variable vs file**: If **`MARCHAT_GLOBAL_E2E_KEY`** is set in the client process, that key is used for encryption/decryption for **this run**. The on-disk keystore is **not** modified. You will see **`[INFO] Using global E2E key from environment variable`**. If you later **unset** the variable, the client uses the key from `keystore.dat` again—so the effective key can appear to “change back” even though the file was never updated. To persist a shared key in the file, run **without** the env var once. When the client **auto-generates** a key, it **does not** print the raw base64 material (only a Key ID); share the key with other clients by copying **`keystore.dat`** and the **same passphrase**, or by agreeing on **`MARCHAT_GLOBAL_E2E_KEY`** beforehand (e.g. **`openssl rand -base64 32`** on a trusted machine).
+- **Environment variable vs file**: If **`MARCHAT_GLOBAL_E2E_KEY`** is set in the client process, that key is used for encryption/decryption for **this run**. The on-disk keystore is **not** modified. You will see **`[INFO] Using global E2E key from environment variable`**. If you later **unset** the variable, the client uses the key from `keystore.dat` again, so the effective key can appear to “change back” even though the file was never updated. To persist a shared key in the file, run **without** the env var once. When the client **auto-generates** a key, it **does not** print the raw base64 material (only a Key ID); share the key with other clients by copying **`keystore.dat`** and the **same passphrase**, or by agreeing on **`MARCHAT_GLOBAL_E2E_KEY`** beforehand (e.g. **`openssl rand -base64 32`** on a trusted machine).
 - **Which file is used**: Same resolution order as in **Client vs server config locations** above (primary config dir → per-user marchat keystore when override is empty → cwd legacy).
 - **Legacy note**: Keystore wrapping was previously upgraded to PBKDF2 (replacing an older derivation). Very old keystores from that era may still need re-initialization if they cannot be decrypted.
 
@@ -746,8 +746,8 @@ Profiles stored in platform-appropriate locations:
 
 | Issue | Solution |
 |-------|----------|
-| Wrong config folder / paths | Run `./marchat-client -doctor` or `./marchat-server -doctor` (add `-doctor-json` for scripts; set `NO_COLOR` for plain text). See **Client vs server config locations**. **Server:** if you set `MARCHAT_CONFIG_DIR` only in `config/.env`, restart after saving—the loader re-reads it after `Overload`. |
-| Connection failed | Use `ws://` or `wss://` and the path your server uses (default HTTP handler is **`/ws`**—e.g. `ws://host:8080/ws`). |
+| Wrong config folder / paths | Run `./marchat-client -doctor` or `./marchat-server -doctor` (add `-doctor-json` for scripts; set `NO_COLOR` for plain text). See **Client vs server config locations**. **Server:** if you set `MARCHAT_CONFIG_DIR` only in `config/.env`, restart after saving; the loader re-reads it after `Overload`. |
+| Connection failed | Use `ws://` or `wss://` and the path your server uses (default HTTP handler is **`/ws`**, e.g. `ws://host:8080/ws`). |
 | `wss://localhost:8443` reconnect loop / connection refused | Ensure Caddy (or your proxy) is up: `docker compose -f docker-compose.proxy.yml up -d`, or connect directly with `ws://127.0.0.1:8080/ws` ([reverse proxy guide](deploy/CADDY-REVERSE-PROXY.md)). |
 | Admin commands not working | Client must use **`--admin`** and **`--admin-key`** matching the server’s `MARCHAT_ADMIN_KEY`; username must be listed in `MARCHAT_USERS`. |
 | Clipboard issues (Linux) | Install a clipboard tool (e.g. `sudo apt install xclip` or `xsel`). |
@@ -762,7 +762,7 @@ Profiles stored in platform-appropriate locations:
 | Plugin installation fails | Check registry URL (`MARCHAT_PLUGIN_REGISTRY_URL`), network access, and JSON validity; commercial plugins need a valid license for the **plugin name** (see **PLUGIN_ECOSYSTEM.md**). |
 | E2E encryption errors | Use **`--e2e`** and the keystore passphrase; see **[E2E Encryption](#e2e-encryption)** (keystore path, `MARCHAT_GLOBAL_E2E_KEY` vs file). Client and server must share the same global key material. |
 | Global E2E key errors | Key must be **base64** encoding **32 raw bytes** (`openssl rand -base64 32`). **`MARCHAT_GLOBAL_E2E_KEY`** overrides the in-memory key for that process and is **not** written to the keystore file. |
-| `:savefile` picks the wrong payload when names collide | Received files are stored per sender internally, but `:savefile <name>` matches **basename only**. If two users sent the same filename, which copy is saved is **not deterministic**—ask for distinct names or avoid duplicate basenames until disambiguation is exposed in the UI. |
+| `:savefile` picks the wrong payload when names collide | Received files are stored per sender internally, but `:savefile <name>` matches **basename only**. If two users sent the same filename, which copy is saved is **not deterministic**; ask for distinct names or avoid duplicate basenames until disambiguation is exposed in the UI. |
 | Send file / nothing happens | Check the footer (**Connected** vs **Disconnected**). If disconnected, `:sendfile` should report **Not connected to server**; reconnect, then retry (including **Alt+F** after a connection is up). |
 | Username already taken | A live or **stale** session may still hold the name. Admin: **`:forcedisconnect <user>`**. Otherwise the server’s **~5 minute** WebSocket ping sweep removes broken clients (or run **`:cleanup`**). |
 | Stale / ghost sessions | Same as above: wait for the ping sweep, run `:cleanup`, or `:forcedisconnect`. |
