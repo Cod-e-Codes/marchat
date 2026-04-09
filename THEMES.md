@@ -19,6 +19,13 @@ Marchat comes with 4 built-in themes:
 - **retro** - Retro terminal theme with orange, green, and yellow
 - **modern** - Modern dark theme with blue-gray tones
 
+## Theme list and cycle order
+
+`:themes` and **Ctrl+T** use a **stable** order every run:
+
+1. Built-in themes, always in this sequence: **system** → **patriot** → **retro** → **modern**.
+2. Custom themes from `themes.json`, sorted **alphabetically by JSON key** (the quoted identifier for each theme object, e.g. `"dracula"`). Key order in the file does not affect this list; rename the key if you want a different position in the cycle.
+
 ## Custom Theme Format
 
 ```json
@@ -86,7 +93,7 @@ Marchat comes with 4 built-in themes:
 :themes
 ```
 
-This will show all available themes (built-in + custom) with descriptions.
+This will show all available themes (built-in + custom) with descriptions, in the [order above](#theme-list-and-cycle-order).
 
 ### Switch to a Theme
 ```
@@ -94,7 +101,7 @@ This will show all available themes (built-in + custom) with descriptions.
 ```
 
 ### Cycle Through Themes
-Press `Ctrl+T` to cycle through all available themes (built-in and custom).
+Press `Ctrl+T` to cycle through all available themes (built-in and custom) in the [same order](#theme-list-and-cycle-order).
 
 ### Set Default Theme
 Use the interactive configuration or edit your config file:

@@ -50,6 +50,10 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 #### Toolchain and security
 - **Go 1.25.9** in **`go.mod`**, GitHub Actions, and the **Docker** builder image clears **govulncheck**-listed standard-library issues from **Go 1.25.8** (**crypto/tls**, **crypto/x509**, **archive/tar**, **html/template**, etc.). See **SECURITY.md** for scanner notes: container/SBOM scans often flag dependency **presence** in the image/binary; **`govulncheck ./...`** checks **reachability**. Package-level **pgx** findings (for example **CVE-2026-33815** / **CVE-2026-33816**) may persist while advisory **fixed-version** metadata lags; marchat ships **pgx** v5.9.0+ with related upstream protocol fixes, and default **`govulncheck ./...`** reports no reachable vulnerable call paths.
 
+### Unreleased (main; not in v0.11.0-beta.3 yet)
+
+- **Client themes**: **`:themes`** and **Ctrl+T** use a deterministic order—built-ins `system` → `patriot` → `retro` → `modern`, then custom themes sorted alphabetically by JSON key in `themes.json` ([THEMES.md](THEMES.md)).
+
 ### v0.11.0-beta.2
 - **Go 1.25.8** across CI, Docker, and docs; **SECURITY.md** updates (supported versions, edwards25519 note)
 - **UX**: Terminal-native chrome (reaction/message emoji unchanged); **Alt+M** / **`:msginfo`** toggle message metadata; colorized server banner and client pre-TUI (**`NO_COLOR`** respected)

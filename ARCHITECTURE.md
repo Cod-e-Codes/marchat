@@ -524,6 +524,7 @@ marchat produces two main executables:
 - **Color Schemes**: Comprehensive color palette support
 - **Component Styling**: Granular control over UI elements
 - **Dynamic Loading**: Runtime theme switching
+- **List / cycle order**: Built-in themes in a fixed sequence; custom themes sorted lexicographically by JSON key for `:themes` and Ctrl+T (see **THEMES.md**)
 
 ### Alternative Frontends
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -80,12 +81,14 @@ func LoadCustomThemes() error {
 	return nil
 }
 
-// GetCustomThemeNames returns a list of all custom theme names
+// GetCustomThemeNames returns a list of all custom theme names (sorted by key).
+// Map iteration order is undefined in Go, so we sort for stable Ctrl+T / :themes order.
 func GetCustomThemeNames() []string {
 	names := make([]string, 0, len(customThemes))
 	for name := range customThemes {
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names
 }
 
