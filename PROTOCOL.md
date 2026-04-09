@@ -122,7 +122,7 @@ These values of `type` extend the core chat protocol:
 
 | `type` | Purpose |
 |--------|---------|
-| `edit` | Replace the text of an existing message. Requires `message_id` and new text in `content`. Only the original author may edit (server-enforced). |
+| `edit` | Replace the text of an existing message. Requires `message_id` and new body in `content`. Set `encrypted` to `true` when `content` is E2E ciphertext (same base64 **nonce ‖ ciphertext** layout as `text`); the server persists that flag to `is_encrypted` so history and reconnects stay consistent. Only the original sender may edit; admins cannot edit someone else's message (unlike `delete`, where an admin may remove any message). Enforced by matching WebSocket `sender` to the stored row. |
 | `delete` | Soft-delete a message. Requires `message_id`. Authors may delete their own messages; admins may delete any message. |
 | `typing` | Typing indicator; `content` is not required. The server sets `sender` and broadcasts to clients (see [Channels](#channels) for delivery scope when `channel` is set). |
 | `reaction` | Add or remove a reaction. Requires the `reaction` object (`emoji`, `target_id`, optional `is_removal`). |
@@ -158,6 +158,7 @@ Optional chat encryption uses a **shared symmetric key** for all participants (g
 - **Algorithm**: ChaCha20-Poly1305 (RFC 8439). Each encrypted payload uses a random **12-byte nonce** (typical for this AEAD).
 - **Text messages on the wire**: Same JSON message shape as plaintext chat; set `encrypted` to `true`. The `content` field is **standard base64** encoding of **nonce ‖ ciphertext** (nonce first, 12 bytes, then the Poly1305-sealed ciphertext). The plaintext decrypted by the AEAD is a JSON object representing the inner chat message (e.g. sender, content, type, timestamp) as produced by the reference client.
 - **Files**: When `type` is `file` and E2E is enabled, the reference client encrypts file bytes with the same global key; see client implementation for the exact binary layout (nonce-prefixed ciphertext).
+- **Edits** (`type`: `edit`): When E2E is enabled, the reference client encrypts the new plaintext the same way as a normal `text` message and sets `encrypted` accordingly. The server stores the new opaque `content` and updates `is_encrypted` from the incoming `encrypted` field (it does not force plaintext).
 
 The server stores and relays opaque `content` (and encrypted file blobs) without performing decryption.
 
@@ -175,6 +176,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
   - Delivers to all connected clients **or** only to members of a channel when `channel` is non-empty and `sender` is not `System` (see [Channels](#channels)). Direct messages use a separate path (sender and recipient only).
 - Reactions, read receipts, and last channel per user may be persisted server-side and replayed to reconnecting clients.
 - Message history is capped at 1000 messages.
+- On successful `type`: `edit`, the server updates `content`, sets `edited`, and sets stored encryption metadata from the incoming `encrypted` field (so edited ciphertext rows remain ciphertext with `is_encrypted` aligned to the wire).
 
 ---
 

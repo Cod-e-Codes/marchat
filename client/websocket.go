@@ -39,6 +39,32 @@ type UserList struct {
 
 type quitMsg struct{}
 
+// encryptGlobalTextWireContent returns base64(nonce ‖ ciphertext) for global chat E2E text,
+// matching the wire format produced for normal encrypted messages.
+func encryptGlobalTextWireContent(keystore *crypto.KeyStore, username, plaintext string) (string, error) {
+	if keystore == nil {
+		return "", fmt.Errorf("keystore not initialized")
+	}
+	if keystore.GetSessionKey("global") == nil {
+		return "", fmt.Errorf("global key not available - global E2E encryption not initialized")
+	}
+	encryptedMsg, err := keystore.EncryptMessage(username, plaintext, "global")
+	if err != nil {
+		return "", fmt.Errorf("global encryption failed: %w", err)
+	}
+	if len(encryptedMsg.Encrypted) == 0 {
+		return "", fmt.Errorf("encryption returned empty ciphertext")
+	}
+	combinedData := make([]byte, 0, len(encryptedMsg.Nonce)+len(encryptedMsg.Encrypted))
+	combinedData = append(combinedData, encryptedMsg.Nonce...)
+	combinedData = append(combinedData, encryptedMsg.Encrypted...)
+	finalContent := base64.StdEncoding.EncodeToString(combinedData)
+	if len(finalContent) == 0 {
+		return "", fmt.Errorf("final content is empty after encoding")
+	}
+	return finalContent, nil
+}
+
 func debugEncryptAndSend(recipients []string, plaintext string, ws *websocket.Conn, keystore *crypto.KeyStore, username string) error {
 	log.Printf("DEBUG: Starting global encryption for %d recipients", len(recipients))
 	log.Printf("DEBUG: Plaintext length: %d", len(plaintext))
@@ -56,31 +82,12 @@ func debugEncryptAndSend(recipients []string, plaintext string, ws *websocket.Co
 	}
 	log.Printf("DEBUG: Global key available (ID: %s)", globalKey.KeyID)
 
-	conversationID := "global"
-	encryptedMsg, err := keystore.EncryptMessage(username, plaintext, conversationID)
+	finalContent, err := encryptGlobalTextWireContent(keystore, username, plaintext)
 	if err != nil {
 		log.Printf("ERROR: Global encryption failed: %v", err)
-		return fmt.Errorf("global encryption failed: %v", err)
+		return err
 	}
-
-	log.Printf("DEBUG: Global encryption successful - encrypted length: %d", len(encryptedMsg.Encrypted))
-
-	if len(encryptedMsg.Encrypted) == 0 {
-		log.Printf("ERROR: Encryption returned empty ciphertext")
-		return fmt.Errorf("encryption returned empty ciphertext; aborting send")
-	}
-
-	combinedData := make([]byte, 0, len(encryptedMsg.Nonce)+len(encryptedMsg.Encrypted))
-	combinedData = append(combinedData, encryptedMsg.Nonce...)
-	combinedData = append(combinedData, encryptedMsg.Encrypted...)
-
-	finalContent := base64.StdEncoding.EncodeToString(combinedData)
 	log.Printf("DEBUG: Base64 encoded nonce+ciphertext - length: %d", len(finalContent))
-
-	if len(finalContent) == 0 {
-		log.Printf("ERROR: Final content is empty after encoding")
-		return fmt.Errorf("final content is empty after encoding")
-	}
 
 	msg := shared.Message{
 		Content:   finalContent,

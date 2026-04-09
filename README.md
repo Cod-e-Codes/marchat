@@ -347,7 +347,7 @@ Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text 
 ### Messaging
 | Command | Description |
 |---------|-------------|
-| `:edit <id> <text>` | Edit a message by its ID |
+| `:edit <id> <text>` | Edit your own message by ID (admins cannot edit others' messages; with E2E on, the new text is encrypted like normal chat and the server keeps `is_encrypted` in sync) |
 | `:delete <id>` | Delete a message by its ID |
 | `:dm [user] [msg]` | Send a DM or toggle DM mode (no args exits DM mode) |
 | `:search <query>` | Search message history on the server |

@@ -274,6 +274,7 @@ See [PROTOCOL.md](PROTOCOL.md) for the full message format specification.
 3. **Message encryption**: Inner JSON payload is sealed with ChaCha20-Poly1305; nonce ‖ ciphertext is base64-encoded into `content` with `encrypted: true` (see **PROTOCOL.md**)
 4. **Transport**: Standard WebSocket JSON; server does not decrypt
 5. **Storage**: Server persists opaque ciphertext in the database
+6. **Edits**: For `type: edit`, the reference client sends the replacement body ciphertext when E2E is enabled; the server updates `content` and persists `is_encrypted` from the wire `encrypted` field so reconnects and message metadata stay correct
 
 ## Database Schema
 
@@ -298,6 +299,8 @@ CREATE TABLE messages (
     pinned BOOLEAN DEFAULT 0
 );
 ```
+
+Edits update `content` and `edited`; `is_encrypted` follows the `encrypted` field on the edit message so ciphertext is not downgraded to plain text in the database after an edit.
 
 #### `user_message_state`
 ```sql

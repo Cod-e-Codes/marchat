@@ -458,12 +458,13 @@ func TestEditMessage(t *testing.T) {
 	}
 
 	t.Run("success", func(t *testing.T) {
-		if err := EditMessage(db, id, "alice", "updated"); err != nil {
+		if err := EditMessage(db, id, "alice", "updated", false); err != nil {
 			t.Fatalf("EditMessage failed: %v", err)
 		}
 		var content string
 		var edited bool
-		if err := db.QueryRow(`SELECT content, edited FROM messages WHERE message_id = ?`, id).Scan(&content, &edited); err != nil {
+		var isEnc bool
+		if err := db.QueryRow(`SELECT content, edited, is_encrypted FROM messages WHERE message_id = ?`, id).Scan(&content, &edited, &isEnc); err != nil {
 			t.Fatalf("query row: %v", err)
 		}
 		if content != "updated" {
@@ -471,6 +472,35 @@ func TestEditMessage(t *testing.T) {
 		}
 		if !edited {
 			t.Error("edited flag not set")
+		}
+		if isEnc {
+			t.Error("plain message edit should leave is_encrypted false")
+		}
+	})
+
+	t.Run("encrypted_content_flag", func(t *testing.T) {
+		eid, err := InsertMessage(db, shared.Message{
+			Sender:    "alice",
+			Content:   "original-cipher",
+			CreatedAt: now.Add(2 * time.Minute),
+			Encrypted: true,
+		})
+		if err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
+		if err := EditMessage(db, eid, "alice", "updated-cipher", true); err != nil {
+			t.Fatalf("EditMessage failed: %v", err)
+		}
+		var content string
+		var isEnc bool
+		if err := db.QueryRow(`SELECT content, is_encrypted FROM messages WHERE message_id = ?`, eid).Scan(&content, &isEnc); err != nil {
+			t.Fatalf("query row: %v", err)
+		}
+		if content != "updated-cipher" {
+			t.Errorf("content = %q, want updated-cipher", content)
+		}
+		if !isEnc {
+			t.Error("encrypted edit should set is_encrypted true in DB")
 		}
 	})
 
@@ -484,7 +514,7 @@ func TestEditMessage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InsertMessage failed: %v", err)
 		}
-		err = EditMessage(db, id2, "alice", "hijack")
+		err = EditMessage(db, id2, "alice", "hijack", false)
 		if err == nil {
 			t.Fatal("expected error for wrong sender")
 		}

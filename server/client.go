@@ -107,7 +107,7 @@ func (c *Client) readPump() {
 		}
 
 		if msg.Type == shared.EditMessageType && msg.MessageID > 0 {
-			if err := EditMessage(c.db, msg.MessageID, c.username, msg.Content); err != nil {
+			if err := EditMessage(c.db, msg.MessageID, c.username, msg.Content, msg.Encrypted); err != nil {
 				c.send <- shared.Message{
 					Sender:    "System",
 					Content:   "Edit failed: " + err.Error(),

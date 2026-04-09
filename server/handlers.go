@@ -697,10 +697,10 @@ func ClearMessages(db *sql.DB) error {
 	return err
 }
 
-func EditMessage(db *sql.DB, messageID int64, sender, newContent string) error {
+func EditMessage(db *sql.DB, messageID int64, sender, newContent string, encrypted bool) error {
 	result, err := dbExec(db,
-		`UPDATE messages SET content = ?, edited = 1, is_encrypted = 0 WHERE message_id = ? AND sender = ?`,
-		newContent, messageID, sender)
+		`UPDATE messages SET content = ?, edited = 1, is_encrypted = ? WHERE message_id = ? AND sender = ?`,
+		newContent, encrypted, messageID, sender)
 	if err != nil {
 		return fmt.Errorf("edit message: %w", err)
 	}

@@ -595,6 +595,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m2.MessageID == v.MessageID {
 					m.messages[i].Content = v.Content
 					m.messages[i].Edited = true
+					m.messages[i].Encrypted = v.Encrypted
 					break
 				}
 			}
@@ -1560,8 +1561,23 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
 					} else {
 						newContent := strings.Join(parts[2:], " ")
-						editMsg := shared.Message{Type: shared.EditMessageType, MessageID: id, Content: newContent, Sender: m.cfg.Username}
-						if m.conn != nil {
+						editMsg := shared.Message{Type: shared.EditMessageType, MessageID: id, Sender: m.cfg.Username}
+						okToSend := true
+						if m.useE2E && m.keystore != nil && m.keystore.GetSessionKey("global") != nil {
+							if err := verifyKeystoreUnlocked(m.keystore); err != nil {
+								m.messages = append(m.messages, shared.Message{Sender: "System", Content: "[ERROR] Keystore not unlocked: " + err.Error(), CreatedAt: time.Now(), Type: shared.TextMessage})
+								okToSend = false
+							} else if wire, encErr := encryptGlobalTextWireContent(m.keystore, m.cfg.Username, newContent); encErr != nil {
+								m.messages = append(m.messages, shared.Message{Sender: "System", Content: "[ERROR] Failed to encrypt edit: " + encErr.Error(), CreatedAt: time.Now(), Type: shared.TextMessage})
+								okToSend = false
+							} else {
+								editMsg.Content = wire
+								editMsg.Encrypted = true
+							}
+						} else {
+							editMsg.Content = newContent
+						}
+						if okToSend && m.conn != nil {
 							_ = m.conn.WriteJSON(editMsg)
 						}
 					}
