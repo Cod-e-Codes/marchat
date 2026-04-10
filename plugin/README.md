@@ -288,9 +288,19 @@ type Config struct {
 Plugins can store data in their data directory:
 
 ```go
+import (
+    "encoding/json"
+    "os"
+    "path/filepath"
+)
+
 func (p *MyPlugin) saveData(data interface{}) error {
-    dataFile := filepath.Join(p.config.DataDir, "data.json")
-    return os.WriteFile(dataFile, data, 0644)
+    dataFile := filepath.Join(p.GetConfig().DataDir, "data.json")
+    b, err := json.Marshal(data)
+    if err != nil {
+        return err
+    }
+    return os.WriteFile(dataFile, b, 0644)
 }
 ```
 
