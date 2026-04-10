@@ -18,6 +18,10 @@ mergedcoverage
 # HTML coverage report generate by Go tests
 coverage.html
 
+# go test -cpuprofile / -memprofile (local bench artifacts)
+*.pprof
+loadverify-cpu
+
 # SQLite database
 chat.db
 marchat.db

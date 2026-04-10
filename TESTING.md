@@ -41,6 +41,8 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `cmd/server/subprocess_doctor_test.go` | Server binary smoke | `go run ./cmd/server -doctor` / `-doctor-json` subprocess (covers `main` early exits) |
 | `server/handlers_test.go` | Server-side request handling | Database operations, message insertion, IP extraction |
 | `server/hub_test.go` | WebSocket hub management | User bans, kicks, connection management, non-blocking send verification |
+| `server/loadverify_ratelimit_test.go` | WebSocket read-pump rate limit | Window, burst (20), and cooldown behavior (same constants as `client.go`) |
+| `server/loadverify_bench_test.go` | Hub broadcast benchmarks (optional) | Channel vs system-wide fan-out, parallel senders, JSON marshal baseline; see [Optional hub load benchmarks](#optional-hub-load-benchmarks-server) |
 | `server/integration_test.go` | End-to-end workflows | Message flow, ban flow, concurrent operations |
 | `server/admin_web_test.go` | Admin web interface | HTTP endpoints, authentication, admin panel functionality |
 | `server/config_ui_test.go` | Server configuration UI | Configuration management, environment handling |
@@ -124,6 +126,31 @@ go test ./shared
 # Nested plugin SDK module (separate go.mod)
 cd plugin/sdk
 go test ./...
+```
+
+### Optional hub load benchmarks (server)
+
+`server/loadverify_bench_test.go` defines `BenchmarkLoadverify_*` helpers for profiling hub broadcast paths. **`go test ./...` does not run benchmarks** unless you pass `-bench` (and usually `-run=^$` so only benchmarks execute).
+
+What they approximate:
+
+- **Hub `Run` loop** fed by `hub.broadcast`, with clients registered and channel membership like production, but **no real WebSocket** and **large per-client send buffers** so the harness measures routing/coordination rather than production backpressure.
+- **`TypingMessage`** on the broadcast path avoids `SendMessageToPlugins` (see file comments). A separate sub-benchmark times `json.Marshal` on a text-shaped message for comparison.
+
+Interpreting results: channel-scoped delivery still iterates **all** registered clients in `hub.go` and filters by channel; the `fixedChannel8` sub-benchmarks vary total clients while keeping eight members in `#bench` to highlight that cost scales with **server-wide** connections, not only room size. ns/op and B/op depend on hardware, OS, and Go version, so use these runs for trends and profiling, not as fixed targets.
+
+Examples (repo root; adjust `-bench` regex as needed):
+
+```bash
+go test ./server -run=Loadverify -v
+go test ./server -run='^$' -bench=Loadverify -benchmem -count=5
+```
+
+**Windows PowerShell:** quote `-cpuprofile` (e.g. `-cpuprofile="loadverify-cpu.pprof"`) so the path is not misparsed; the profile is written to the shell’s current directory unless you pass an absolute path.
+
+```powershell
+go test ./server -run='^$' -bench=Loadverify_HubBroadcast_ChannelMessage/all_in_channel_128 -cpuprofile="loadverify-cpu.pprof"
+go tool pprof -top .\loadverify-cpu.pprof
 ```
 
 ### Using Test Scripts
