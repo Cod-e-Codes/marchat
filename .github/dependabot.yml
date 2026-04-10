@@ -1,3 +1,9 @@
+# Version updates for Go modules. Security advisories are configured separately under repo Settings.
+#
+# If GitHub shows a Node.js 20 deprecation warning on update-go_modules-graph for
+# github/dependabot-action@main, that comes from GitHub's Dependabot runner, not from
+# workflows in this repo. We keep our own Actions on pinned SHAs and use gh CLI where we
+# avoid third-party JS actions (see release.yml); Dependabot itself cannot be switched to gh.
 version: 2
 updates:
   - package-ecosystem: "gomod"
