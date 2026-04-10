@@ -2,12 +2,15 @@ package server
 
 import (
 	"database/sql"
+	"encoding/binary"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/gorilla/websocket"
 	_ "modernc.org/sqlite"
 )
 
@@ -789,4 +792,41 @@ func TestGetPinnedMessages(t *testing.T) {
 			t.Errorf("unexpected message_id %d", m.MessageID)
 		}
 	}
+}
+
+func TestFormatWSClose(t *testing.T) {
+	t.Run("policy violation reason", func(t *testing.T) {
+		const reason = "Username not allowed on this server"
+		p := formatWSClose(websocket.ClosePolicyViolation, reason)
+		if len(p) < 2 || len(p) > 123 {
+			t.Fatalf("payload len %d, want 2..123", len(p))
+		}
+		code := int(binary.BigEndian.Uint16(p[:2]))
+		if code != websocket.ClosePolicyViolation {
+			t.Fatalf("close code %d, want %d", code, websocket.ClosePolicyViolation)
+		}
+		if got := string(p[2:]); got != reason {
+			t.Fatalf("reason %q, want %q", got, reason)
+		}
+	})
+
+	t.Run("truncates long reason to RFC 6455 limit", func(t *testing.T) {
+		long := strings.Repeat("a", 200)
+		p := formatWSClose(websocket.ClosePolicyViolation, long)
+		if len(p) > 123 {
+			t.Fatalf("payload len %d, want <= 123", len(p))
+		}
+	})
+
+	t.Run("utf8 truncation does not split code points", func(t *testing.T) {
+		s := strings.Repeat("世", 50)
+		p := formatWSClose(websocket.ClosePolicyViolation, s)
+		if len(p) > 123 {
+			t.Fatalf("payload len %d", len(p))
+		}
+		reason := string(p[2:])
+		if !utf8.ValidString(reason) {
+			t.Fatal("truncated reason is not valid UTF-8")
+		}
+	})
 }

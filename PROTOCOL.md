@@ -42,8 +42,9 @@ If `admin` is requested:
 
 - The username must match one in the admin allowlist (case-insensitive).
 - The provided key must match the server’s configured key.
+- If the key does not match, the server sends a JSON message with `type` **`auth_failed`** and `data` containing `reason: "invalid admin key"`, then a **1008** WebSocket close with reason `Invalid admin key` (same RFC 6455 close frame format as other handshake rejections).
 
-Invalid handshakes (missing username, duplicate names, or invalid admin credentials) result in immediate connection termination. Duplicate usernames typically produce a close reason indicating the name is already taken (for example: `Username already taken - please choose a different username`).
+Invalid handshakes (missing username, duplicate names, or invalid admin credentials) result in immediate connection termination. The server sends a **standard WebSocket close frame** (RFC 6455): a registered **close code** plus an optional UTF-8 **reason** string (not raw text without a code). Handshake JSON parse failures use **1002** (`CloseProtocolError`); policy rejections (empty username, invalid username, allowlist, non-admin claiming admin, duplicate username, ban, etc.) use **1008** (`ClosePolicyViolation`). Duplicate usernames typically include reason text such as `Username already taken - please choose a different username`. Alternative clients should read the close code and reason from their WebSocket API, not assume the payload is plain text.
 
 ---
 

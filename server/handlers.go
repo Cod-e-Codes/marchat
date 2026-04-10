@@ -15,6 +15,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"unicode/utf8"
 
 	"github.com/Cod-e-Codes/marchat/shared"
 
@@ -897,6 +898,32 @@ func (h *Hub) broadcastUserList() {
 	h.clientsMutex.RUnlock()
 }
 
+// formatWSClose returns RFC 6455 close frame application data: 2-byte status (big-endian)
+// plus optional UTF-8 reason, total length at most 123 bytes.
+func formatWSClose(code int, text string) []byte {
+	const maxPayload = 123
+	maxText := maxPayload - 2
+	if maxText < 0 {
+		maxText = 0
+	}
+	text = truncateUTF8CloseReason(text, maxText)
+	return websocket.FormatCloseMessage(code, text)
+}
+
+func truncateUTF8CloseReason(s string, maxBytes int) string {
+	if maxBytes <= 0 {
+		return ""
+	}
+	if len(s) <= maxBytes {
+		return s
+	}
+	s = s[:maxBytes]
+	for len(s) > 0 && !utf8.ValidString(s) {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
 type adminAuth struct {
 	admins   map[string]struct{}
 	adminKey string
@@ -931,7 +958,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		var hs shared.Handshake
 		err = conn.ReadJSON(&hs)
 		if err != nil {
-			if err := conn.WriteMessage(websocket.CloseMessage, []byte("Invalid handshake")); err != nil {
+			if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.CloseProtocolError, "Invalid handshake")); err != nil {
 				log.Printf("WriteMessage error: %v", err)
 			}
 			conn.Close()
@@ -939,7 +966,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		}
 		username := strings.TrimSpace(hs.Username)
 		if username == "" {
-			if err := conn.WriteMessage(websocket.CloseMessage, []byte("Username required")); err != nil {
+			if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.ClosePolicyViolation, "Username required")); err != nil {
 				log.Printf("WriteMessage error: %v", err)
 			}
 			conn.Close()
@@ -953,7 +980,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 				"error":    err.Error(),
 				"ip":       getClientIP(r),
 			})
-			if err := conn.WriteMessage(websocket.CloseMessage, []byte("Invalid username: "+err.Error())); err != nil {
+			if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.ClosePolicyViolation, "Invalid username: "+err.Error())); err != nil {
 				log.Printf("WriteMessage error: %v", err)
 			}
 			conn.Close()
@@ -970,7 +997,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 					"ip":       getClientIP(r),
 				})
 				log.Printf("User '%s' (IP: %s) rejected - not in allowed users list", username, getClientIP(r))
-				if err := conn.WriteMessage(websocket.CloseMessage, []byte("Username not allowed on this server")); err != nil {
+				if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.ClosePolicyViolation, "Username not allowed on this server")); err != nil {
 					log.Printf("WriteMessage error: %v", err)
 				}
 				conn.Close()
@@ -980,16 +1007,18 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		isAdmin := false
 		if hs.Admin {
 			if _, ok := auth.admins[lu]; !ok {
-				if err := conn.WriteMessage(websocket.CloseMessage, []byte("Not an admin user")); err != nil {
+				if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.ClosePolicyViolation, "Not an admin user")); err != nil {
 					log.Printf("WriteMessage error: %v", err)
 				}
 				conn.Close()
 				return
 			}
 			if !hmac.Equal([]byte(hs.AdminKey), []byte(auth.adminKey)) {
-				// Send auth_failed message before closing
 				failMsg, _ := json.Marshal(map[string]string{"reason": "invalid admin key"})
 				if err := conn.WriteJSON(WSMessage{Type: "auth_failed", Data: failMsg}); err != nil {
+					log.Printf("WriteMessage error: %v", err)
+				}
+				if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.ClosePolicyViolation, "Invalid admin key")); err != nil {
 					log.Printf("WriteMessage error: %v", err)
 				}
 				conn.Close()
@@ -1004,7 +1033,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		// Atomically reserve username before creating client/session state.
 		if !hub.TryReserveUsername(username) {
 			log.Printf("Duplicate username attempt blocked: '%s' (IP: %s)", username, ipAddr)
-			if err := conn.WriteMessage(websocket.CloseMessage, []byte("Username already taken - please choose a different username")); err != nil {
+			if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.ClosePolicyViolation, "Username already taken - please choose a different username")); err != nil {
 				log.Printf("WriteMessage error: %v", err)
 			}
 			conn.Close()
@@ -1020,7 +1049,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		// Check if user is banned
 		if hub.IsUserBanned(username) {
 			log.Printf("Banned user '%s' (IP: %s) attempted to connect", username, ipAddr)
-			if err := conn.WriteMessage(websocket.CloseMessage, []byte("You are banned from this server")); err != nil {
+			if err := conn.WriteMessage(websocket.CloseMessage, formatWSClose(websocket.ClosePolicyViolation, "You are banned from this server")); err != nil {
 				log.Printf("WriteMessage error: %v", err)
 			}
 			conn.Close()
