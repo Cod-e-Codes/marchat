@@ -213,10 +213,7 @@ func (p *MyPlugin) Commands() []sdk.PluginCommand {
    package main
 
    import (
-       "encoding/json"
-       "fmt"
-       "os"
-       "time"
+       "log"
 
        "github.com/Cod-e-Codes/marchat/plugin/sdk"
    )
@@ -245,37 +242,19 @@ func (p *MyPlugin) Commands() []sdk.PluginCommand {
 
    func main() {
        plugin := NewMyPlugin()
-       
-       decoder := json.NewDecoder(os.Stdin)
-       encoder := json.NewEncoder(os.Stdout)
-       
-       for {
-           var req sdk.PluginRequest
-           if err := decoder.Decode(&req); err != nil {
-               break
-           }
-           
-           response := handleRequest(plugin, req)
-           encoder.Encode(response)
+       if err := sdk.RunStdio(plugin, plugin.handleCommand); err != nil {
+           log.Fatalf("plugin exited: %v", err)
        }
    }
 
-   func handleRequest(plugin *MyPlugin, req sdk.PluginRequest) sdk.PluginResponse {
-       // Handle different request types
-       switch req.Type {
-       case "init":
-           // Handle initialization
-       case "message":
-           // Handle incoming message
-       case "command":
-           // Handle command execution
-       case "shutdown":
-           // Handle shutdown
-       }
-       
+   // handleCommand handles PluginRequest type "command" (chat :commands).
+   // init, message, and shutdown are handled by sdk.HandlePluginRequest via RunStdio.
+   func (p *MyPlugin) handleCommand(command string, args []string) sdk.PluginResponse {
+       _ = args
        return sdk.PluginResponse{
-           Type:    req.Type,
-           Success: true,
+           Type:    "command",
+           Success: false,
+           Error:   "unknown command",
        }
    }
    ```

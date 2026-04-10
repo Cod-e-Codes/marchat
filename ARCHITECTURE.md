@@ -166,7 +166,7 @@ Extensible architecture allowing custom functionality through external plugins.
 
 #### Components
 
-- **SDK** (`plugin/sdk/`): Core plugin interface definitions and base implementations
+- **SDK** (`plugin/sdk/`): Core plugin interface definitions, base implementations, and optional stdio helpers (`RunStdio`, `HandlePluginRequest`)
 - **Host** (`plugin/host/`): Subprocess management and JSON-based communication
 - **Manager** (`plugin/manager/`): Plugin installation, store integration, and command execution
 - **Store** (`plugin/store/`): Terminal-based plugin browsing and installation interface

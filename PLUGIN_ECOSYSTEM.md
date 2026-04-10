@@ -34,6 +34,7 @@ The plugin ecosystem consists of several interconnected components:
 **Key Files**:
 - `plugin.go` - Core Plugin interface and supporting types
 - `BasePlugin` - Default implementation for common functionality
+- `stdio.go` - Shared stdin/stdout JSON loop (`RunStdio`, `RunIO`) and `HandlePluginRequest` for init/message/command/shutdown
 
 **Features**:
 - Plugin interface with lifecycle methods

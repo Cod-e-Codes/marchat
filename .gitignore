@@ -15,6 +15,7 @@
 coverage
 mergedcoverage
 cover_sdk
+plugin/sdk/cov
 
 # HTML coverage report generate by Go tests
 coverage.html
