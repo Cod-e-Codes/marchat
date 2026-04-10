@@ -494,7 +494,9 @@ func (h *Hub) Run() {
 
 			if sharedMsg, ok := message.(shared.Message); ok && sharedMsg.Type == shared.TextMessage {
 				if h.pluginCommandHandler != nil {
-					h.pluginCommandHandler.SendMessageToPlugins(sharedMsg)
+					// Never block the hub on plugin IPC; fan-out runs in its own goroutine.
+					msgCopy := sharedMsg
+					go h.pluginCommandHandler.SendMessageToPlugins(msgCopy)
 				}
 			}
 		}

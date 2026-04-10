@@ -79,7 +79,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 
 #### Core Structures
 
-- **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered. All sends to `client.send` use non-blocking `select/default` to prevent deadlocks when a client's write buffer is full; stalled clients are dropped or the message is logged and skipped.
+- **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered. All sends to `client.send` use non-blocking `select/default` to prevent deadlocks when a client's write buffer is full; stalled clients are dropped or the message is logged and skipped. **Text** messages fan out to plugins in a **separate goroutine** so plugin IPC never blocks the hub’s broadcast loop.
 - **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer.
 - **`AdminPanel`**: Terminal-based administrative interface for server management
 - **`WebAdminServer`**: Web-based administrative interface with session authentication
@@ -167,7 +167,7 @@ Extensible architecture allowing custom functionality through external plugins.
 #### Components
 
 - **SDK** (`plugin/sdk/`): Core plugin interface definitions, base implementations, and optional stdio helpers (`RunStdio`, `HandlePluginRequest`)
-- **Host** (`plugin/host/`): Subprocess management and JSON-based communication
+- **Host** (`plugin/host/`): Subprocess management and JSON-based communication; **chat** fan-out uses a **bounded per-plugin queue** and a dedicated writer goroutine so a slow or stuck plugin cannot block the server hub (overflow drops are logged).
 - **Manager** (`plugin/manager/`): Plugin installation, store integration, and command execution
 - **Store** (`plugin/store/`): Terminal-based plugin browsing and installation interface
 - **License** (`plugin/license/`): Cryptographic license validation for official plugins (cached licenses re-verified on read)

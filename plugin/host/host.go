@@ -19,6 +19,10 @@ import (
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
 )
 
+// pluginOutboundQueueDepth caps how many chat fan-out messages are buffered per plugin.
+// Beyond this, new fan-out messages are dropped so slow or stuck plugins cannot block the server hub.
+const pluginOutboundQueueDepth = 64
+
 // Valid plugin name pattern: lowercase letters, numbers, hyphens, underscores only
 var validPluginNameRegex = regexp.MustCompile(`^[a-z0-9_-]+$`)
 
@@ -64,6 +68,9 @@ type PluginInstance struct {
 	Enabled  bool
 	decoder  *json.Decoder
 	mu       sync.Mutex
+	// msgQueue carries chat fan-out only; each running plugin has a dedicated writer goroutine.
+	msgQueue     chan sdk.Message
+	outboundDone sync.WaitGroup
 }
 
 // NewPluginHost creates a new plugin host
@@ -244,6 +251,14 @@ func (h *PluginHost) StartPlugin(name string) error {
 		return fmt.Errorf("failed to initialize plugin %s: %w", name, err)
 	}
 
+	outCh := make(chan sdk.Message, pluginOutboundQueueDepth)
+	instance.msgQueue = outCh
+	instance.outboundDone.Add(1)
+	go func() {
+		defer instance.outboundDone.Done()
+		h.runPluginOutboundWriter(outCh, instance)
+	}()
+
 	// Start communication goroutines.
 	// Stderr is captured as a function arg so StopPlugin can safely nil the
 	// struct field without racing the goroutine's first read.
@@ -270,10 +285,19 @@ func (h *PluginHost) StopPlugin(name string) error {
 	}
 
 	instance.mu.Lock()
+	alreadyStopped := instance.Process == nil
+	instance.mu.Unlock()
+	if alreadyStopped {
+		return nil
+	}
+
+	h.drainAndWaitPluginOutbound(instance)
+
+	instance.mu.Lock()
 	defer instance.mu.Unlock()
 
 	if instance.Process == nil {
-		return nil // Already stopped
+		return nil
 	}
 
 	// Send shutdown request
@@ -389,7 +413,9 @@ func (h *PluginHost) ListPlugins() map[string]*PluginInstance {
 	return result
 }
 
-// SendMessage sends a message to all enabled plugins
+// SendMessage enqueues a chat fan-out message for each enabled, running plugin.
+// Delivery is asynchronous with a bounded queue per plugin; full queues drop messages
+// so the caller never blocks on plugin stdin I/O.
 func (h *PluginHost) SendMessage(msg sdk.Message) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
@@ -398,15 +424,70 @@ func (h *PluginHost) SendMessage(msg sdk.Message) {
 		if !instance.Enabled || instance.Process == nil {
 			continue
 		}
+		h.enqueuePluginChatMessage(instance, name, msg)
+	}
+}
 
+func (h *PluginHost) enqueuePluginChatMessage(instance *PluginInstance, name string, msg sdk.Message) {
+	instance.mu.Lock()
+	defer instance.mu.Unlock()
+	q := instance.msgQueue
+	if q == nil {
+		return
+	}
+	select {
+	case q <- msg:
+	default:
+		log.Printf("Plugin %s outbound queue full; dropping chat fan-out message", name)
+	}
+}
+
+func (h *PluginHost) runPluginOutboundWriter(ch <-chan sdk.Message, instance *PluginInstance) {
+	for msg := range ch {
 		req := sdk.PluginRequest{
 			Type: "message",
 			Data: mustMarshal(msg),
 		}
-
-		if err := h.sendRequest(instance, req); err != nil {
-			log.Printf("Failed to send message to plugin %s: %v", name, err)
+		data, err := json.Marshal(req)
+		if err != nil {
+			log.Printf("Failed to marshal plugin request for %s: %v", instance.Name, err)
+			continue
 		}
+		line := append(data, '\n')
+
+		instance.mu.Lock()
+		stdin := instance.Stdin
+		instance.mu.Unlock()
+		if stdin == nil {
+			continue
+		}
+		if _, err := stdin.Write(line); err != nil {
+			log.Printf("Failed to send message to plugin %s: %v", instance.Name, err)
+		}
+	}
+}
+
+func (h *PluginHost) drainAndWaitPluginOutbound(instance *PluginInstance) {
+	instance.mu.Lock()
+	ch := instance.msgQueue
+	instance.msgQueue = nil
+	instance.mu.Unlock()
+
+	if ch == nil {
+		return
+	}
+	close(ch)
+
+	waitDone := make(chan struct{})
+	go func() {
+		instance.outboundDone.Wait()
+		close(waitDone)
+	}()
+
+	select {
+	case <-waitDone:
+	case <-time.After(2 * time.Second):
+		log.Printf("Plugin %s outbound writer did not finish within 2s; proceeding with shutdown", instance.Name)
 	}
 }
 

@@ -111,6 +111,7 @@ type Message struct {
 **Message routing rules**:
 
 - The hub only forwards messages with `type` set to `"text"` to plugins. Other types (typing, reactions, etc.) are not delivered.
+- **Host behavior**: The server never blocks its hub on plugin stdin. Each running plugin has a **bounded outbound queue** (64 messages by default in `plugin/host`); if a plugin falls behind, **new chat fan-out lines may be dropped** (logged server-side). Plugins should return quickly from `OnMessage` and avoid blocking the stdio read loop.
 - Plugin replies that **omit** `type` (or set it to anything other than `"text"`) are broadcast to clients but are **not** re-forwarded to other plugins. This prevents accidental infinite loops.
 - To opt into **plugin-to-plugin chaining**, set `Type: "text"` on outbound `sdk.Message` explicitly. Use with care: the echo plugin, for example, should not do this or it will loop.
 - **Encrypted messages**: The hub does not filter encrypted messages before forwarding to plugins. Plugins receive them with `Encrypted: true` and opaque `Content`. Plugins that parse `Content` should check `msg.Encrypted` and skip or handle accordingly.
