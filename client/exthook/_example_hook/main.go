@@ -1,6 +1,6 @@
 // Example stdin hook: append each JSON line to a log file for spike testing.
 //
-// Build: go build -o marchat-hook-log ./client/exthook/example_hook
+// Build: go build -o marchat-hook-log ./client/exthook/_example_hook
 // Run client from repo root: go run ./client  (not go run .)
 // Env: MARCHAT_CLIENT_HOOK_RECEIVE=C:\full\path\marchat-hook-log.exe (and/or MARCHAT_CLIENT_HOOK_SEND)
 //

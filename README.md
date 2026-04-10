@@ -775,10 +775,11 @@ Foundational test suite covering core functionality, cryptography, and plugins. 
 
 ### Running Tests
 ```bash
-go test ./...              # Run all tests
+go test ./...              # Run all tests (main module only)
 go test -cover ./...       # With coverage
 go test ./server -v        # Specific package
 go test ./... -timeout 10s # With timeout (CI recommended)
+cd plugin/sdk && go test ./...   # Nested SDK module (separate go.mod)
 ```
 
 ### Test Scripts
@@ -790,21 +791,22 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 
 | Package | Coverage | Size | Status |
 |---------|----------|------|--------|
-| `shared` | 88.1% | 212 LOC | High |
-| `plugin/license` | 87.1% | 203 LOC | High |
-| `client/crypto` | 80.3% | 320 LOC | High |
-| `config` | 73.2% | 285 LOC | High |
-| `plugin/host` | 62.5% | 539 LOC | Medium |
-| `client/config` | 57.3% | 1683 LOC | Medium |
-| `internal/doctor` | 49.8% | 661 LOC | Medium |
-| `plugin/store` | 47.0% | 490 LOC | Medium |
-| `cmd/license` | 42.2% | 140 LOC | Medium |
-| `server` | 36.1% | 6303 LOC | Low |
-| `plugin/manager` | 32.1% | 626 LOC | Low |
-| `client` | 23.0% | 4966 LOC | Low |
-| `cmd/server` | 13.7% | 424 LOC | Low |
+| `shared` | 88.1% | 253 LOC | High |
+| `plugin/license` | 87.1% | 246 LOC | High |
+| `client/crypto` | 80.3% | 387 LOC | High |
+| `config` | 73.2% | 339 LOC | High |
+| `plugin/host` | 62.5% | 623 LOC | Medium |
+| `client/config` | 58.0% | 1993 LOC | Medium |
+| `internal/doctor` | 52.1% | 802 LOC | Medium |
+| `plugin/store` | 47.0% | 552 LOC | Medium |
+| `cmd/license` | 42.2% | 160 LOC | Medium |
+| `server` | 36.3% | 7215 LOC | Low |
+| `plugin/manager` | 32.1% | 747 LOC | Low |
+| `client/exthook` | 24.1% | 204 LOC | Low |
+| `client` | 23.1% | 5555 LOC | Low |
+| `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 37.7%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 37.8%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

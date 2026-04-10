@@ -54,6 +54,17 @@ myplugin/
 
 ## Plugin SDK
 
+### Running SDK tests (nested module)
+
+`plugin/sdk` has its own `go.mod`, so the repo root `go test ./...` command does **not** execute its tests. From the repository root:
+
+```bash
+cd plugin/sdk
+go test ./...
+```
+
+The sample under `plugin/examples/echo` is also a small standalone module (`cd plugin/examples/echo && go test ./...`); it may report `[no test files]`. Full-suite notes and merged coverage for the main module are in [TESTING.md](../TESTING.md).
+
 ### Core Interface
 
 ```go

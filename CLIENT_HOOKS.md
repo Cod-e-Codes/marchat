@@ -80,10 +80,10 @@ Filter scripts on `message.type` / `event` as needed.
 
 ## Example: append-only logger
 
-Build the bundled sample (from repo root):
+Build the bundled sample (from repo root). The directory is named **`_example_hook`** on purpose: Go omits paths whose first path element begins with **`_`** (or **`.`**) or is named **`testdata`** from **`./...`**, so this sample **`package main`** tree is not matched by **`go test ./...`** at the repository root. You still build or run it by passing that path explicitly, as below.
 
 ```bash
-go build -o /tmp/marchat-hook-log ./client/exthook/example_hook
+go build -o /tmp/marchat-hook-log ./client/exthook/_example_hook
 ```
 
 Run the client with hooks (paths must be absolute on your OS):
