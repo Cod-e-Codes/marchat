@@ -166,7 +166,7 @@ When the hub sends a `"message"` request, the `data` payload is an `sdk.Message`
 
 Zero-value fields (`channel` empty, `encrypted` false, `message_id` 0, etc.) are omitted from JSON via `omitempty`. Plugins compiled against older SDK versions silently ignore new keys.
 
-**Routing behavior**: Only messages with `type` `"text"` are forwarded to plugins by the hub. Fan-out runs **off the hub goroutine** and each plugin has a **bounded outbound queue** in the host; if a plugin cannot keep up, **chat deliveries may be dropped** (see server logs). Plugin replies that omit `type` are broadcast to clients but **not** re-forwarded to plugins (prevents loops). Set `Type: "text"` on outbound `sdk.Message` to opt into plugin-to-plugin chaining. Encrypted messages are delivered with `Encrypted: true` and opaque `Content`; plugins should check the flag before parsing.
+**Routing behavior**: Only messages with `type` `"text"` are forwarded to plugins by the hub. Fan-out runs **off the hub goroutine** and each plugin has a **bounded outbound queue** in the host; if a plugin cannot keep up, **chat deliveries may be dropped** (see server logs). Delivery is **best-effort** and **at most once per plugin per message** from the host (no server-side retry after a drop or a failed write to that plugin's stdin). Plugin replies that omit `type` are broadcast to clients but **not** re-forwarded to plugins (prevents loops). Set `Type: "text"` on outbound `sdk.Message` to opt into plugin-to-plugin chaining. Encrypted messages are delivered with `Encrypted: true` and opaque `Content`; plugins should check the flag before parsing.
 
 ### Request Types
 
