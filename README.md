@@ -280,7 +280,7 @@ The repository’s `config/` directory holds **server** runtime files and the **
 
 ### Diagnostics (`-doctor`)
 
-Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, redacted `MARCHAT_*` secrets as length-only, other env values as shown, sanity checks). **Server** doctor lists `MARCHAT_*` **after** loading the resolved config directory’s **`.env`** (same as the running server), so values are not limited to what your shell exported. **Client** doctor only shows variables present in the client process (it does not read the server’s `config/.env`). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, and attempts a DB ping. On a **color-capable terminal** (stdout is a TTY), the text report uses **ANSI colors** aligned with the server pre-TUI banner; set **`NO_COLOR`** or redirect to a file/pipe for **plain** output. Use **`-doctor-json`** for machine-readable output (never colorized). If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, redacted `MARCHAT_*` secrets as length-only, other env values as shown, sanity checks). **Server** doctor lists `MARCHAT_*` **after** loading the resolved config directory’s **`.env`** (same as the running server), so values are not limited to what your shell exported. **Client** doctor only shows variables present in the client process (it does not read the server’s `config/.env`); it also lists **experimental client hook** env vars and validates receive/send hook paths when set (see [CLIENT_HOOKS.md](CLIENT_HOOKS.md)). **Server** doctor does **not** list those client-only hook variables, even if they are set in the shell (for example when you run client and server from the same session). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, and attempts a DB ping. On a **color-capable terminal** (stdout is a TTY), the text report uses **ANSI colors** aligned with the server pre-TUI banner; set **`NO_COLOR`** or redirect to a file/pipe for **plain** output. Use **`-doctor-json`** for machine-readable output (never colorized). If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 ## Admin Commands
 
@@ -675,6 +675,15 @@ Profiles stored in platform-appropriate locations:
 ./marchat-client --non-interactive --server ws://localhost:8080/ws --username alice
 ```
 
+## Advanced features
+
+### Experimental client hooks (local automation)
+
+The TUI client can spawn **optional** external programs on send/receive and pass one JSON line on stdin per event, useful for custom logging, bridges, or local tooling. This is **experimental** (protocol may change); it does not replace server plugins or built-in notifications.
+
+- **Documentation:** [CLIENT_HOOKS.md](CLIENT_HOOKS.md) (security model, env vars, JSON shape).
+- **Entrypoint:** from the repo root, `go run ./client` (the client lives in `client/`, not the repo root).
+
 ## Security Best Practices
 
 1. **Generate Secure Keys**
@@ -820,6 +829,7 @@ go test ./...
 - **[PROTOCOL.md](PROTOCOL.md)** - WebSocket message types and payloads
 - **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md)** - Optional TLS reverse proxy (Caddy) for local or LAN `wss://`
 - **[NOTIFICATIONS.md](NOTIFICATIONS.md)** - Notification system guide (desktop, quiet hours, focus mode)
+- **[CLIENT_HOOKS.md](CLIENT_HOOKS.md)** - Experimental client-side external hooks (local automation)
 - **[THEMES.md](THEMES.md)** - Custom theme creation guide
 - **[PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md)** - Plugin development guide
 - **[ROADMAP.md](ROADMAP.md)** - Planned features and enhancements

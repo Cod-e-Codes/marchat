@@ -13,6 +13,7 @@ import (
 
 	"github.com/Cod-e-Codes/marchat/client/config"
 	"github.com/Cod-e-Codes/marchat/client/crypto"
+	"github.com/Cod-e-Codes/marchat/client/exthook"
 	"github.com/Cod-e-Codes/marchat/internal/doctor"
 	"github.com/Cod-e-Codes/marchat/shared"
 
@@ -1791,6 +1792,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							Content: text,
 							Type:    shared.AdminCommandType,
 						}
+						exthook.FireSend(msg)
 						err := m.conn.WriteJSON(msg)
 						if err != nil {
 							m.banner = "[ERROR] Failed to send command (connection lost)"
@@ -1805,6 +1807,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							Recipient: m.dmRecipient,
 							Content:   text,
 						}
+						exthook.FireSend(dmMsg)
 						if err := m.conn.WriteJSON(dmMsg); err != nil {
 							m.banner = "[ERROR] Failed to send DM (connection lost)"
 							m.sending = false
@@ -1830,6 +1833,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 
 						// Use the debug encryption function for global chat
+						exthook.FireSend(shared.Message{
+							Sender:  m.cfg.Username,
+							Content: text,
+							Type:    shared.TextMessage,
+						})
 						if err := debugEncryptAndSend(recipients, text, m.conn, m.keystore, m.cfg.Username); err != nil {
 							m.banner = fmt.Sprintf("[ERROR] Global encryption failed: %v", err)
 							m.sending = false
@@ -1842,6 +1850,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						// Send plain text message
 						msg := shared.Message{Sender: m.cfg.Username, Content: text}
+						exthook.FireSend(msg)
 						if err := debugWebSocketWrite(m.conn, msg); err != nil {
 							m.banner = "[ERROR] Failed to send (connection lost)"
 							m.sending = false

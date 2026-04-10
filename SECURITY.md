@@ -59,6 +59,10 @@ It **does not cover**:
 
 The `-doctor` / `-doctor-json` commands print masked values for sensitive `MARCHAT_*` variables; avoid sharing raw process environment dumps alongside doctor output. For air-gapped hosts, set `MARCHAT_DOCTOR_NO_NETWORK=1` so doctor does not call the GitHub API.
 
+### Experimental client hooks (local)
+
+Optional **`MARCHAT_CLIENT_HOOK_*`** settings run programs you choose on your machine with **decrypted message content** (receive) or **plaintext before send** (send). That does not break wire encryption, but it **extends trust** to those binaries and anything that can read their output or logs. Treat hook paths like running arbitrary executables. See **[CLIENT_HOOKS.md](CLIENT_HOOKS.md)** for the experimental protocol and env vars.
+
 ### Client global E2E key
 
 When the client **auto-generates** a global E2E key, it does **not** print the full base64 key to stdout (only a Key ID). Distribute the key using **`MARCHAT_GLOBAL_E2E_KEY`**, **`keystore.dat`** plus passphrase, or another channel you treat as confidential; do not rely on terminal output for key material.

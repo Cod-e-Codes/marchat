@@ -234,7 +234,7 @@ func RunServer(o Options) error {
 	}
 
 	// Snapshot MARCHAT_* after config load so .env (godotenv.Overload) is reflected.
-	envLines := buildEnvLines()
+	envLines := buildEnvLines("server")
 
 	rep := Report{
 		Role:          "server",
@@ -288,10 +288,12 @@ func RunClient(o Options) error {
 	if absErr != nil {
 		absDir = dir
 	}
-	envLines := buildEnvLines()
-	checks := make([]Check, 0, 20)
+	envLines := buildEnvLines("client")
+	checks := make([]Check, 0, 24)
 
 	appendCheck(&checks, "config_dir", "ok", fmt.Sprintf("client config directory (absolute): %s", absDir))
+
+	appendClientHookChecks(&checks)
 
 	if os.Getenv("MARCHAT_CONFIG_DIR") != "" {
 		appendCheck(&checks, "config_layout", "ok", "MARCHAT_CONFIG_DIR overrides the default per-user client directory")

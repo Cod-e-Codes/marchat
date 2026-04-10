@@ -54,7 +54,7 @@ func TestBuildEnvLines_orderAndMask(t *testing.T) {
 			"MARCHAT_EXTRA_CUSTOM=bar",
 		}
 	}
-	lines := buildEnvLines()
+	lines := buildEnvLines("server")
 	foundPort := false
 	foundExtra := false
 	for _, e := range lines {
@@ -160,6 +160,78 @@ func TestRunServerDoctor_environmentReflectsDotenv(t *testing.T) {
 	}
 	if usersDisplay != "alice,bob" {
 		t.Fatalf("MARCHAT_USERS want alice,bob from .env, got %q", usersDisplay)
+	}
+}
+
+func TestBuildEnvLines_clientIncludesHookVars(t *testing.T) {
+	t.Parallel()
+	found := false
+	for _, e := range buildEnvLines("client") {
+		if e.Key == "MARCHAT_CLIENT_HOOK_RECEIVE" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("client doctor env should list MARCHAT_CLIENT_HOOK_RECEIVE")
+	}
+	for _, e := range buildEnvLines("server") {
+		if e.Key == "MARCHAT_CLIENT_HOOK_RECEIVE" {
+			t.Fatal("server doctor env should not list client hook vars")
+		}
+	}
+}
+
+func TestBuildEnvLines_serverOmitsClientHookEnvEvenWhenSet(t *testing.T) {
+	t.Parallel()
+	old := osEnviron
+	t.Cleanup(func() { osEnviron = old })
+	osEnviron = func() []string {
+		return []string{
+			"MARCHAT_PORT=8080",
+			"MARCHAT_CLIENT_HOOK_RECEIVE=C:\\temp\\marchat-hook-log.exe",
+			"MARCHAT_CLIENT_HOOK_SEND=C:\\temp\\marchat-hook-log.exe",
+			"MARCHAT_HOOK_LOG=C:\\Users\\x\\hook.log",
+		}
+	}
+	for _, e := range buildEnvLines("server") {
+		switch e.Key {
+		case "MARCHAT_CLIENT_HOOK_RECEIVE", "MARCHAT_CLIENT_HOOK_SEND", "MARCHAT_HOOK_LOG":
+			t.Fatalf("server doctor should omit client hook env when set in process: saw %s", e.Key)
+		}
+	}
+}
+
+func TestAppendClientHookChecks_goodPath(t *testing.T) {
+	dir := t.TempDir()
+	p := filepath.Join(dir, "hook.exe")
+	if err := os.WriteFile(p, []byte{1, 2}, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	abs, err := filepath.Abs(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("MARCHAT_CLIENT_HOOK_RECEIVE", abs)
+	t.Setenv("MARCHAT_CLIENT_HOOK_SEND", "")
+	t.Cleanup(func() {
+		_ = os.Unsetenv("MARCHAT_CLIENT_HOOK_RECEIVE")
+		_ = os.Unsetenv("MARCHAT_CLIENT_HOOK_SEND")
+	})
+	var checks []Check
+	appendClientHookChecks(&checks)
+	if len(checks) != 1 || checks[0].Status != "ok" || checks[0].ID != "client_hook_receive" {
+		t.Fatalf("checks: %+v", checks)
+	}
+}
+
+func TestAppendClientHookChecks_relativePathWarns(t *testing.T) {
+	t.Setenv("MARCHAT_CLIENT_HOOK_RECEIVE", "relative\\hook.exe")
+	t.Cleanup(func() { _ = os.Unsetenv("MARCHAT_CLIENT_HOOK_RECEIVE") })
+	var checks []Check
+	appendClientHookChecks(&checks)
+	if len(checks) != 1 || checks[0].Status != "warn" {
+		t.Fatalf("checks: %+v", checks)
 	}
 }
 

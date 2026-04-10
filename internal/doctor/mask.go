@@ -48,3 +48,15 @@ var KnownMarchatEnvKeys = []string{
 	"MARCHAT_ALLOWED_USERS",
 	"MARCHAT_DOCTOR_NO_NETWORK",
 }
+
+// ClientHookMarchatEnvKeys lists client-only hook-related variables appended after KnownMarchatEnvKeys
+// when running client doctor. Server doctor omits these rows (they are not read by the server).
+// MARCHAT_HOOK_LOG is consumed by the bundled example_hook binary, not the marchat client itself.
+var ClientHookMarchatEnvKeys = []string{
+	"MARCHAT_CLIENT_HOOK_RECEIVE",
+	"MARCHAT_CLIENT_HOOK_SEND",
+	"MARCHAT_CLIENT_HOOK_TIMEOUT_SEC",
+	"MARCHAT_CLIENT_HOOK_RECEIVE_TYPING",
+	"MARCHAT_CLIENT_HOOK_DEBUG",
+	"MARCHAT_HOOK_LOG",
+}

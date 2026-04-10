@@ -37,6 +37,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - **`hotkeys.go`**: Key binding definitions and methods
 - **`render.go`**: Message rendering and UI display logic (optional per-line metadata: message id and encrypted flag)
 - **`websocket.go`**: WebSocket connection management, send/receive, and E2E encryption helpers
+- **`exthook/`**: Optional, experimental subprocess hooks for local automation (stdin JSON per event); see **CLIENT_HOOKS.md**
 - **`commands.go`**: Help text generation and command-related utilities
 - **`notification_manager.go`**: Desktop/bell notification system
 
@@ -108,7 +109,7 @@ The server package contains the core server logic and components that are used b
 
 #### Core Components
 
-- **WebSocket Handlers**: Connection management and message routing
+- **WebSocket Handlers**: Connection management and message routing; failed handshakes close with **RFC 6455** close frames (registered status code + UTF-8 reason, not a raw text payload—see `PROTOCOL.md`)
 - **Database Layer**: Pluggable SQL backends (SQLite/PostgreSQL/MySQL) with dialect-aware schema and query helpers
 - **Admin Interfaces**: Both TUI and web-based administrative panels
 - **Plugin Integration**: Plugin command handling and execution
@@ -209,7 +210,7 @@ The **client** stores `config.json`, `profiles.json`, keystore, themes, and debu
 
 ### Diagnostics (`internal/doctor`)
 
-Shared package invoked by **`marchat-client`** and **`marchat-server`** when passed **`-doctor`** (human-readable report) or **`-doctor-json`** (JSON on stdout). It summarizes Go/OS, resolved config directories, known `MARCHAT_*` variables with secrets masked, role-specific checks (client: profiles, clipboard, TTY; server: `.env`, validation, detected DB dialect, DB connection-string format validation, DB/TLS ping checks), and optionally compares the embedded version to the latest GitHub release. For **server** doctor, the `MARCHAT_*` listing is captured **after** `LoadConfigWithoutValidation` applies **`godotenv.Overload`** on `config/.env`, matching effective runtime env; **client** doctor still reflects only the client process environment. The **text** report is **colorized** when stdout is a terminal and **`NO_COLOR`** is unset (otherwise plain); **`-doctor-json`** is always unstyled JSON. Set **`MARCHAT_DOCTOR_NO_NETWORK=1`** to skip the release check (e.g. air-gapped environments).
+Shared package invoked by **`marchat-client`** and **`marchat-server`** when passed **`-doctor`** (human-readable report) or **`-doctor-json`** (JSON on stdout). It summarizes Go/OS, resolved config directories, known `MARCHAT_*` variables with secrets masked, role-specific checks (client: profiles, clipboard, TTY, and optional **experimental client hook** env vars plus executable path validation when receive/send paths are set; server: `.env`, validation, detected DB dialect, DB connection-string format validation, DB/TLS ping checks), and optionally compares the embedded version to the latest GitHub release. For **server** doctor, the `MARCHAT_*` listing is captured **after** `LoadConfigWithoutValidation` applies **`godotenv.Overload`** on `config/.env`, matching effective runtime env; **client** doctor still reflects only the client process environment. **Server** doctor omits client-only hook keys from the environment section entirely, even when they are set in the process (for example the same shell session used to start the client). The **text** report is **colorized** when stdout is a terminal and **`NO_COLOR`** is unset (otherwise plain); **`-doctor-json`** is always unstyled JSON. Set **`MARCHAT_DOCTOR_NO_NETWORK=1`** to skip the release check (e.g. air-gapped environments).
 
 ### Command Line Tools (`cmd/`)
 

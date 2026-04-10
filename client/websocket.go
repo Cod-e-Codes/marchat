@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/client/crypto"
+	"github.com/Cod-e-Codes/marchat/client/exthook"
 	"github.com/Cod-e-Codes/marchat/shared"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
@@ -380,6 +381,7 @@ func (m *model) connectWebSocket(serverURL string) error {
 					}
 				}
 
+				exthook.FireReceive(chatMsg)
 				m.deliverWSMsg(chatMsg)
 				continue
 			}
