@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.11.0--beta.4-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.4)
+[![Version](https://img.shields.io/badge/version-v0.11.0--beta.5-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.5)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -15,14 +15,20 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ## Latest Updates
 
-### v0.11.0-beta.4 (Current)
+### v0.11.0-beta.5 (Current)
 
-**Released 2026-04-09.** Since **[v0.11.0-beta.3](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.3)**; compare [`v0.11.0-beta.3...v0.11.0-beta.4`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.3...v0.11.0-beta.4). Commits: **`git log v0.11.0-beta.3..v0.11.0-beta.4 --oneline`**.
+**Released 2026-04-10.** Since **[v0.11.0-beta.4](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.4)**; compare [`v0.11.0-beta.4...v0.11.0-beta.5`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.4...v0.11.0-beta.5). Commits: **`git log v0.11.0-beta.4..v0.11.0-beta.5 --oneline`**.
 
-- **E2E**: Message edits keep ciphertext and **`is_encrypted`** consistent.
-- **Themes**: Deterministic **`:themes`** / **Ctrl+T** order (built-ins then custom keys in `themes.json`); **[THEMES.md](THEMES.md)**.
-- **Docs**: Container/SBOM scanners vs **`govulncheck`** and **pgx** CVE metadata (**SECURITY.md**, **README**).
-- **Repo**: **`.gitattributes`** LF enforcement and renormalized text files.
+- **Server**: RFC 6455 WebSocket close frames on handshake errors; hub stays off plugin IPC with bounded, best-effort, at-most-once plugin chat fan-out.
+- **Client**: Experimental env-driven **exthook** and **`-doctor`** integration.
+- **Plugin SDK**: **`RunStdio`** / **`HandlePluginRequest`** stdio loop; echo sample uses the SDK; docs and **README** plugin examples aligned (**GetConfig**, **Marshal**); **`plugin/sdk/cov`** gitignored; CI runs nested plugin modules (**fmt**, **govulncheck**).
+- **Tests / CI**: Server loadverify benches and rate-limit coverage; **`-doctor`** tests serialize **`os.Environ`** hook; Dependabot Node 20 note in **`.github/dependabot.yml`**.
+- **Docs**: **TESTING** bench section; refreshed metrics, coverage, and LoC; hook example lives under **`_example_hook`**; prose uses ASCII hyphens where edited.
+- **Deps**: **`golang.org/x/crypto`**, **`golang.org/x/term`**, **`modernc.org/sqlite`**.
+
+### v0.11.0-beta.4
+
+**Released 2026-04-09.** [Compare from beta.3](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.3...v0.11.0-beta.4). E2E edit consistency; deterministic theme cycle; security scanner vs **govulncheck** docs; **`.gitattributes`** LF normalization.
 
 ### v0.11.0-beta.3
 
@@ -151,12 +157,12 @@ Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQ
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.4/marchat-v0.11.0-beta.4-linux-amd64.zip
-unzip marchat-v0.11.0-beta.4-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.5/marchat-v0.11.0-beta.5-linux-amd64.zip
+unzip marchat-v0.11.0-beta.5-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.4/marchat-v0.11.0-beta.4-darwin-amd64.zip
-unzip marchat-v0.11.0-beta.4-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.5/marchat-v0.11.0-beta.5-darwin-amd64.zip
+unzip marchat-v0.11.0-beta.5-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -164,11 +170,11 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.11.0-beta.4
+docker pull codecodesxyz/marchat:v0.11.0-beta.5
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.11.0-beta.4
+  codecodesxyz/marchat:v0.11.0-beta.5
 ```
 
 **Docker Compose (local development):**
