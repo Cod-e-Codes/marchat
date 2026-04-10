@@ -38,6 +38,24 @@ jobs:
             go vet ./...
           fi
 
+      # Nested modules are not part of root `go test ./...` / `go build ./...` (separate go.mod).
+      - name: Nested Go modules (plugin/sdk, plugin/examples/echo)
+        run: |
+          set -euo pipefail
+          for dir in plugin/sdk plugin/examples/echo; do
+            echo "::group::$dir"
+            (cd "$dir" && go mod tidy && go build ./... && go test -race ./... && go vet ./...)
+            echo "::endgroup::"
+          done
+          LINT="$(go env GOPATH)/bin/golangci-lint"
+          if [ -x "$LINT" ]; then
+            for dir in plugin/sdk plugin/examples/echo; do
+              echo "::group::lint $dir"
+              (cd "$dir" && "$LINT" run ./...)
+              echo "::endgroup::"
+            done
+          fi
+
   database-smoke:
     runs-on: ubuntu-latest
     services:

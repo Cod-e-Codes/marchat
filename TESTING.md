@@ -329,7 +329,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 
 The test suite is designed to run in CI/CD environments:
 
-- **Default job** (`.github/workflows/go.yml` `build`): `go test -race ./...` on Ubuntu (SQLite only for DB tests; CI DB smoke tests skip without env).
+- **Default job** (`.github/workflows/go.yml` `build`): `go test -race ./...` on Ubuntu (SQLite only for DB tests; CI DB smoke tests skip without env), then **`plugin/sdk`** and **`plugin/examples/echo`** each run `go mod tidy`, `go build ./...`, `go test -race ./...`, `go vet ./...`, and **`golangci-lint run ./...`** when the linter was installed for the root job (nested modules use their own `go.mod` and are not included in root `./...`).
 - **Database smoke job** (`database-smoke`): Postgres 16 and MySQL 8 services, then `go test -race ./server -run 'Test(Postgres|MySQL)InitDBAndSchemaSmoke'` with `MARCHAT_CI_POSTGRES_URL` / `MARCHAT_CI_MYSQL_URL` set.
 - **Parallel Safe**: Standard tests avoid shared mutable global state; subprocess tests serialize via their own `go run` invocations.
 - **Deterministic**: Doctor subprocess tests set `MARCHAT_DOCTOR_NO_NETWORK=1` to avoid GitHub API flakiness.
