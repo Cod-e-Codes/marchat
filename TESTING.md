@@ -12,7 +12,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: When **`main`** has moved past the latest Git tag, a narrative summary may appear in **README.md** → **Latest Updates**. This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 37.8%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage` or `coverage`) so the argument is not misparsed.
+**Note**: When **`main`** has moved past the latest Git tag, a narrative summary may appear in **README.md** → **Latest Updates**. This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 37.9%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage` or `coverage`) so the argument is not misparsed.
 
 **Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. **GitHub Actions** runs an extra **`database-smoke`** job (see `.github/workflows/go.yml`) with Postgres 16 and MySQL 8 service containers: it sets `MARCHAT_CI_POSTGRES_URL` and `MARCHAT_CI_MYSQL_URL` and runs `TestPostgresInitDBAndSchemaSmoke` / `TestMySQLInitDBAndSchemaSmoke` in `server/db_ci_smoke_test.go` (`InitDB` + `CreateSchema` + table checks). Locally, those tests **skip** unless you export the same variables (for MySQL, use a `mysql:` or `mysql://` prefix on the DSN so it is not parsed as a SQLite path). Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
 
@@ -209,7 +209,7 @@ go test -cover ./...
 | `config` | 73.2% | High | 339 | Small |
 | `plugin/host` | 62.5% | Medium | 623 | Medium |
 | `client/config` | 58.0% | Medium | 1993 | Medium |
-| `internal/doctor` | 52.1% | Medium | 802 | Medium |
+| `internal/doctor` | 52.5% | Medium | 809 | Medium |
 | `plugin/store` | 47.0% | Medium | 552 | Medium |
 | `cmd/license` | 42.2% | Medium | 160 | Small |
 | `server` | 36.3% | Low | 7215 | Large |
@@ -220,7 +220,7 @@ go test -cover ./...
 
 ¹Non-test `.go` files only, physical line count (`wc -l` style), **only `.go` files in that package directory** (not subpackages such as `client/config` inside `client/`). Regenerate with the Python snippet in **Test Metrics** or `find` + `wc`.
 
-**Overall coverage: 37.8%** (all packages in the main module; merged profile `coverage` or another `-coverprofile` path)
+**Overall coverage: 37.9%** (all packages in the main module; merged profile `coverage` or another `-coverprofile` path)
 
 ### High Coverage (70%+)
 - **Shared Package**: Cryptographic operations, data types, message handling, version utilities (88.1%)
@@ -231,7 +231,7 @@ go test -cover ./...
 ### Medium Coverage (40-70%)
 - **Plugin Host Package**: Load/start/stop lifecycle, JSON IPC with a minimal test plugin, `ExecuteCommand` (62.5%)
 - **Client Config Package**: Configuration management, path utilities, keystore migration, interactive UI (58.0%)
-- **Doctor Package**: Server/client diagnostics, env checks, update metadata, DB probes (52.1%)
+- **Doctor Package**: Server/client diagnostics, env checks, update metadata, DB probes (52.5%)
 - **Plugin Store**: Registry management, platform resolution, filtering, caching (47.0%)
 - **Command License**: CLI functions for license management (42.2%)
 
@@ -249,6 +249,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 |------|----------|---------|-------------|
 | `shared/version.go` | 100.0% | shared | Version information functions |
 | `internal/doctor/db_checks.go` | 100.0% | internal/doctor | SQLite checks for `-doctor` |
+| `internal/doctor/env.go` | 97.4% | internal/doctor | Ordered `MARCHAT_*` env lines for doctor reports |
 | `client/file_picker.go` | 98.2% | client | File selection TUI component |
 | `server/health.go` | 89.3% | server | Health monitoring and status |
 | `plugin/license/validator.go` | 87.1% | plugin/license | License validation and verification |
@@ -425,8 +426,8 @@ When adding new functionality to Marchat:
 - **Top-level tests**: 348 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 10 more (`cd plugin/sdk && go test -list . ./...`).
 - **Test files**: 42 tracked `_test.go` files (`git ls-files '*_test.go'`), including `plugin/sdk/plugin_test.go` in the nested SDK module.
 - **Packages (`go list ./...`)**: 15 in the main module; `plugin/sdk` and `plugin/examples/echo` are nested modules with their own `go.mod` files (root `go test ./...` does not run their tests).
-- **Coverage by Package** (statement %, merged profile): 88.1% (`shared`), 87.1% (`plugin/license`), 80.3% (`client/crypto`), 73.2% (`config`), 62.5% (`plugin/host`), 58.0% (`client/config`), 52.1% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 36.3% (`server`), 32.1% (`plugin/manager`), 24.1% (`client/exthook`), 23.1% (`client`), 13.7% (`cmd/server`)
-- **Overall Coverage**: **37.8%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell avoid `-coverprofile=*.out`--see note above)
+- **Coverage by Package** (statement %, merged profile): 88.1% (`shared`), 87.1% (`plugin/license`), 80.3% (`client/crypto`), 73.2% (`config`), 62.5% (`plugin/host`), 58.0% (`client/config`), 52.5% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 36.3% (`server`), 32.1% (`plugin/manager`), 24.1% (`client/exthook`), 23.1% (`client`), 13.7% (`cmd/server`)
+- **Overall Coverage**: **37.9%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell avoid `-coverprofile=*.out`--see note above)
 - **Lines of code (approx.)**: non-test `.go` lines per package directory, same totals as the **Current Coverage Status** table (e.g. `server` 7215, `client` 5555); re-count with:  
   `python -c "import os; ..."` walking the tree and skipping `*_test.go`, or equivalent `find` + `wc -l`.
 - **Execution Time**: on the order of a few seconds for `go test ./...` on a typical dev machine

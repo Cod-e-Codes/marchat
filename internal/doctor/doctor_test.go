@@ -46,7 +46,7 @@ func TestParseLatestReleaseTag(t *testing.T) {
 func TestBuildEnvLines_orderAndMask(t *testing.T) {
 	t.Parallel()
 	old := osEnviron
-	t.Cleanup(func() { osEnviron = old })
+	environMu.Lock()
 	osEnviron = func() []string {
 		return []string{
 			"MARCHAT_PORT=9090",
@@ -54,6 +54,12 @@ func TestBuildEnvLines_orderAndMask(t *testing.T) {
 			"MARCHAT_EXTRA_CUSTOM=bar",
 		}
 	}
+	environMu.Unlock()
+	t.Cleanup(func() {
+		environMu.Lock()
+		osEnviron = old
+		environMu.Unlock()
+	})
 	lines := buildEnvLines("server")
 	foundPort := false
 	foundExtra := false
@@ -185,7 +191,7 @@ func TestBuildEnvLines_clientIncludesHookVars(t *testing.T) {
 func TestBuildEnvLines_serverOmitsClientHookEnvEvenWhenSet(t *testing.T) {
 	t.Parallel()
 	old := osEnviron
-	t.Cleanup(func() { osEnviron = old })
+	environMu.Lock()
 	osEnviron = func() []string {
 		return []string{
 			"MARCHAT_PORT=8080",
@@ -194,6 +200,12 @@ func TestBuildEnvLines_serverOmitsClientHookEnvEvenWhenSet(t *testing.T) {
 			"MARCHAT_HOOK_LOG=C:\\Users\\x\\hook.log",
 		}
 	}
+	environMu.Unlock()
+	t.Cleanup(func() {
+		environMu.Lock()
+		osEnviron = old
+		environMu.Unlock()
+	})
 	for _, e := range buildEnvLines("server") {
 		switch e.Key {
 		case "MARCHAT_CLIENT_HOOK_RECEIVE", "MARCHAT_CLIENT_HOOK_SEND", "MARCHAT_HOOK_LOG":

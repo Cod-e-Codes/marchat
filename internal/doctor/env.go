@@ -4,10 +4,14 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"sync"
 )
 
-// osEnviron is the source of environment pairs; tests may replace it.
-var osEnviron = os.Environ
+// osEnviron is the source of environment pairs; tests may replace it under environMu.
+var (
+	environMu sync.RWMutex
+	osEnviron = os.Environ
+)
 
 type envLine struct {
 	Key     string `json:"key"`
@@ -15,8 +19,11 @@ type envLine struct {
 }
 
 func collectMarchatEnviron() map[string]string {
+	environMu.RLock()
+	fn := osEnviron
+	environMu.RUnlock()
 	out := make(map[string]string)
-	for _, e := range osEnviron() {
+	for _, e := range fn() {
 		key, val, ok := strings.Cut(e, "=")
 		if !ok {
 			continue
