@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.11.0--beta.3-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.3)
+[![Version](https://img.shields.io/badge/version-v0.11.0--beta.4-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.4)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -15,56 +15,27 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ## Latest Updates
 
-### v0.11.0-beta.3 (Current)
+### v0.11.0-beta.4 (Current)
 
-**Released 2026-04-09.** Changes since **[v0.11.0-beta.2](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.2)**; compare on GitHub: [`v0.11.0-beta.2...v0.11.0-beta.3`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.2...v0.11.0-beta.3). For the commit list (newest-first): **`git log v0.11.0-beta.2..v0.11.0-beta.3 --oneline`** (append **`--reverse`** for oldest-first).
+**Released 2026-04-09.** Since **[v0.11.0-beta.3](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.3)**; compare [`v0.11.0-beta.3...v0.11.0-beta.4`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.3...v0.11.0-beta.4). Commits: **`git log v0.11.0-beta.3..v0.11.0-beta.4 --oneline`**.
 
-#### Client and configuration
-- **Profiles**: Dedupe display names on load; default **Profile-N** naming when adding profiles.
-- **Paths**: **`GetConfigPath`** honors **`MARCHAT_CONFIG_DIR`** (same resolution idea as **`ResolveClientConfigDir()`**).
-- **Keystore**: Portable **v3** format (random salt in file header); legacy path-based PBKDF2 salt migrates on unlock; see **ARCHITECTURE.md** / **PROTOCOL.md** (very old clients may need a current build to read migrated files).
-- **Keystore location**: **`GetKeystorePath`** prefers the resolved config directory and the standard per-user **`keystore.dat`** before legacy **`./keystore.dat`** in the process working directory, so a stray file in a git clone does not override your real profile key (**README.md** → Client vs server config; **ARCHITECTURE.md**).
-- **Hardening**: Broader client UX and crypto-path fixes alongside server send-path hardening (see commit **`5feb098`** on `main`).
+- **E2E**: Message edits keep ciphertext and **`is_encrypted`** consistent.
+- **Themes**: Deterministic **`:themes`** / **Ctrl+T** order (built-ins then custom keys in `themes.json`); **[THEMES.md](THEMES.md)**.
+- **Docs**: Container/SBOM scanners vs **`govulncheck`** and **pgx** CVE metadata (**SECURITY.md**, **README**).
+- **Repo**: **`.gitattributes`** LF enforcement and renormalized text files.
 
-#### Server and web admin
-- **Startup**: Admin list normalization and startup validation refactored into shared helpers (`cmd/server`, **`config`** validation).
-- **Web admin**: Sidebar layout, dark theme, confirmation modals (**`server/admin_web.html`** / related Go).
-- **Sessions**: Web admin prefers **`MARCHAT_SESSION_SECRET`** ( **`MARCHAT_JWT_SECRET`** remains a deprecated alias); assorted doc fixes for current behavior.
-- **Reliability**: Hardened server send paths and related trust/config boundaries (same wave as client fixes above).
+### v0.11.0-beta.3
 
-#### Plugins
-- **SDK**: **`plugin/sdk`** **`Message`** carries channel, encryption, and DM context for richer plugin chat integration.
-- **Host**: Plugin replies flow through **`ConvertPluginMessage`**; **`StopPlugin`** data race fixed; decode loop exits cleanly on closed pipe (quieter CI logs).
-- **Docs**: Plugin message routing, type chaining, and encrypted delivery (**ARCHITECTURE.md** / **PROTOCOL.md** references where applicable).
-
-#### Documentation and demos
-- **README**: Five current GIF demos with section headings (replaces older demo assets).
-- **E2E narrative**: Docs aligned with the **global ChaCha20-Poly1305** design; unused **X25519** API removed from the tree.
-- **Operations**: Troubleshooting and **`-doctor`** / diagnostics text refreshed to match current flags and env behavior.
-
-#### CI, releases, and local build scripts
-- **Releases**: **`gh release upload`** for matrix **`.zip`** assets and **`gh release edit`** for the Docker Hub blurb; workflow documentation; shell/Docker sources normalized to LF where needed.
-- **CI**: **`database-smoke`** job (Postgres + MySQL) for **`InitDB`** / **`CreateSchema`** / table checks; MySQL DSN uses a **`mysql:`** / **`mysql://`** prefix so driver detection matches SQLite-style paths; expanded server and plugin manager tests.
-- **Scripts**: **`build-release.ps1`** includes a **darwin/arm64** build target.
-
-#### Toolchain and security
-- **Go 1.25.9** in **`go.mod`**, GitHub Actions, and the **Docker** builder image clears **govulncheck**-listed standard-library issues from **Go 1.25.8** (**crypto/tls**, **crypto/x509**, **archive/tar**, **html/template**, etc.). See **SECURITY.md** for scanner notes: container/SBOM scans often flag dependency **presence** in the image/binary; **`govulncheck ./...`** checks **reachability**. Package-level **pgx** findings (for example **CVE-2026-33815** / **CVE-2026-33816**) may persist while advisory **fixed-version** metadata lags; marchat ships **pgx** v5.9.0+ with related upstream protocol fixes, and default **`govulncheck ./...`** reports no reachable vulnerable call paths.
-
-### Unreleased (main; not in v0.11.0-beta.3 yet)
-
-- **Client themes**: **`:themes`** and **Ctrl+T** use a deterministic order—built-ins `system` → `patriot` → `retro` → `modern`, then custom themes sorted alphabetically by JSON key in `themes.json` ([THEMES.md](THEMES.md)).
+**Released 2026-04-09.** [Compare from beta.2](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.2...v0.11.0-beta.3). Keystore v3 and config/path fixes; web admin refresh; plugin SDK context and host fixes; DB smoke CI; Go 1.25.9; demos, E2E docs, and release asset workflow updates.
 
 ### v0.11.0-beta.2
-- **Go 1.25.8** across CI, Docker, and docs; **SECURITY.md** updates (supported versions, edwards25519 note)
-- **UX**: Terminal-native chrome (reaction/message emoji unchanged); **Alt+M** / **`:msginfo`** toggle message metadata; colorized server banner and client pre-TUI (**`NO_COLOR`** respected)
-- **Doctor**: TTY color for text mode; server **`MARCHAT_*`** reflects **`config/.env`**; docs for **`-doctor-json`** / **`NO_COLOR`**
-- **Server**: Hardened license cache, username reservation, DB backup SQL; **CI**: static release builds; published releases attach zips with **`gh release upload`** and append the Docker blurb with **`gh release edit`** (avoids Node 20–labeled JS actions); **Termux** → **linux-arm64** assets
+
+Go 1.25.8 toolchain/docs; **`-doctor`** and env reflection improvements; terminal chrome and **`:msginfo`** metadata; license cache and server hardening; static release zips + **linux-arm64** for Termux.
 
 ### Earlier
-- **v0.11.0-beta.1**: **[PR #83](https://github.com/Cod-e-Codes/marchat/pull/83)**: SQLite / PostgreSQL / MySQL, durable reactions & read receipts, message-state layer; release **`resolve-version`** + static builds; serialized WS writes; admin TUI & doctor DB checks (see **ARCHITECTURE.md**, **PROTOCOL.md**)
-- **v0.10.0-beta.3**: Caddy TLS proxy sample ([**deploy/CADDY-REVERSE-PROXY.md**](deploy/CADDY-REVERSE-PROXY.md)), client WSS/TLS & direct-connect UX, **`config/.env`** precedence docs
-- **v0.10.0-beta.2**: **`-doctor`** / **`-doctor-json`**, **`CGO_ENABLED=0`** builds, sqlite bump, Docker entrypoint & volume permissions
-- **v0.10.0-beta.1**: Edit/delete/pin/search, reactions, DMs, channels, typing, E2E files, plugins, rate limits, Docker Compose; client modularization
+
+- **v0.11.0-beta.1**: Multi-DB (SQLite / Postgres / MySQL), reactions, read receipts, message state, serialized WS writes, admin TUI ([PR #83](https://github.com/Cod-e-Codes/marchat/pull/83)).
+- **v0.10.x**: Core chat features (edit/delete/pin/search, DMs, channels, E2E files, plugins), **`-doctor`**, Docker, Caddy TLS proxy docs ([**deploy/CADDY-REVERSE-PROXY.md**](deploy/CADDY-REVERSE-PROXY.md)), **`config/.env`** precedence.
 
 Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
@@ -180,12 +151,12 @@ Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQ
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.3/marchat-v0.11.0-beta.3-linux-amd64.zip
-unzip marchat-v0.11.0-beta.3-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.4/marchat-v0.11.0-beta.4-linux-amd64.zip
+unzip marchat-v0.11.0-beta.4-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.3/marchat-v0.11.0-beta.3-darwin-amd64.zip
-unzip marchat-v0.11.0-beta.3-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.4/marchat-v0.11.0-beta.4-darwin-amd64.zip
+unzip marchat-v0.11.0-beta.4-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -193,11 +164,11 @@ iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.11.0-beta.3
+docker pull codecodesxyz/marchat:v0.11.0-beta.4
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.11.0-beta.3
+  codecodesxyz/marchat:v0.11.0-beta.4
 ```
 
 **Docker Compose (local development):**
