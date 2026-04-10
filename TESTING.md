@@ -12,7 +12,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: When **`main`** has moved past the latest Git tag, a narrative summary may appear in **README.md** → **Latest Updates**. This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 37.9%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage` or `coverage`) so the argument is not misparsed.
+**Note**: When **`main`** has moved past the latest Git tag, a narrative summary may appear in **README.md** → **Latest Updates**. This is a foundational test suite with good coverage for smaller utility packages and significantly improved coverage for client and server components. **Overall statement coverage is 37.9%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage` or `coverage`) so the argument is not misparsed. The nested **`plugin/sdk`** module (separate `go.mod`) is not included in that merged number; its package statement coverage is **58.8%** when measured with `cd plugin/sdk && go test -coverprofile=sdkcover ./... && go tool cover -func=sdkcover`.
 
 **Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. **GitHub Actions** runs an extra **`database-smoke`** job (see `.github/workflows/go.yml`) with Postgres 16 and MySQL 8 service containers: it sets `MARCHAT_CI_POSTGRES_URL` and `MARCHAT_CI_MYSQL_URL` and runs `TestPostgresInitDBAndSchemaSmoke` / `TestMySQLInitDBAndSchemaSmoke` in `server/db_ci_smoke_test.go` (`InitDB` + `CreateSchema` + table checks). Locally, those tests **skip** unless you export the same variables (for MySQL, use a `mysql:` or `mysql://` prefix on the DSN so it is not parsed as a SQLite path). Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
 
@@ -56,6 +56,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations |
 | `server/health_test.go` | Server health monitoring | Health checks, system metrics, HTTP endpoints, concurrent access |
 | `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, extended fields (channel, encrypted, message_id, recipient, edited), JSON serialization, omitempty validation, backwards-compat unknown-field handling |
+| `plugin/sdk/stdio_test.go` | Plugin SDK stdio | `HandlePluginRequest` / `RunIO` (init, message, command, shutdown), EOF handling |
 | `plugin/host/host_test.go` | Plugin Host | Plugin lifecycle, communication, enable/disable |
 | `plugin/host/plugin_lifecycle_test.go` | Plugin Host subprocess IPC | Minimal JSON plugin built with `go build`, `StartPlugin` / `StopPlugin`, `ExecuteCommand`, double-start guard |
 | `plugin/store/store_test.go` | Plugin Store | Registry management, platform resolution, filtering |
@@ -329,7 +330,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 
 The test suite is designed to run in CI/CD environments:
 
-- **Default job** (`.github/workflows/go.yml` `build`): `go test -race ./...` on Ubuntu (SQLite only for DB tests; CI DB smoke tests skip without env), then **`plugin/sdk`** and **`plugin/examples/echo`** each run `go mod tidy`, `go build ./...`, `go test -race ./...`, `go vet ./...`, and **`golangci-lint run ./...`** when the linter was installed for the root job (nested modules use their own `go.mod` and are not included in root `./...`).
+- **Default job** (`.github/workflows/go.yml` `build`): `gofmt -l` must be empty on the root tree, then `go test -race ./...`, `go vet ./...`, **`govulncheck -show verbose ./...`**, and **`golangci-lint run ./...`** (SQLite only for DB tests; DB smoke skips without env). Then **`plugin/sdk`** and **`plugin/examples/echo`** each run `go mod tidy`, `gofmt -l`, `go build ./...`, `go test -race ./...`, `go vet ./...`, **`govulncheck`**, and **`golangci-lint`** (nested modules use their own `go.mod` and are not included in root `./...`).
 - **Database smoke job** (`database-smoke`): Postgres 16 and MySQL 8 services, then `go test -race ./server -run 'Test(Postgres|MySQL)InitDBAndSchemaSmoke'` with `MARCHAT_CI_POSTGRES_URL` / `MARCHAT_CI_MYSQL_URL` set.
 - **Parallel Safe**: Standard tests avoid shared mutable global state; subprocess tests serialize via their own `go run` invocations.
 - **Deterministic**: Doctor subprocess tests set `MARCHAT_DOCTOR_NO_NETWORK=1` to avoid GitHub API flakiness.
@@ -412,6 +413,28 @@ Run tests with debug output:
 go test -v -race ./...
 ```
 
+### Local validation (PowerShell)
+
+From the repo root, with `golangci-lint` and `govulncheck` on `PATH` (install with `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest` and `go install golang.org/x/vuln/cmd/govulncheck@latest`):
+
+```powershell
+$env:GOTOOLCHAIN = "auto"
+gofmt -w .
+golangci-lint run ./...
+go test ./... -count=1
+go vet ./...
+govulncheck -show verbose ./...
+foreach ($D in @("plugin\sdk", "plugin\examples\echo")) {
+  Push-Location $D
+  gofmt -w .
+  golangci-lint run ./...
+  go test ./... -count=1
+  go vet ./...
+  govulncheck -show verbose ./...
+  Pop-Location
+}
+```
+
 ## Contributing
 
 When adding new functionality to Marchat:
@@ -423,11 +446,12 @@ When adding new functionality to Marchat:
 
 ## Test Metrics
 
-- **Top-level tests**: 348 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 10 more (`cd plugin/sdk && go test -list . ./...`).
-- **Test files**: 42 tracked `_test.go` files (`git ls-files '*_test.go'`), including `plugin/sdk/plugin_test.go` in the nested SDK module.
+- **Top-level tests**: 348 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 21 more (`cd plugin/sdk && go test -list . ./...`).
+- **Test files**: 43 tracked `_test.go` files (`git ls-files '*_test.go'`), including `plugin/sdk/plugin_test.go` and `plugin/sdk/stdio_test.go` in the nested SDK module.
 - **Packages (`go list ./...`)**: 15 in the main module; `plugin/sdk` and `plugin/examples/echo` are nested modules with their own `go.mod` files (root `go test ./...` does not run their tests).
 - **Coverage by Package** (statement %, merged profile): 88.1% (`shared`), 87.1% (`plugin/license`), 80.3% (`client/crypto`), 73.2% (`config`), 62.5% (`plugin/host`), 58.0% (`client/config`), 52.5% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 36.3% (`server`), 32.1% (`plugin/manager`), 24.1% (`client/exthook`), 23.1% (`client`), 13.7% (`cmd/server`)
-- **Overall Coverage**: **37.9%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell avoid `-coverprofile=*.out`--see note above)
+- **Nested `plugin/sdk` coverage**: **58.8%** statements (run inside `plugin/sdk`; not part of the root merged profile).
+- **Overall Coverage**: **37.9%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell avoid `-coverprofile=*.out`, see note above)
 - **Lines of code (approx.)**: non-test `.go` lines per package directory, same totals as the **Current Coverage Status** table (e.g. `server` 7215, `client` 5555); re-count with:  
   `python -c "import os; ..."` walking the tree and skipping `*_test.go`, or equivalent `find` + `wc -l`.
 - **Execution Time**: on the order of a few seconds for `go test ./...` on a typical dev machine

@@ -787,7 +787,7 @@ cd plugin/sdk && go test ./...   # Nested SDK module (separate go.mod)
 - **Windows**: `.\test.ps1`
 
 ### Coverage Summary
-Percentages are **statement coverage** from a merged profile (`go test -coverprofile=... ./...` then `go tool cover -func=...`). **Size** is non-test `.go` lines per package (approximate). See [TESTING.md](TESTING.md) for file-level tables and how to regenerate from your `coverage` / `coverage.out` file.
+Percentages are **statement coverage** from a merged profile (`go test -coverprofile=... ./...` then `go tool cover -func=...`). **Size** is non-test `.go` lines per package (approximate). See [TESTING.md](TESTING.md) for file-level tables and how to regenerate from your `coverage` / `coverage.out` file. The nested **`plugin/sdk`** module is measured separately (about **59%** statements); see [TESTING.md](TESTING.md) for the exact figure and commands.
 
 | Package | Coverage | Size | Status |
 |---------|----------|------|--------|

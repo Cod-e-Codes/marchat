@@ -24,6 +24,11 @@ jobs:
       - name: Tidy modules
         run: go mod tidy
 
+      - name: Formatting (gofmt)
+        run: |
+          out="$(gofmt -l .)"
+          if [ -n "$out" ]; then echo "Unformatted files:"; echo "$out"; exit 1; fi
+
       - name: Build
         run: go build ./...
 
@@ -38,13 +43,29 @@ jobs:
             go vet ./...
           fi
 
+      - name: Govulncheck
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          "$(go env GOPATH)/bin/govulncheck" -show verbose ./...
+
       # Nested modules are not part of root `go test ./...` / `go build ./...` (separate go.mod).
       - name: Nested Go modules (plugin/sdk, plugin/examples/echo)
         run: |
           set -euo pipefail
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          VULN="$(go env GOPATH)/bin/govulncheck"
           for dir in plugin/sdk plugin/examples/echo; do
             echo "::group::$dir"
-            (cd "$dir" && go mod tidy && go build ./... && go test -race ./... && go vet ./...)
+            (
+              cd "$dir"
+              go mod tidy
+              out="$(gofmt -l .)"
+              if [ -n "$out" ]; then echo "Unformatted in $dir:"; echo "$out"; exit 1; fi
+              go build ./...
+              go test -race ./...
+              go vet ./...
+              "$VULN" -show verbose ./...
+            )
             echo "::endgroup::"
           done
           LINT="$(go env GOPATH)/bin/golangci-lint"
