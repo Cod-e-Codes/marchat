@@ -1,4 +1,5 @@
 # Binaries
+*.nupkg
 *.exe
 *.exe~
 *.dll
