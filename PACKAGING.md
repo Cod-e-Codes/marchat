@@ -27,7 +27,7 @@ Other install paths (zip, `install.sh` / `install.ps1`, Docker) stay in [README.
 
 ## Release alignment
 
-When you tag a release, bump the version everywhere listed in `.cursor/rules/marchat.mdc` (install scripts, `build-release.ps1`, README badges and snippets, workflow defaults, and every file under `packaging/` that embeds a version or URL).
+When you tag a release, bump the version everywhere listed in install scripts, build-release.ps1, README badges and snippets, workflow defaults, and every file under packaging/ that embeds a version or URL.
 
 After the release assets exist on GitHub:
 
