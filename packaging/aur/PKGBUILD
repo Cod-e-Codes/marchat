@@ -1,4 +1,4 @@
-# Maintainer: set your AUR account name when publishing
+# Maintainer: Cody Marsengill <cod.e.codes.dev@gmail.com>
 pkgname=marchat-bin
 pkgver=0.11.0.beta.5
 pkgrel=1
