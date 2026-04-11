@@ -9,7 +9,7 @@ The `packaging/` directory holds **templates** (and pinned checksums for the cur
 | **Homebrew** (macOS, Linux) | [Tap repo](https://github.com/Cod-e-Codes/homebrew-marchat) | `brew tap cod-e-codes/marchat` then `brew install marchat` |
 | **Scoop** (Windows) | [Bucket repo](https://github.com/Cod-e-Codes/scoop-marchat) | `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat` |
 | **winget** (Windows) | Listed in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) after merge; track [PR #358094](https://github.com/microsoft/winget-pkgs/pull/358094) while pending | `winget install Cod-e-Codes.Marchat` |
-| **Chocolatey** | Not published from this repo yet; see `packaging/chocolatey/` | N/A |
+| **Chocolatey** | [community package](https://community.chocolatey.org/packages/marchat); templates in `packaging/chocolatey/`; prereleases use automated review | `choco install marchat` (when listed) |
 | **AUR** (Arch) | [marchat-bin](https://aur.archlinux.org/packages/marchat-bin) on the AUR | `yay -S marchat-bin` or `paru -S marchat-bin` (or any AUR helper) |
 
 Other install paths (zip, `install.sh` / `install.ps1`, Docker) stay in [README.md](README.md).
