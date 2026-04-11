@@ -53,6 +53,7 @@ The plugin ecosystem consists of several interconnected components:
 **Features**:
 - Subprocess creation and management
 - JSON communication over stdin/stdout
+- After the subprocess exits, **stop** waits for stdout/stderr JSON reader goroutines before clearing pipes so **enable/disable** cycles do not race on shared instance state
 - Graceful shutdown with timeout
 - Error handling and logging
 - Message routing to plugins

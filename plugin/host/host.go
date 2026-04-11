@@ -71,6 +71,9 @@ type PluginInstance struct {
 	// msgQueue carries chat fan-out only; each running plugin has a dedicated writer goroutine.
 	msgQueue     chan sdk.Message
 	outboundDone sync.WaitGroup
+	// ipcWG waits for stdout/stderr reader goroutines so a follow-up StartPlugin cannot race
+	// on instance.decoder (or pipes) while a prior handlePluginOutput is still starting.
+	ipcWG sync.WaitGroup
 }
 
 // NewPluginHost creates a new plugin host
@@ -262,8 +265,16 @@ func (h *PluginHost) StartPlugin(name string) error {
 	// Start communication goroutines.
 	// Stderr is captured as a function arg so StopPlugin can safely nil the
 	// struct field without racing the goroutine's first read.
-	go h.handlePluginOutput(instance)
-	go h.handlePluginErrors(instance, instance.Stderr)
+	stderrR := instance.Stderr
+	instance.ipcWG.Add(2)
+	go func() {
+		defer instance.ipcWG.Done()
+		h.handlePluginOutput(instance)
+	}()
+	go func() {
+		defer instance.ipcWG.Done()
+		h.handlePluginErrors(instance, stderrR)
+	}()
 
 	log.Printf("Plugin %s started successfully", name)
 	return nil
@@ -327,6 +338,12 @@ func (h *PluginHost) StopPlugin(name string) error {
 		}
 		log.Printf("Plugin %s killed after timeout", name)
 	}
+
+	// Readers must finish before pipes are cleared or a new process reuses this instance;
+	// otherwise initializePlugin can assign instance.decoder while a prior output goroutine
+	// still reads it (see plugin/manager lifecycle tests under -race).
+	instance.ipcWG.Wait()
+	instance.decoder = nil
 
 	instance.Process = nil
 	instance.Stdin = nil

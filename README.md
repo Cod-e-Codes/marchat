@@ -22,8 +22,8 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - **Server**: RFC 6455 WebSocket close frames on handshake errors; hub stays off plugin IPC with bounded, best-effort, at-most-once plugin chat fan-out.
 - **Client**: Experimental env-driven **exthook** and **`-doctor`** integration.
 - **Plugin SDK**: **`RunStdio`** / **`HandlePluginRequest`** stdio loop; echo sample uses the SDK; docs and **README** plugin examples aligned (**GetConfig**, **Marshal**); **`plugin/sdk/cov`** gitignored; CI runs nested plugin modules (**fmt**, **govulncheck**).
-- **Tests / CI**: Server loadverify benches and rate-limit coverage; **`-doctor`** tests serialize **`os.Environ`** hook; Dependabot Node 20 note in **`.github/dependabot.yml`**.
-- **Docs**: **TESTING** bench section; refreshed metrics, coverage, and LoC; hook example lives under **`_example_hook`**; prose uses ASCII hyphens where edited.
+- **Tests / CI**: Server loadverify benches and rate-limit coverage; **`-doctor`** tests use the injectable **`osEnviron`** hook under **`environMu`** (no parallel **`buildEnvLines`** tests that swap it); **plugin host** **`StopPlugin`** waits for stdout/stderr reader goroutines before reuse so **`-race`** is clean on disable/enable; Dependabot Node 20 note in **`.github/dependabot.yml`**.
+- **Docs**: **TESTING** bench section; coverage/LoC tables refreshed from **`go test -coverprofile=mergedcoverage ./...`** (overall **38.1%** statements, main module); hook example lives under **`_example_hook`**; prose uses ASCII hyphens where edited.
 - **Deps**: **`golang.org/x/crypto`**, **`golang.org/x/term`**, **`modernc.org/sqlite`**.
 
 ### v0.11.0-beta.4
@@ -819,18 +819,18 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `plugin/license` | 87.1% | 246 LOC | High |
 | `client/crypto` | 80.3% | 387 LOC | High |
 | `config` | 73.2% | 339 LOC | High |
-| `plugin/host` | 63.6% | 704 LOC | Medium |
+| `plugin/host` | 64.6% | 721 LOC | Medium |
 | `client/config` | 58.0% | 1993 LOC | Medium |
 | `internal/doctor` | 52.5% | 809 LOC | Medium |
 | `plugin/store` | 47.0% | 552 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 36.3% | 7215 LOC | Low |
+| `server` | 36.3% | 7217 LOC | Low |
 | `plugin/manager` | 32.1% | 747 LOC | Low |
 | `client/exthook` | 24.1% | 204 LOC | Low |
 | `client` | 23.1% | 5555 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 38.0%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 38.1%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

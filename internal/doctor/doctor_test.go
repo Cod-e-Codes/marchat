@@ -43,10 +43,10 @@ func TestParseLatestReleaseTag(t *testing.T) {
 	}
 }
 
+// Not parallel: swaps package-level osEnviron; parallel tests would restore/stomp each other.
 func TestBuildEnvLines_orderAndMask(t *testing.T) {
-	t.Parallel()
-	old := osEnviron
 	environMu.Lock()
+	old := osEnviron
 	osEnviron = func() []string {
 		return []string{
 			"MARCHAT_PORT=9090",
@@ -169,8 +169,8 @@ func TestRunServerDoctor_environmentReflectsDotenv(t *testing.T) {
 	}
 }
 
+// Not parallel: buildEnvLines reads osEnviron; must not run while another test's mock is installed.
 func TestBuildEnvLines_clientIncludesHookVars(t *testing.T) {
-	t.Parallel()
 	found := false
 	for _, e := range buildEnvLines("client") {
 		if e.Key == "MARCHAT_CLIENT_HOOK_RECEIVE" {
@@ -188,10 +188,10 @@ func TestBuildEnvLines_clientIncludesHookVars(t *testing.T) {
 	}
 }
 
+// Not parallel: swaps package-level osEnviron (see TestBuildEnvLines_orderAndMask).
 func TestBuildEnvLines_serverOmitsClientHookEnvEvenWhenSet(t *testing.T) {
-	t.Parallel()
-	old := osEnviron
 	environMu.Lock()
+	old := osEnviron
 	osEnviron = func() []string {
 		return []string{
 			"MARCHAT_PORT=8080",
