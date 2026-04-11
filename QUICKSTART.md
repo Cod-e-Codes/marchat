@@ -22,7 +22,7 @@ Pick one:
 - **Docker**: `docker pull codecodesxyz/marchat` (pin a tag in production; see [README.md](README.md#installation)).
 - **Homebrew** ([tap](https://github.com/Cod-e-Codes/homebrew-marchat)): `brew tap cod-e-codes/marchat` then `brew install marchat`.
 - **Scoop** ([bucket](https://github.com/Cod-e-Codes/scoop-marchat)): `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat`.
-- **winget**: [PR to winget-pkgs](https://github.com/microsoft/winget-pkgs/pull/358094) pending; then `winget install Cod-e-Codes.Marchat`. More detail: [PACKAGING.md](PACKAGING.md).
+- **winget**: After [microsoft/winget-pkgs#358094](https://github.com/microsoft/winget-pkgs/pull/358094) merges, use `winget install Cod-e-Codes.Marchat`. Status and paths: [PACKAGING.md](PACKAGING.md).
 
 ## 2. Create secrets
 
@@ -130,5 +130,5 @@ Use `-doctor-json` for machine-readable output. To skip the GitHub “latest rel
 | Desktop / bell / quiet hours | [NOTIFICATIONS.md](NOTIFICATIONS.md) |
 | Plugins | [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md), [plugin/README.md](plugin/README.md) |
 | Tests and CI expectations | [TESTING.md](TESTING.md) |
-| Package managers (templates) | [PACKAGING.md](PACKAGING.md) |
+| Package managers | [PACKAGING.md](PACKAGING.md) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |

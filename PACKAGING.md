@@ -1,71 +1,63 @@
 # Package manager distribution
 
-This repo ships **templates and checksums** under `packaging/` so you can publish marchat through Homebrew, winget, Scoop, Chocolatey, and the AUR without guessing URLs or archive layouts. Release zips always contain two binaries (names include the platform suffix), for example `marchat-client-linux-amd64` and `marchat-server-linux-amd64`.
+The `packaging/` directory holds **templates** (and pinned checksums for the current release) for Homebrew, winget, Scoop, Chocolatey, and the AUR. Official release zips from GitHub each contain two binaries whose names include the platform suffix, for example `marchat-client-linux-amd64` and `marchat-server-linux-amd64`.
 
-## Published installs (current)
+## Installing marchat
 
-| Ecosystem | Status | User commands |
-|-----------|--------|----------------|
-| **Homebrew** (macOS / Linux) | Live tap [Cod-e-Codes/homebrew-marchat](https://github.com/Cod-e-Codes/homebrew-marchat) | `brew tap cod-e-codes/marchat` then `brew install marchat` |
-| **Scoop** (Windows) | Live bucket [Cod-e-Codes/scoop-marchat](https://github.com/Cod-e-Codes/scoop-marchat) | `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat` |
-| **winget** (Windows) | Submission [microsoft/winget-pkgs#358094](https://github.com/microsoft/winget-pkgs/pull/358094) (pending review; after merge use `winget install Cod-e-Codes.Marchat`) | First-time contributors must reply to the PR with `@microsoft-github-policy-service agree` so the Microsoft CLA check passes |
-| **Chocolatey** | Templates only in `packaging/chocolatey/` | Build and push per Chocolatey docs |
-| **AUR** | Template only in `packaging/aur/` | Publish `marchat-bin` (or similar) under your AUR account |
+| Ecosystem | Notes | Command |
+|-----------|-------|---------|
+| **Homebrew** (macOS, Linux) | [Tap repo](https://github.com/Cod-e-Codes/homebrew-marchat) | `brew tap cod-e-codes/marchat` then `brew install marchat` |
+| **Scoop** (Windows) | [Bucket repo](https://github.com/Cod-e-Codes/scoop-marchat) | `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat` |
+| **winget** (Windows) | Listed in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) after merge; track [PR #358094](https://github.com/microsoft/winget-pkgs/pull/358094) while pending | `winget install Cod-e-Codes.Marchat` |
+| **Chocolatey** | Not published from this repo yet; see `packaging/chocolatey/` | N/A |
+| **AUR** | Not published from this repo yet; see `packaging/aur/` | Use your helper or `yay`/`paru` once a package exists |
 
-Tap and bucket repos are maintained next to this project (for example under `packaging-forks/` on your machine). After each marchat release, update **both** the templates here and those repos, plus open a new winget-pkgs PR when the manifest version changes.
+Other install paths (zip, `install.sh` / `install.ps1`, Docker) stay in [README.md](README.md).
 
-**Version discipline:** When you cut a release, bump the canonical version everywhere listed in `.cursor/rules/marchat.mdc` (install scripts, `build-release.ps1`, README badges and install snippets, workflow defaults, and the files under `packaging/`). Then recompute SHA256 for each zip (same names as in `.github/workflows/release.yml`).
+## Files in this repo
 
-**Checksums after a new tag:**
+| Path | Role |
+|------|------|
+| `packaging/homebrew/marchat.rb` | Homebrew formula template |
+| `packaging/winget/manifests/...` | winget multi-file manifest set |
+| `packaging/scoop/marchat.json` | Scoop manifest |
+| `packaging/chocolatey/` | Chocolatey nuspec and install scripts |
+| `packaging/aur/PKGBUILD` | AUR `-bin` style package |
 
-1. Download each `marchat-<tag>-<platform>.zip` from the GitHub release.
-2. Replace `sha256` / `InstallerSha256` / `hash` fields in the packaging files for that tag.
-3. Run validators when available (`brew audit`, `winget validate`, `choco pack` dry run).
+## Release alignment
 
-Paths below are relative to the repo root.
+When you tag a release, bump the version everywhere listed in `.cursor/rules/marchat.mdc` (install scripts, `build-release.ps1`, README badges and snippets, workflow defaults, and every file under `packaging/` that embeds a version or URL).
 
-## Homebrew (macOS and Linux)
+After the release assets exist on GitHub:
 
-**Published tap:** [github.com/Cod-e-Codes/homebrew-marchat](https://github.com/Cod-e-Codes/homebrew-marchat) (`Formula/marchat.rb`). Copy edits from `packaging/homebrew/marchat.rb` when you bump versions.
+1. Download each `marchat-<tag>-<platform>.zip` from the release.
+2. Update `sha256` / `InstallerSha256` / `hash` fields in the packaging templates for that tag.
+3. Run checks where applicable (`brew audit`, `winget validate`, `choco pack`).
 
-**Source file in this repo:** `packaging/homebrew/marchat.rb`
+Publish updates to **outbound** repos separately: push the tap `Formula/marchat.rb`, the Scoop `bucket/marchat.json`, a new folder under your **winget-pkgs** fork (then open a PR to Microsoft), Chocolatey push, or AUR Git as needed. Templates in **this** repo should match what you ship there.
 
-**core vs tap:** Submitting to `Homebrew/homebrew-core` is possible but review is stricter and slower; a tap is usually enough for pre-release tags and fast iteration.
+## Homebrew
 
-## winget (Windows)
+Published tap: [homebrew-marchat](https://github.com/Cod-e-Codes/homebrew-marchat). Formula source in marchat: `packaging/homebrew/marchat.rb`. Submitting to `Homebrew/homebrew-core` instead is possible but usually slower; a tap fits pre-releases and fast iteration.
 
-**Upstream:** [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). Use your fork (for example [Cod-e-Codes/winget-pkgs](https://github.com/Cod-e-Codes/winget-pkgs)), add a version folder under `manifests/c/Cod-e-Codes/Marchat/<PackageVersion>/`, run `winget validate`, open a PR, and complete the CLA comment on the PR if the bot asks.
+## winget
 
-**Source layout in this repo (copy into your fork):** `packaging/winget/manifests/c/Cod-e-Codes/Marchat/0.11.0-beta.5/`
+Upstream is [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). Maintainers use a fork, add `manifests/c/Cod-e-Codes/Marchat/<PackageVersion>/`, run `winget validate` on that folder, and open a PR. Package identifier: `Cod-e-Codes.Marchat`. The installer is a zip with `NestedInstallerType: portable` and two `PortableCommandAlias` entries for client and server. Microsoft may prompt first-time contributors to accept the CLA on the PR; follow the bot instructions there.
 
-**Package identifier:** `Cod-e-Codes.Marchat` (publisher and app name; adjust only if you rename the publisher in manifests consistently).
+Example template path in this repo: `packaging/winget/manifests/c/Cod-e-Codes/Marchat/0.11.0-beta.5/` (duplicate the folder layout for new versions).
 
-**Notes:** Only the Windows amd64 zip is represented. Install is `zip` plus `NestedInstallerType: portable` so both `marchat-client` and `marchat-server` aliases are registered.
+## Scoop
 
-## Scoop (Windows)
+Published bucket: [scoop-marchat](https://github.com/Cod-e-Codes/scoop-marchat). Manifest source in marchat: `packaging/scoop/marchat.json`. Optional: propose the same manifest to [ScoopInstaller/Extras](https://github.com/ScoopInstaller/Extras) if their maintainers accept it.
 
-**Published bucket:** [github.com/Cod-e-Codes/scoop-marchat](https://github.com/Cod-e-Codes/scoop-marchat) (`bucket/marchat.json`). Sync from `packaging/scoop/marchat.json` when you bump versions.
+## Chocolatey
 
-**Source file in this repo:** `packaging/scoop/marchat.json`
+Templates live in `packaging/chocolatey/`. Building: `choco pack` in that directory. Publishing to the community gallery needs a [Chocolatey account](https://community.chocolatey.org/) and API key; packages are moderated.
 
-Users add the bucket, then `scoop install marchat` (name matches the manifest file name without `.json`). You can alternatively PR to [ScoopInstaller/Extras](https://github.com/ScoopInstaller/Extras) if maintainers accept it.
+## AUR
 
-## Chocolatey (Windows)
-
-**Typical approach:** A package folder with `marchat.nuspec` and `tools/chocolateyinstall.ps1`, built with `choco pack` and pushed to the Chocolatey community feed (or a private source).
-
-**Source layout in this repo:** `packaging/chocolatey/`
-
-Chocolatey `version` in the nuspec must follow their versioning rules; pre-releases often use a numeric prerelease label (see the nuspec comment).
-
-## AUR (Arch Linux, binary package)
-
-**Upstream:** Publish a `PKGBUILD` to the Arch User Repository (for example package name `marchat-bin`). Maintainers usually track the upstream repo separately from this tree.
-
-**Source file in this repo:** `packaging/aur/PKGBUILD`
-
-The PKGBUILD downloads the official **linux-amd64** or **linux-arm64** release zips (same static binaries as Termux arm64 users, documented in README).
+Template: `packaging/aur/PKGBUILD` (binary package from official linux-amd64 and linux-arm64 zips). Publishing requires an [AUR account](https://aur.archlinux.org/), SSH key on the account, and a `.SRCINFO` generated with `makepkg --printsrcinfo` on Arch. Follow [AUR submission guidelines](https://wiki.archlinux.org/title/AUR_submission_guidelines). The canonical `PKGBUILD` for copying into the AUR Git repo is the one in this tree.
 
 ## Install scripts and CI
 
-Do **not** change the default install URL pattern in `install.sh` / `install.ps1` unless you intentionally switch download sources. Package managers are an extra path; GitHub release zips remain the source of truth and match `release.yml`.
+Do **not** change the default download URL pattern in `install.sh` or `install.ps1` unless you intentionally move binaries off GitHub releases. Package managers are additional channels; release zips stay the source of truth and match `.github/workflows/release.yml`.

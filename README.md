@@ -182,9 +182,9 @@ scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat
 scoop install marchat
 ```
 
-**winget:** Submission [microsoft/winget-pkgs#358094](https://github.com/microsoft/winget-pkgs/pull/358094) is pending; when it merges, install with `winget install Cod-e-Codes.Marchat`.
+**winget:** When [microsoft/winget-pkgs#358094](https://github.com/microsoft/winget-pkgs/pull/358094) is merged, install with `winget install Cod-e-Codes.Marchat`.
 
-Templates, Chocolatey, AUR, release checksum steps, and tap or bucket updates: [PACKAGING.md](PACKAGING.md) and `packaging/`.
+See [PACKAGING.md](PACKAGING.md) and `packaging/` for Chocolatey, AUR, winget manifests, and how releases line up with those channels.
 
 **Docker:**
 ```bash
@@ -851,7 +851,7 @@ go test ./...
 ## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Short path from install to first client connection
-- **[PACKAGING.md](PACKAGING.md)** - Package manager templates (Homebrew, winget, Scoop, Chocolatey, AUR) and release alignment
+- **[PACKAGING.md](PACKAGING.md)** - Package manager installs (Homebrew, winget, Scoop, Chocolatey, AUR) and release alignment
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Components, data flow, config paths, diagnostics
 - **[PROTOCOL.md](PROTOCOL.md)** - WebSocket message types and payloads
 - **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md)** - Optional TLS reverse proxy (Caddy) for local or LAN `wss://`
