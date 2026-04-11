@@ -1,0 +1,24 @@
+{
+  "version": "0.11.0-beta.5",
+  "description": "Terminal chat with WebSockets, optional E2E encryption, and plugins",
+  "homepage": "https://github.com/Cod-e-Codes/marchat",
+  "license": "MIT",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.5/marchat-v0.11.0-beta.5-windows-amd64.zip",
+      "hash": "f38696037c3927c3f7c80e778f73a0af094a22f3b1fb93082495f8857948bfb4"
+    }
+  },
+  "bin": [
+    ["marchat-client-windows-amd64.exe", "marchat-client"],
+    ["marchat-server-windows-amd64.exe", "marchat-server"]
+  ],
+  "checkver": "github/Cod-e-Codes/marchat",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/Cod-e-Codes/marchat/releases/download/v$version/marchat-v$version-windows-amd64.zip"
+      }
+    }
+  }
+}

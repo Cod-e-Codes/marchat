@@ -168,6 +168,24 @@ unzip marchat-v0.11.0-beta.5-darwin-amd64.zip && chmod +x marchat-*
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
 ```
 
+**Package managers:**
+
+```bash
+# Homebrew (macOS / Linux): https://github.com/Cod-e-Codes/homebrew-marchat
+brew tap cod-e-codes/marchat
+brew install marchat
+```
+
+```powershell
+# Scoop (Windows): https://github.com/Cod-e-Codes/scoop-marchat
+scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat
+scoop install marchat
+```
+
+**winget:** Submission [microsoft/winget-pkgs#358094](https://github.com/microsoft/winget-pkgs/pull/358094) is pending; when it merges, install with `winget install Cod-e-Codes.Marchat`.
+
+Templates, Chocolatey, AUR, release checksum steps, and tap or bucket updates: [PACKAGING.md](PACKAGING.md) and `packaging/`.
+
 **Docker:**
 ```bash
 docker pull codecodesxyz/marchat:v0.11.0-beta.5
@@ -833,6 +851,7 @@ go test ./...
 ## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - Short path from install to first client connection
+- **[PACKAGING.md](PACKAGING.md)** - Package manager templates (Homebrew, winget, Scoop, Chocolatey, AUR) and release alignment
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Components, data flow, config paths, diagnostics
 - **[PROTOCOL.md](PROTOCOL.md)** - WebSocket message types and payloads
 - **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md)** - Optional TLS reverse proxy (Caddy) for local or LAN `wss://`
