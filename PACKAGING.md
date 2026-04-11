@@ -37,6 +37,17 @@ After the release assets exist on GitHub:
 
 Publish updates to **outbound** repos separately: push the tap `Formula/marchat.rb`, the Scoop `bucket/marchat.json`, a new folder under your **winget-pkgs** fork (then open a PR to Microsoft), Chocolatey push, or AUR Git as needed. Templates in **this** repo should match what you ship there.
 
+### Automated publishing (GitHub release workflow)
+
+After release assets are uploaded, the `publish-downstream-packages` job in [`.github/workflows/release.yml`](.github/workflows/release.yml) can refresh manifests from the published zips (via [`packaging/ci/render-release-manifests.sh`](packaging/ci/render-release-manifests.sh)) and push or PR them. Each destination is skipped if its secret is missing.
+
+| Secret | Purpose |
+|--------|---------|
+| `PACKAGING_GITHUB_PAT` | Fine-grained or classic PAT with **contents** (and **pull requests** if you use fine-grained) on your forks: `{owner}/homebrew-marchat`, `{owner}/scoop-marchat`, `{owner}/winget-pkgs`. Used to push the tap and bucket, push a branch on the winget fork, and open a PR to `microsoft/winget-pkgs`. |
+| `AUR_SSH_PRIVATE_KEY` | Private key whose public half is registered on [aur.archlinux.org](https://aur.archlinux.org/) for your maintainer account. Used to `git push` `PKGBUILD` and `.SRCINFO` to `ssh://aur@aur.archlinux.org/marchat-bin.git`. Multiline secret; include the full `BEGIN`/`END` lines. |
+
+Fork names are derived from [`github.repository_owner`](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/accessing-contextual-information-about-workflow-runs#github_context): `homebrew-marchat`, `scoop-marchat`, and `winget-pkgs` under the same owner as this repo. Chocolatey is not automated here (API key and moderation are separate).
+
 ## Homebrew
 
 Published tap: [homebrew-marchat](https://github.com/Cod-e-Codes/homebrew-marchat). Formula source in marchat: `packaging/homebrew/marchat.rb`. Submitting to `Homebrew/homebrew-core` instead is possible but usually slower; a tap fits pre-releases and fast iteration.

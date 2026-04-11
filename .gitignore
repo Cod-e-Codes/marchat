@@ -73,6 +73,9 @@ plugin/examples/*/*.dylib
 # Build release
 build-release.sh
 
+# Local output from packaging/ci/render-release-manifests.sh
+packaging-out/
+
 # Local scratch / generated invites (may contain secrets)
 tmp/
 

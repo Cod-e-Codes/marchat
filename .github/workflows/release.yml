@@ -228,3 +228,135 @@ jobs:
             printf '%s\n' '```'
           } > /tmp/marchat-release-body.md
           gh release edit "$TAG" --repo "$REPO" --notes-file /tmp/marchat-release-body.md
+
+  # Pushes updated manifests to your tap, bucket, winget-pkgs fork (opens PR to Microsoft), and AUR.
+  # Each step no-ops when its secret is unset. Requires PACKAGING_GITHUB_PAT for Git-hosted targets.
+  publish-downstream-packages:
+    name: Publish downstream package manifests
+    runs-on: ubuntu-latest
+    needs: [upload-assets]
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ github.event.release.tag_name }}
+          fetch-depth: 1
+
+      - name: Render manifests from release zips
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.release.published_at }}" ]; then
+            export RELEASE_DATE_UTC="$(echo '${{ github.event.release.published_at }}' | cut -dT -f1)"
+          fi
+          chmod +x packaging/ci/render-release-manifests.sh
+          packaging/ci/render-release-manifests.sh
+
+      - name: Push Homebrew tap
+        env:
+          TOKEN: ${{ secrets.PACKAGING_GITHUB_PAT }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then echo "Skip Homebrew: PACKAGING_GITHUB_PAT unset"; exit 0; fi
+          VER="${RELEASE_TAG#v}"
+          DEFAULT="$(GH_TOKEN="${TOKEN}" gh api "repos/${OWNER}/homebrew-marchat" --jq .default_branch)"
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${OWNER}/homebrew-marchat.git" /tmp/homebrew-marchat
+          cp packaging-out/marchat.rb /tmp/homebrew-marchat/Formula/marchat.rb
+          cd /tmp/homebrew-marchat
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add Formula/marchat.rb
+          if git diff --cached --quiet; then echo "Homebrew: no changes"; exit 0; fi
+          git commit -m "marchat ${VER}"
+          git push origin "HEAD:${DEFAULT}"
+
+      - name: Push Scoop bucket
+        env:
+          TOKEN: ${{ secrets.PACKAGING_GITHUB_PAT }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then echo "Skip Scoop: PACKAGING_GITHUB_PAT unset"; exit 0; fi
+          VER="${RELEASE_TAG#v}"
+          DEFAULT="$(GH_TOKEN="${TOKEN}" gh api "repos/${OWNER}/scoop-marchat" --jq .default_branch)"
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${OWNER}/scoop-marchat.git" /tmp/scoop-marchat
+          cp packaging-out/marchat.json /tmp/scoop-marchat/bucket/marchat.json
+          cd /tmp/scoop-marchat
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add bucket/marchat.json
+          if git diff --cached --quiet; then echo "Scoop: no changes"; exit 0; fi
+          git commit -m "marchat ${VER}"
+          git push origin "HEAD:${DEFAULT}"
+
+      - name: Open winget-pkgs PR
+        env:
+          TOKEN: ${{ secrets.PACKAGING_GITHUB_PAT }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          OWNER: ${{ github.repository_owner }}
+          REPO_FULL: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TOKEN:-}" ]; then echo "Skip winget: PACKAGING_GITHUB_PAT unset"; exit 0; fi
+          VER="${RELEASE_TAG#v}"
+          BRANCH="marchat-${VER}"
+          BASE_BRANCH="$(GH_TOKEN="${TOKEN}" gh api repos/microsoft/winget-pkgs --jq .default_branch)"
+          git clone --depth 1 "https://x-access-token:${TOKEN}@github.com/${OWNER}/winget-pkgs.git" /tmp/winget-pkgs
+          cd /tmp/winget-pkgs
+          git checkout -B "${BRANCH}"
+          DEST="manifests/c/Cod-e-Codes/Marchat/${VER}"
+          mkdir -p "${DEST}"
+          cp "${GITHUB_WORKSPACE}/packaging-out/winget/"*.yaml "${DEST}/"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add "${DEST}"
+          if git diff --cached --quiet; then echo "winget: no changes"; exit 0; fi
+          git commit -m "Marchat: ${VER}"
+          git push -u origin "${BRANCH}" --force
+          EXISTING="$(GH_TOKEN="${TOKEN}" gh pr list --repo microsoft/winget-pkgs --head "${OWNER}:${BRANCH}" --json number --jq 'length')"
+          if [ "${EXISTING}" != "0" ]; then echo "winget: PR already open for ${OWNER}:${BRANCH}"; exit 0; fi
+          BODY_FILE="$(mktemp)"
+          {
+            echo "Automated PR for **${REPO_FULL}** release **${RELEASE_TAG}**."
+            echo
+            echo "Manifests match published release zips (workflow publish-downstream-packages)."
+          } > "${BODY_FILE}"
+          GH_TOKEN="${TOKEN}" gh pr create \
+            --repo microsoft/winget-pkgs \
+            --head "${OWNER}:${BRANCH}" \
+            --base "${BASE_BRANCH}" \
+            --title "Marchat: version ${VER}" \
+            --body-file "${BODY_FILE}"
+
+      - name: Push AUR package
+        env:
+          AUR_SSH_PRIVATE_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${AUR_SSH_PRIVATE_KEY:-}" ]; then echo "Skip AUR: AUR_SSH_PRIVATE_KEY unset"; exit 0; fi
+          VER="${RELEASE_TAG#v}"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${AUR_SSH_PRIVATE_KEY}" > ~/.ssh/aur_marchat_ci
+          chmod 600 ~/.ssh/aur_marchat_ci
+          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null || true
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_marchat_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
+          git clone ssh://aur@aur.archlinux.org/marchat-bin.git /tmp/marchat-aur
+          cp "${GITHUB_WORKSPACE}/packaging-out/aur/PKGBUILD" /tmp/marchat-aur/PKGBUILD
+          cp "${GITHUB_WORKSPACE}/packaging-out/aur/.SRCINFO" /tmp/marchat-aur/.SRCINFO
+          cd /tmp/marchat-aur
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git add PKGBUILD .SRCINFO
+          if git diff --cached --quiet; then echo "AUR: no changes"; exit 0; fi
+          git commit -m "release ${VER}"
+          git push origin HEAD
