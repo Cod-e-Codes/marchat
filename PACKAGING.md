@@ -10,7 +10,7 @@ The `packaging/` directory holds **templates** (and pinned checksums for the cur
 | **Scoop** (Windows) | [Bucket repo](https://github.com/Cod-e-Codes/scoop-marchat) | `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat` |
 | **winget** (Windows) | Listed in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) after merge; track [PR #358094](https://github.com/microsoft/winget-pkgs/pull/358094) while pending | `winget install Cod-e-Codes.Marchat` |
 | **Chocolatey** | Not published from this repo yet; see `packaging/chocolatey/` | N/A |
-| **AUR** | Not published from this repo yet; see `packaging/aur/` | Use your helper or `yay`/`paru` once a package exists |
+| **AUR** (Arch) | [marchat-bin](https://aur.archlinux.org/packages/marchat-bin) on the AUR | `yay -S marchat-bin` or `paru -S marchat-bin` (or any AUR helper) |
 
 Other install paths (zip, `install.sh` / `install.ps1`, Docker) stay in [README.md](README.md).
 
@@ -22,7 +22,8 @@ Other install paths (zip, `install.sh` / `install.ps1`, Docker) stay in [README.
 | `packaging/winget/manifests/...` | winget multi-file manifest set |
 | `packaging/scoop/marchat.json` | Scoop manifest |
 | `packaging/chocolatey/` | Chocolatey nuspec and install scripts |
-| `packaging/aur/PKGBUILD` | AUR `-bin` style package |
+| `packaging/aur/PKGBUILD` | Canonical AUR package definition (edit here first) |
+| `packaging/aur/.SRCINFO` | AUR metadata; regenerate on Arch with `makepkg --printsrcinfo > .SRCINFO` whenever `PKGBUILD` changes |
 
 ## Release alignment
 
@@ -56,7 +57,13 @@ Templates live in `packaging/chocolatey/`. Building: `choco pack` in that direct
 
 ## AUR
 
-Template: `packaging/aur/PKGBUILD` (binary package from official linux-amd64 and linux-arm64 zips). Publishing requires an [AUR account](https://aur.archlinux.org/), SSH key on the account, and a `.SRCINFO` generated with `makepkg --printsrcinfo` on Arch. Follow [AUR submission guidelines](https://wiki.archlinux.org/title/AUR_submission_guidelines). The canonical `PKGBUILD` for copying into the AUR Git repo is the one in this tree.
+**Package:** [marchat-bin](https://aur.archlinux.org/packages/marchat-bin) (`marchat-client`, `marchat-server` from official linux-amd64 / linux-arm64 release zips).
+
+**In this repo:** Maintain `packaging/aur/PKGBUILD` and `packaging/aur/.SRCINFO`. After any `PKGBUILD` edit, regenerate `.SRCINFO` on an Arch system (`makepkg --printsrcinfo > .SRCINFO` in that directory).
+
+**Publishing updates:** Push `PKGBUILD` and `.SRCINFO` to the AUR with Git over SSH ([guidelines](https://wiki.archlinux.org/title/AUR_submission_guidelines#Submitting_packages)). Your account needs an SSH key on [aur.archlinux.org](https://aur.archlinux.org/).
+
+**Verify build (Docker on Windows):** `docker run --rm archlinux:latest bash -lc "pacman -Sy --noconfirm --needed base-devel git && useradd -m build && su build -c 'cd /home/build && git clone https://aur.archlinux.org/marchat-bin.git && cd marchat-bin && makepkg -f --noconfirm'"`
 
 ## Install scripts and CI
 
