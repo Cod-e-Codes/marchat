@@ -33,9 +33,10 @@ Marchat is a self-hosted, terminal-based chat application built in Go with a cli
 The client is a standalone terminal user interface built with the Bubble Tea framework. It's a complete application that can be built and run independently. The code is split across several files:
 
 - **`main.go`**: Core model, state, Update loop, and command handlers
+- **`chrome.go`**: Status footer builder (`buildStatusFooter`), debounced tail `read_receipt` sends, and `stripKindForBanner` plus `BannerStrip` styles so `[ERROR]` / `[WARN]` / other banner lines use distinct strip colors (built-in themes and optional `banner_*` keys in custom `themes.json`)
 - **`cli_output.go`**: Lipgloss helpers for pre-TUI stdout (connection, E2E status, profile flow messages)
 - **`hotkeys.go`**: Key binding definitions and methods
-- **`render.go`**: Message rendering and UI display logic (optional per-line metadata: message id and encrypted flag)
+- **`render.go`**: Message rendering and UI display logic (optional per-line metadata: message id and encrypted flag); `System` transcript lines use `systemLineStyle` so errors and warnings are not forced into the same color as timestamps
 - **`websocket.go`**: WebSocket connection management, send/receive, and E2E encryption helpers
 - **`exthook/`**: Optional, experimental subprocess hooks for local automation (stdin JSON per event); see **CLIENT_HOOKS.md**
 - **`commands.go`**: Help text generation and command-related utilities
@@ -70,6 +71,9 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - Tab completion for @mentions
 - Connection status indicator
 - Unread message count
+- Optional debounced `read_receipt` to the server when the viewport follows the newest messages; failures surface in the banner only
+- Footer shows `E2E` when encryption is on, and `#channel` when the current room is not `general`; plaintext sessions omit an explicit `Unencrypted` label in the footer
+- Automatic WebSocket reconnect with exponential backoff (capped); on each successful connect (`wsConnected`), the reference client clears the in-memory transcript and related UI state before processing server history replay, so a server restart or network drop does not duplicate messages that were already on screen
 - Multi-line input via Alt+Enter / Ctrl+J
 - **Diagnostics**: `-doctor` and `-doctor-json` for environment, paths, and config checks (`internal/doctor`)
 

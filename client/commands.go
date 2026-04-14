@@ -17,6 +17,7 @@ func (m *model) generateHelpContent() string {
 	} else {
 		sessionInfo = "Session: Unencrypted (messages are sent in plain text)\n"
 	}
+	sessionInfo += "Status bar: connection, unread when any, E2E when on, current channel when not #general. When disconnected, a Ctrl+H hint is shown. Command results, :msginfo ack, and errors use the banner above the transcript.\n"
 
 	shortcuts := "\nKeyboard Shortcuts:\n"
 	shortcuts += "  Ctrl+H               Toggle this help\n"

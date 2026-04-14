@@ -130,7 +130,7 @@ These values of `type` extend the core chat protocol:
 | `dm` | Direct message. Requires `recipient` (target username). Delivered only to sender and recipient. |
 | `search` | Full-text search. `content` is the search query; the server replies with a private `text` message from `System` listing up to 20 matches (not broadcast). |
 | `pin` | Toggle pinned state for `message_id`. **Admin only**; non-admins receive an error `text` from `System`. On success, a `System` `text` notice is broadcast. |
-| `read_receipt` | Read-receipt notification. Relayed to connected clients; payload conventions (e.g. which message was read) may use `content` and/or `message_id` as agreed by clients. |
+| `read_receipt` | Read receipt. Clients may send `read_receipt` with `message_id` set to the latest persisted chat line they have read while the transcript viewport is scrolled to the tail (the reference client debounces bursts). The server sets `sender` from the connection, persists when `message_id` is positive (`read_receipts` table), and broadcasts the message. Receivers may ignore or surface receipts in UI; the reference TUI does not print them in the transcript. |
 | `join_channel` | Join a channel. Requires `channel` (name). If the client was in another channel, they leave it first. The server sends a confirmation `text` from `System`. |
 | `leave_channel` | Leave the current channel and return to `#general`. No `content` required. If already in `general`, no-op. The server sends a confirmation `text` from `System`. |
 
@@ -168,7 +168,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
 ## Server Behavior
 
 - On successful handshake:
-  - Sends up to 50 recent messages from history (newest first; clients typically display in chronological order).
+  - Sends up to 50 recent messages from history (newest first; clients typically display in chronological order). The same replay happens on every new WebSocket session after a disconnect. Clients that keep a local transcript in memory should **replace** or **dedupe** against that replay instead of appending it blindly, or they will show duplicate lines. The reference TUI clears its transcript (messages, reactions, typing state, and cached received-file metadata) when a connection succeeds so the replay is the single source of truth for the visible scrollback window.
   - Sends current user list.
 - On user connect/disconnect:
   - Broadcasts updated user list.

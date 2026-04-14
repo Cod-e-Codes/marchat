@@ -36,7 +36,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `client/config/interactive_ui_test.go` | Client interactive UI components | TUI forms, profile selection, authentication prompts |
 | `client/code_snippet_test.go` | Client code snippet functionality | Text editing, selection, clipboard, syntax highlighting |
 | `client/file_picker_test.go` | Client file picker functionality | File browsing, selection, size validation, directory navigation |
-| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling, encryption functions, flag validation |
+| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling, encryption functions, flag validation, `wsConnected` transcript reset on reconnect |
 | `client/websocket_sanitize_test.go` | WebSocket URL / TLS hints | Sanitization helpers for display and connection hints |
 | `client/exthook/exthook_test.go` | Client hook helpers | Executable validation, hook JSON shaping, path rules |
 | `internal/doctor/db_checks_test.go` | Doctor DB probes | SQLite connectivity and version checks used by `-doctor` |
@@ -83,7 +83,7 @@ Per-file statement percentages for important paths are listed under [Test Covera
 - **Client Config**: Configuration loading/saving, path utilities, keystore migration
 - **Client Interactive UI**: TUI forms, profile selection, authentication prompts, navigation, validation
 - **Client Code Snippet**: Text editing, selection, clipboard operations, syntax highlighting, state management
-- **Client Main**: Message rendering, user lists, URL handling, encryption functions, flag validation
+- **Client Main**: Message rendering, user lists, URL handling, encryption functions, flag validation, reconnect transcript handling (`TestWsConnectedClearsTranscript`)
 - **Client WebSocket helpers**: URL / TLS hint sanitization (`websocket_sanitize_test.go`)
 - **Client Hooks (`client/exthook`)**: Executable path validation and hook-safe JSON for send/receive events (`exthook_test.go`)
 - **Client File Picker**: File browsing, directory navigation, file selection, size validation, error handling

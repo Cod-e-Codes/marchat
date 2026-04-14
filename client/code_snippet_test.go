@@ -11,10 +11,16 @@ import (
 // Mock themeStyles for testing
 func getMockThemeStyles() themeStyles {
 	return themeStyles{
-		User:   lipgloss.NewStyle(),
-		Msg:    lipgloss.NewStyle(),
-		Time:   lipgloss.NewStyle(),
-		Banner: lipgloss.NewStyle(),
+		User:           lipgloss.NewStyle(),
+		Msg:            lipgloss.NewStyle(),
+		Time:           lipgloss.NewStyle(),
+		Banner:         lipgloss.NewStyle(),
+		BannerError:    lipgloss.NewStyle(),
+		BannerWarn:     lipgloss.NewStyle(),
+		BannerInfo:     lipgloss.NewStyle(),
+		SystemMsg:      lipgloss.NewStyle(),
+		SystemMsgError: lipgloss.NewStyle(),
+		SystemMsgWarn:  lipgloss.NewStyle(),
 	}
 }
 

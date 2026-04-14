@@ -85,6 +85,12 @@ Marchat comes with 4 built-in themes:
 | `help_overlay_fg` | Help menu text |
 | `help_overlay_border` | Help menu border |
 | `help_title` | Help menu title color |
+| `banner_error_bg` | Optional. Full-width banner strip background when the line starts with `[ERROR]` |
+| `banner_error_fg` | Optional. Text color for the error strip (pair with `banner_error_bg`) |
+| `banner_warn_bg` | Optional. Background when the line starts with `[WARN]` |
+| `banner_warn_fg` | Optional. Foreground for the warn strip |
+| `banner_info_bg` | Optional. Background for all other banner lines (`[OK]`, toggles, sending, and plain text) |
+| `banner_info_fg` | Optional. Foreground for the info strip. If `banner_info_bg` and `banner_info_fg` are both omitted, the info strip reuses `footer_bg` and `footer_fg` |
 
 ## Using Custom Themes
 

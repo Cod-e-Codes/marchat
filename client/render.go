@@ -27,6 +27,50 @@ func sortMessagesByTimestamp(messages []shared.Message) {
 	})
 }
 
+type systemLineSeverity int
+
+const (
+	systemLineInfo systemLineSeverity = iota
+	systemLineWarn
+	systemLineErr
+)
+
+// systemLineSeverityClass classifies System sender content for transcript coloring.
+func systemLineSeverityClass(content string) systemLineSeverity {
+	t := strings.TrimSpace(content)
+	tl := strings.ToLower(t)
+	switch {
+	case strings.HasPrefix(tl, "[error]"):
+		return systemLineErr
+	case strings.HasPrefix(tl, "[warn]"):
+		return systemLineWarn
+	case strings.HasPrefix(tl, "unknown "),
+		strings.HasPrefix(tl, "invalid "),
+		tl == "error",
+		strings.HasPrefix(tl, "error "),
+		strings.HasPrefix(tl, "error:"),
+		strings.Contains(tl, " not found"),
+		strings.Contains(tl, " not allowed"),
+		strings.Contains(tl, "failed"):
+		return systemLineErr
+	default:
+		return systemLineInfo
+	}
+}
+
+// systemLineStyle picks transcript styling for Server "System" lines so errors
+// and warnings are not the same color as normal notices.
+func systemLineStyle(styles themeStyles, content string) lipgloss.Style {
+	switch systemLineSeverityClass(content) {
+	case systemLineErr:
+		return styles.SystemMsgError
+	case systemLineWarn:
+		return styles.SystemMsgWarn
+	default:
+		return styles.SystemMsg
+	}
+}
+
 func renderMessages(msgs []shared.Message, styles themeStyles, username string, users []string, width int, twentyFourHour bool, showMessageMetadata bool, reactions ...map[int64]map[string]map[string]bool) string {
 	var reactionMap map[int64]map[string]map[string]bool
 	if len(reactions) > 0 {
@@ -104,7 +148,7 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 
 		switch msg.Sender {
 		case "System":
-			b.WriteString(timestamp + " " + prefix + styles.Info.Render(content) + metaSuffix + "\n")
+			b.WriteString(timestamp + " " + prefix + systemLineStyle(styles, content).Render(content) + metaSuffix + "\n")
 		case username:
 			b.WriteString(timestamp + " " + prefix + styles.Me.Render(msg.Sender) + ": " + content + metaSuffix + "\n")
 		default:

@@ -197,6 +197,12 @@ type model struct {
 	reactions      map[int64]map[string]map[string]bool
 	lastTypingSent time.Time
 	unreadCount    int
+
+	// Hub channel (lowercase); empty means unknown or general for display.
+	currentChannel string
+	// Read receipts: debounced tail cursor sent to the server.
+	lastReadReceiptSentID     int64
+	readReceiptFlushScheduled bool
 }
 
 // configToNotificationConfig converts Config to NotificationConfig
@@ -289,15 +295,22 @@ func (m *model) shouldNotify(msg shared.Message) (bool, NotificationLevel) {
 }
 
 type themeStyles struct {
-	User      lipgloss.Style
-	Time      lipgloss.Style
-	Info      lipgloss.Style // empty state, date headers, system lines
-	Timestamp lipgloss.Style // bracketed message times in transcript
-	Msg       lipgloss.Style
-	Banner    lipgloss.Style
-	Box       lipgloss.Style // frame color
-	Mention   lipgloss.Style // mention highlighting
-	Hyperlink lipgloss.Style // hyperlink highlighting
+	User        lipgloss.Style
+	Time        lipgloss.Style
+	Info        lipgloss.Style // empty state and date headers (not System transcript body)
+	Timestamp   lipgloss.Style // bracketed message times in transcript
+	Msg         lipgloss.Style
+	Banner      lipgloss.Style // accent foreground (inline highlights); not the full-width strip
+	BannerError lipgloss.Style
+	BannerWarn  lipgloss.Style
+	BannerInfo  lipgloss.Style
+	// Transcript: lines from sender "System" (distinct from top banner strip).
+	SystemMsg      lipgloss.Style
+	SystemMsgError lipgloss.Style
+	SystemMsgWarn  lipgloss.Style
+	Box            lipgloss.Style // frame color
+	Mention        lipgloss.Style // mention highlighting
+	Hyperlink      lipgloss.Style // hyperlink highlighting
 
 	UserList lipgloss.Style // NEW: user list panel
 	Me       lipgloss.Style // NEW: current user style
@@ -317,22 +330,28 @@ type themeStyles struct {
 func baseThemeStyles() themeStyles {
 	timeStyle := lipgloss.NewStyle().Faint(true)
 	return themeStyles{
-		User:       lipgloss.NewStyle().Bold(true),
-		Time:       timeStyle,
-		Info:       timeStyle,
-		Timestamp:  timeStyle,
-		Msg:        lipgloss.NewStyle(),
-		Banner:     lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F5F")).Bold(true),
-		Box:        lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#AAAAAA")),
-		Mention:    lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFD700")),
-		Hyperlink:  lipgloss.NewStyle().Underline(true).Foreground(lipgloss.Color("#4A9EFF")),
-		UserList:   lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#AAAAAA")).Padding(0, 1),
-		Me:         lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Bold(true),
-		Other:      lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")),
-		Background: lipgloss.NewStyle(),
-		Header:     lipgloss.NewStyle(),
-		Footer:     lipgloss.NewStyle(),
-		Input:      lipgloss.NewStyle(),
+		User:           lipgloss.NewStyle().Bold(true),
+		Time:           timeStyle,
+		Info:           timeStyle,
+		Timestamp:      timeStyle,
+		Msg:            lipgloss.NewStyle(),
+		Banner:         lipgloss.NewStyle().Foreground(lipgloss.Color("#FF5F5F")).Bold(true),
+		BannerError:    lipgloss.NewStyle().Background(lipgloss.Color("#C42B2B")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true),
+		BannerWarn:     lipgloss.NewStyle().Background(lipgloss.Color("#B8860B")).Foreground(lipgloss.Color("#000000")).Bold(true),
+		BannerInfo:     lipgloss.NewStyle().Background(lipgloss.Color("#2D4A68")).Foreground(lipgloss.Color("#E8E8E8")).Bold(true),
+		SystemMsg:      timeStyle,
+		SystemMsgError: lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5555")),
+		SystemMsgWarn:  lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#D7AF00")),
+		Box:            lipgloss.NewStyle().Border(lipgloss.NormalBorder()).BorderForeground(lipgloss.Color("#AAAAAA")),
+		Mention:        lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FFD700")),
+		Hyperlink:      lipgloss.NewStyle().Underline(true).Foreground(lipgloss.Color("#4A9EFF")),
+		UserList:       lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(lipgloss.Color("#AAAAAA")).Padding(0, 1),
+		Me:             lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD700")).Bold(true),
+		Other:          lipgloss.NewStyle().Foreground(lipgloss.Color("#AAAAAA")),
+		Background:     lipgloss.NewStyle(),
+		Header:         lipgloss.NewStyle(),
+		Footer:         lipgloss.NewStyle(),
+		Input:          lipgloss.NewStyle(),
 		HelpOverlay: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
 			BorderForeground(lipgloss.Color("#FFFFFF")).
@@ -343,6 +362,63 @@ func baseThemeStyles() themeStyles {
 			Foreground(lipgloss.Color("#FFD700")).
 			Bold(true).
 			MarginBottom(1),
+	}
+}
+
+// applyBuiltinBannerStrips sets full-width banner strip styles per built-in theme.
+func applyBuiltinBannerStrips(s *themeStyles, theme string) {
+	switch theme {
+	case "system":
+		s.BannerError = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5555"))
+		s.BannerWarn = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#D7AF00"))
+		s.BannerInfo = lipgloss.NewStyle().Bold(true)
+	case "patriot":
+		// BannerError must differ from header red (#BF0A30) so errors read as their own band.
+		s.BannerError = lipgloss.NewStyle().Background(lipgloss.Color("#5C1018")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+		s.BannerWarn = lipgloss.NewStyle().Background(lipgloss.Color("#FFD700")).Foreground(lipgloss.Color("#002868")).Bold(true)
+		s.BannerInfo = lipgloss.NewStyle().Background(lipgloss.Color("#002868")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+	case "retro":
+		s.BannerError = lipgloss.NewStyle().Background(lipgloss.Color("#CC2200")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+		// Avoid same fill as header orange strip.
+		s.BannerWarn = lipgloss.NewStyle().Background(lipgloss.Color("#CC6600")).Foreground(lipgloss.Color("#181818")).Bold(true)
+		s.BannerInfo = lipgloss.NewStyle().Background(lipgloss.Color("#222200")).Foreground(lipgloss.Color("#FFFFAA")).Bold(true)
+	case "modern":
+		s.BannerError = lipgloss.NewStyle().Background(lipgloss.Color("#D32F2F")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
+		s.BannerWarn = lipgloss.NewStyle().Background(lipgloss.Color("#F9A825")).Foreground(lipgloss.Color("#000000")).Bold(true)
+		s.BannerInfo = lipgloss.NewStyle().Background(lipgloss.Color("#23272E")).Foreground(lipgloss.Color("#E0E0E0")).Bold(true)
+	}
+}
+
+// applySemanticStylesForTheme sets date-divider Info (not always equal to chat
+// timestamp color) and System transcript line styles so errors are not the
+// same color as normal system text.
+func applySemanticStylesForTheme(s *themeStyles, theme string) {
+	switch theme {
+	case "patriot":
+		s.Info = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#8FA3B8"))
+		s.SystemMsg = lipgloss.NewStyle().Foreground(lipgloss.Color("#E8EAED"))
+		s.SystemMsgError = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF8A80")).Bold(true)
+		s.SystemMsgWarn = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFD54F")).Bold(true)
+	case "retro":
+		s.Info = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#66AA66"))
+		s.SystemMsg = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFCC"))
+		s.SystemMsgError = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6E6E")).Bold(true)
+		s.SystemMsgWarn = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFF00")).Bold(true)
+	case "modern":
+		s.Info = lipgloss.NewStyle().Faint(true).Foreground(lipgloss.Color("#78909C"))
+		s.SystemMsg = lipgloss.NewStyle().Foreground(lipgloss.Color("#B0BEC5"))
+		s.SystemMsgError = lipgloss.NewStyle().Foreground(lipgloss.Color("#EF5350")).Bold(true)
+		s.SystemMsgWarn = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFCA28")).Bold(true)
+	case "system":
+		s.Info = s.Time
+		s.SystemMsg = s.Time
+		s.SystemMsgError = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5555"))
+		s.SystemMsgWarn = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#D7AF00"))
+	default:
+		s.Info = s.Time
+		s.SystemMsg = s.Time
+		s.SystemMsgError = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#FF5555"))
+		s.SystemMsgWarn = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#D7AF00"))
 	}
 }
 
@@ -421,8 +497,10 @@ func getThemeStyles(theme string) themeStyles {
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#23272E")).Foreground(lipgloss.Color("#E0E0E0"))
 		s.HelpOverlay = s.HelpOverlay.BorderForeground(lipgloss.Color("#4F8EF7")).Background(lipgloss.Color("#181C24"))
 	}
+	themeKey := strings.ToLower(theme)
+	applyBuiltinBannerStrips(&s, themeKey)
 	s.Timestamp = s.Time
-	s.Info = s.Time
+	applySemanticStylesForTheme(&s, themeKey)
 	return s
 }
 
@@ -459,7 +537,20 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.connected = true
 		m.banner = "[OK] Connected to server."
 		m.reconnectDelay = time.Second // reset on success
+		m.lastReadReceiptSentID = 0
+		m.readReceiptFlushScheduled = false
+		// Server replays history on each handshake; drop local transcript so we do
+		// not duplicate messages after a disconnect or server restart.
+		m.messages = nil
+		m.reactions = make(map[int64]map[string]map[string]bool)
+		m.typingUsers = make(map[string]time.Time)
+		m.receivedFiles = nil
+		m.unreadCount = 0
+		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 		return m, m.listenWebSocket()
+	case readReceiptFlushMsg:
+		m.readReceiptFlushScheduled = false
+		return m, m.flushReadReceipt()
 	case wsReaderClosed:
 		return m, nil
 	case wsMsg:
@@ -586,6 +677,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showFilePicker = false
 		return m, m.listenWebSocket()
 	case shared.Message:
+		if ch := strings.TrimSpace(v.Channel); ch != "" {
+			m.currentChannel = strings.ToLower(ch)
+		}
 		if shouldNotify, level := m.shouldNotify(v); shouldNotify {
 			m.notificationManager.Notify(v.Sender, v.Content, level)
 		}
@@ -656,7 +750,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.unreadCount++
 		}
 		m.sending = false
-		return m, m.listenWebSocket()
+		cmds := []tea.Cmd{m.listenWebSocket()}
+		if m.viewport.AtBottom() {
+			if rr := m.scheduleReadReceiptFlush(); rr != nil {
+				cmds = append(cmds, rr)
+			}
+		}
+		return m, tea.Batch(cmds...)
 	case wsUsernameError:
 		log.Printf("Handling wsUsernameError: %s", v.message)
 		m.connected = false
@@ -845,7 +945,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(v, m.keys.MessageInfoHotkey):
 			m.showMessageMetadata = !m.showMessageMetadata
-			m.banner = "Message metadata: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
+			m.banner = "Msg info: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
 			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 			return m, nil
 		case key.Matches(v, m.keys.ClearHotkey):
@@ -954,6 +1054,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.viewport.AtBottom() {
 				m.unreadCount = 0
+				if rr := m.scheduleReadReceiptFlush(); rr != nil {
+					return m, rr
+				}
 			}
 			return m, nil
 		case key.Matches(v, m.keys.PageUp):
@@ -971,6 +1074,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if m.viewport.AtBottom() {
 				m.unreadCount = 0
+				if rr := m.scheduleReadReceiptFlush(); rr != nil {
+					return m, rr
+				}
 			}
 			return m, nil
 		case key.Matches(v, m.keys.Copy): // Custom Copy
@@ -1340,7 +1446,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if text == ":msginfo" {
 				m.showMessageMetadata = !m.showMessageMetadata
-				m.banner = "Message metadata: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
+				m.banner = "Msg info: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
 				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
@@ -1721,6 +1827,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(text, ":join ") {
 				channel := strings.TrimSpace(strings.TrimPrefix(text, ":join "))
 				if channel != "" {
+					m.currentChannel = strings.ToLower(channel)
 					joinMsg := shared.Message{
 						Type:    shared.JoinChannelType,
 						Sender:  m.cfg.Username,
@@ -1732,6 +1839,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if text == ":leave" {
+				m.currentChannel = "general"
 				leaveMsg := shared.Message{
 					Type:   shared.LeaveChannelType,
 					Sender: m.cfg.Username,
@@ -1984,23 +2092,7 @@ func (m *model) View() string {
 	headerText := fmt.Sprintf(" marchat %s ", shared.ClientVersion)
 	header := m.styles.Header.Width(m.viewport.Width + userListWidth + 4).Render(headerText)
 
-	connStatus := "Disconnected"
-	if m.connected {
-		connStatus = "Connected"
-	}
-	footerText := connStatus + " | Press Ctrl+H for help"
-	if m.showHelp {
-		footerText = connStatus + " | Press Ctrl+H to close help"
-	}
-	if m.useE2E {
-		footerText += " | E2E Encrypted"
-	} else {
-		footerText += " | Unencrypted"
-	}
-	if m.unreadCount > 0 {
-		footerText += fmt.Sprintf(" | %d unread", m.unreadCount)
-	}
-	footerText += " | Msg info: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
+	footerText := buildStatusFooter(m.connected, m.showHelp, m.unreadCount, m.useE2E, m.currentChannel)
 	footer := m.styles.Footer.Width(m.viewport.Width + userListWidth + 4).Render(footerText)
 
 	// Banner
@@ -2014,13 +2106,13 @@ func (m *model) View() string {
 				bannerText = "[Sending...]"
 			}
 		}
-		bannerBox = m.styles.Banner.
-			Width(m.viewport.Width).
+		kind := stripKindForBanner(bannerText)
+		fullW := chromeFullWidth(m.viewport.Width)
+		bannerShown := layoutBannerForStrip(bannerText, fullW)
+		bannerBox = m.styles.BannerStrip(kind).
+			Width(fullW).
 			PaddingLeft(1).
-			Background(lipgloss.Color("#FF5F5F")).
-			Foreground(lipgloss.Color("#000000")).
-			Bold(true).
-			Render(bannerText)
+			Render(bannerShown)
 	}
 
 	// Chat and user list layout

@@ -40,6 +40,9 @@ type UserList struct {
 
 type quitMsg struct{}
 
+// readReceiptFlushMsg fires after debounce to send one coalesced read_receipt.
+type readReceiptFlushMsg struct{}
+
 // encryptGlobalTextWireContent returns base64(nonce ‖ ciphertext) for global chat E2E text,
 // matching the wire format produced for normal encrypted messages.
 func encryptGlobalTextWireContent(keystore *crypto.KeyStore, username, plaintext string) (string, error) {
@@ -433,6 +436,7 @@ func (m *model) closeWebSocket() {
 		m.conn.Close()
 		m.conn = nil
 	}
+	m.readReceiptFlushScheduled = false
 	m.wg.Wait()
 }
 

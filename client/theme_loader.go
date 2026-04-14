@@ -34,6 +34,13 @@ type ThemeColors struct {
 	HelpOverlayFg     string `json:"help_overlay_fg"`
 	HelpOverlayBorder string `json:"help_overlay_border"`
 	HelpTitle         string `json:"help_title"`
+	// Optional full-width banner strip (above transcript). Empty uses defaults; info strip falls back to footer colors.
+	BannerErrorBg string `json:"banner_error_bg,omitempty"`
+	BannerErrorFg string `json:"banner_error_fg,omitempty"`
+	BannerWarnBg  string `json:"banner_warn_bg,omitempty"`
+	BannerWarnFg  string `json:"banner_warn_fg,omitempty"`
+	BannerInfoBg  string `json:"banner_info_bg,omitempty"`
+	BannerInfoFg  string `json:"banner_info_fg,omitempty"`
 }
 
 // ThemeDefinition represents a complete theme with metadata
@@ -123,7 +130,47 @@ func ApplyCustomTheme(def ThemeDefinition) themeStyles {
 			Bold(true).
 			MarginBottom(1),
 	}
+	be, bw, bi := customThemeBannerStrips(def.Colors)
+	s.BannerError, s.BannerWarn, s.BannerInfo = be, bw, bi
+	s.SystemMsg = lipgloss.NewStyle().Foreground(lipgloss.Color(def.Colors.Message))
+	s.SystemMsgError = lipgloss.NewStyle().Foreground(lipgloss.Color(def.Colors.Banner)).Bold(true)
+	s.SystemMsgWarn = lipgloss.NewStyle().Foreground(lipgloss.Color(def.Colors.Mention)).Bold(true)
 	return s
+}
+
+// customThemeBannerStrips builds error, warn, and info banner strip styles from ThemeColors.
+func customThemeBannerStrips(c ThemeColors) (lipgloss.Style, lipgloss.Style, lipgloss.Style) {
+	errBg, errFg := strings.TrimSpace(c.BannerErrorBg), strings.TrimSpace(c.BannerErrorFg)
+	if errBg == "" {
+		errBg = "#C42B2B"
+	}
+	if errFg == "" {
+		errFg = "#FFFFFF"
+	}
+	warnBg, warnFg := strings.TrimSpace(c.BannerWarnBg), strings.TrimSpace(c.BannerWarnFg)
+	if warnBg == "" {
+		warnBg = "#B8860B"
+	}
+	if warnFg == "" {
+		warnFg = "#000000"
+	}
+	infoBg, infoFg := strings.TrimSpace(c.BannerInfoBg), strings.TrimSpace(c.BannerInfoFg)
+	if infoBg == "" {
+		infoBg = strings.TrimSpace(c.FooterBg)
+		if infoBg == "" {
+			infoBg = "#2A2A2A"
+		}
+	}
+	if infoFg == "" {
+		infoFg = strings.TrimSpace(c.FooterFg)
+		if infoFg == "" {
+			infoFg = "#CCCCCC"
+		}
+	}
+	errStrip := lipgloss.NewStyle().Background(lipgloss.Color(errBg)).Foreground(lipgloss.Color(errFg)).Bold(true)
+	warnStrip := lipgloss.NewStyle().Background(lipgloss.Color(warnBg)).Foreground(lipgloss.Color(warnFg)).Bold(true)
+	infoStrip := lipgloss.NewStyle().Background(lipgloss.Color(infoBg)).Foreground(lipgloss.Color(infoFg)).Bold(true)
+	return errStrip, warnStrip, infoStrip
 }
 
 // IsCustomTheme checks if a theme name refers to a custom theme

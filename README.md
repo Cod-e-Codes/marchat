@@ -77,7 +77,7 @@ Screen recordings of a current build (GIF autoplay depends on the viewer).
 - **Direct Messages** - Private DM conversations between users
 - **Channels** - Multiple chat rooms with join/leave and per-channel messaging
 - **Typing Indicators** - See when other users are typing
-- **Read Receipts** - Message read acknowledgement (broadcast-level)
+- **Read Receipts** - Server stores per-user read rows; the reference client sends debounced `read_receipt` when the transcript is scrolled to the newest messages
 - **Plugin System** - Remote registry with text commands and Alt+key hotkeys
 - **E2E Encryption** - ChaCha20-Poly1305 with a shared global key (`MARCHAT_GLOBAL_E2E_KEY`), including file transfers
 - **File Sharing** - Send files up to 1MB (configurable) with interactive picker and optional E2E encryption
@@ -87,7 +87,7 @@ Screen recordings of a current build (GIF autoplay depends on the viewer).
 - **Docker Support** - Containerized deployment with `docker-compose.yml` for local dev; optional **TLS reverse proxy** via Caddy ([guide](deploy/CADDY-REVERSE-PROXY.md))
 - **Health Monitoring** - `/health` and `/health/simple` endpoints with system metrics
 - **Structured Logging** - JSON logs with component separation and user tracking
-- **UX Enhancements** - Connection status indicator, tab completion for @mentions, unread message count, multi-line input, chat export
+- **UX Enhancements** - Stable status footer (connection, unread, optional E2E and channel), banner for command feedback, tab completion for @mentions, multi-line input, chat export
 - **Cross-Platform** - Runs on Linux, macOS, Windows, and Android/Termux
 - **Diagnostics** - `marchat-client -doctor` and `marchat-server -doctor` (or `-doctor-json`) summarize environment, resolved paths, and configuration health
 
@@ -765,6 +765,7 @@ The TUI client can spawn **optional** external programs on send/receive and pass
 | MySQL connection fails | Verify DSN prefix `mysql:` and body `user:pass@tcp(host:3306)/db?parseTime=true`; test with the `mysql` CLI. |
 | SQL syntax error after backend switch | Ensure tables were created by the current server version and restart after changing `MARCHAT_DB_PATH`. |
 | Message history looks incomplete | History depends on **channel**, **per-user message state**, and server filters. **Ban/unban** and related flows can reset stored state so scrollback differs from the raw DB. |
+| Transcript resets after reconnect | On each successful WebSocket connect the reference client clears local messages and rebuilds from the server handshake replay (up to 50 recent lines). That avoids duplicates when the server comes back while the client stayed open. Lines older than that replay window are not shown again in that session unless you saved them with **`:export`** earlier. Third-party clients should replace or dedupe history on handshake; see **PROTOCOL.md** (Server Behavior). |
 | Ban history gaps not working | Set `MARCHAT_BAN_HISTORY_GAPS=true` (default off). The server creates the **`ban_history`** table when using a database backend that runs marchat migrations. |
 | TLS certificate errors | For dev/self-signed certs, pass **`--skip-tls-verify`** on the client (or enable **Skip TLS verify** in the profile / interactive setup). |
 | Plugin installation fails | Check registry URL (`MARCHAT_PLUGIN_REGISTRY_URL`), network access, and JSON validity; commercial plugins need a valid license for the **plugin name** (see **PLUGIN_ECOSYSTEM.md**). |

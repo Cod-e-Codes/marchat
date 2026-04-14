@@ -23,7 +23,13 @@
       "help_overlay_bg": "#1a1a1a",
       "help_overlay_fg": "#FFFFFF",
       "help_overlay_border": "#FFFFFF",
-      "help_title": "#FFD700"
+      "help_title": "#FFD700",
+      "banner_error_bg": "#D32F2F",
+      "banner_error_fg": "#FFFFFF",
+      "banner_warn_bg": "#F9A825",
+      "banner_warn_fg": "#000000",
+      "banner_info_bg": "#23272E",
+      "banner_info_fg": "#E0E0E0"
     }
   },
   "cyberpunk": {

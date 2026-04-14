@@ -11,8 +11,61 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Cod-e-Codes/marchat/client/config"
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/charmbracelet/bubbles/viewport"
 )
+
+func TestWsConnectedClearsTranscript(t *testing.T) {
+	vp := viewport.New(80, 20)
+	vp.SetContent("stale viewport body")
+	m := &model{
+		cfg:       config.Config{Username: "alice", Theme: "retro"},
+		viewport:  vp,
+		styles:    getThemeStyles("retro"),
+		users:     []string{"alice"},
+		messages:  []shared.Message{{Sender: "alice", Content: "before reconnect", MessageID: 1}},
+		reactions: map[int64]map[string]map[string]bool{1: {"+1": {"bob": true}}},
+		typingUsers: map[string]time.Time{
+			"bob": time.Now(),
+		},
+		receivedFiles: map[string]*shared.FileMeta{
+			"alice/file.txt": {Filename: "file.txt"},
+		},
+		unreadCount: 5,
+	}
+
+	next, cmd := m.Update(wsConnected{})
+	if cmd == nil {
+		t.Fatal("expected non-nil cmd from wsConnected")
+	}
+	m2, ok := next.(*model)
+	if !ok {
+		t.Fatalf("Update returned %T, want *model", next)
+	}
+	if len(m2.messages) != 0 {
+		t.Errorf("messages len: got %d, want 0", len(m2.messages))
+	}
+	if len(m2.reactions) != 0 {
+		t.Errorf("reactions len: got %d, want 0", len(m2.reactions))
+	}
+	if len(m2.typingUsers) != 0 {
+		t.Errorf("typingUsers len: got %d, want 0", len(m2.typingUsers))
+	}
+	if m2.receivedFiles != nil {
+		t.Errorf("receivedFiles: want nil, got %+v", m2.receivedFiles)
+	}
+	if m2.unreadCount != 0 {
+		t.Errorf("unreadCount: got %d, want 0", m2.unreadCount)
+	}
+	if !m2.connected {
+		t.Error("connected: want true")
+	}
+	body := m2.viewport.View()
+	if strings.Contains(body, "before reconnect") || strings.Contains(body, "stale viewport body") {
+		t.Errorf("viewport should not retain pre-reconnect content; got %q", body)
+	}
+}
 
 func TestMainFunctionExists(t *testing.T) {
 	// This test ensures the main function exists and can be called
