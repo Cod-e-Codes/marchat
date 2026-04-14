@@ -178,6 +178,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
 - Reactions, read receipts, and last channel per user may be persisted server-side and replayed to reconnecting clients.
 - Message history is capped at 1000 messages.
 - On successful `type`: `edit`, the server updates `content`, sets `edited`, and sets stored encryption metadata from the incoming `encrypted` field (so edited ciphertext rows remain ciphertext with `is_encrypted` aligned to the wire).
+- `:`-prefixed input and `admin_command` messages go through the server command path (plugins first, then built-in admin commands for admins). Non-admins may receive a `System` `text` line when a command requires admin privileges. Admins receive a `System` `text` line when no plugin handler and no built-in handler matches the first token (content includes `Unknown command:` and that token).
 
 ---
 

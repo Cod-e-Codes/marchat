@@ -703,6 +703,12 @@ func (c *Client) handleCommand(command string) {
 
 	default:
 		log.Printf("[ADMIN] Unknown admin command by %s: %s", c.username, command)
+		c.send <- shared.Message{
+			Sender:    "System",
+			Content:   "Unknown command: " + parts[0],
+			CreatedAt: time.Now(),
+			Type:      shared.TextMessage,
+		}
 	}
 }
 

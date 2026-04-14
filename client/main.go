@@ -1908,6 +1908,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							return m, m.listenWebSocket()
 						}
 						m.banner = ""
+						// Do not wait for a chat echo: unknown or silent server paths used to leave
+						// m.sending true forever because only shared.Message clears it.
+						m.sending = false
 					} else if m.dmRecipient != "" {
 						dmMsg := shared.Message{
 							Type:      shared.DirectMessage,

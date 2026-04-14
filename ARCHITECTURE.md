@@ -84,7 +84,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 #### Core Structures
 
 - **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered. All sends to `client.send` use non-blocking `select/default` to prevent deadlocks when a client's write buffer is full; stalled clients are dropped or the message is logged and skipped. **Text** messages fan out to plugins in a **separate goroutine** so plugin IPC never blocks the hub’s broadcast loop.
-- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer.
+- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer. `handleCommand` sends a `System` `text` reply to admins when a `:` command is not handled by plugins or built-ins (unknown token), so clients always get a wire response for that case.
 - **`AdminPanel`**: Terminal-based administrative interface for server management
 - **`WebAdminServer`**: Web-based administrative interface with session authentication
 - **`HealthChecker`**: System health monitoring with metrics collection

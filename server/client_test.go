@@ -519,3 +519,29 @@ func TestClient_HandleAdminCommand(t *testing.T) {
 	client.handleCommand(":stats")
 	// Should not panic or cause issues
 }
+
+func TestHandleCommandUnknownAdminSendsSystemReply(t *testing.T) {
+	client, _, _, cleanup := setupTestClient(t)
+	defer cleanup()
+	client.isAdmin = true
+	client.pluginCommandHandler = nil
+	client.handleCommand(":hello")
+	select {
+	case raw := <-client.send:
+		sm, ok := raw.(shared.Message)
+		if !ok {
+			t.Fatalf("expected shared.Message, got %T", raw)
+		}
+		if sm.Sender != "System" {
+			t.Errorf("sender: got %q, want System", sm.Sender)
+		}
+		if sm.Type != shared.TextMessage {
+			t.Errorf("type: got %q, want text", sm.Type)
+		}
+		if !strings.Contains(sm.Content, "Unknown command") || !strings.Contains(sm.Content, ":hello") {
+			t.Errorf("unexpected content: %q", sm.Content)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for reply on send channel")
+	}
+}
