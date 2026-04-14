@@ -88,6 +88,12 @@ func (c *Client) readPump() {
 		if len(msgTimestamps) >= rateLimitMessages {
 			log.Printf("Rate limit exceeded for client %s, cooldown %v", c.username, rateLimitCooldown)
 			cooldownUntil = now.Add(rateLimitCooldown)
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   "Rate limited: too many messages in a short window. Wait before sending again.",
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
 			continue
 		}
 		msgTimestamps = append(msgTimestamps, now)

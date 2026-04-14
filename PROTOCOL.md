@@ -198,7 +198,7 @@ Per WebSocket connection, the server enforces rate limiting on **all** incoming 
 - **Burst:** at most **20 messages** per **5 second** sliding window.
 - **Cooldown:** if the limit is exceeded, further incoming messages from that connection are ignored until **10 seconds** have elapsed since the violation, then counting resumes.
 
-Exceeded messages are dropped silently from the client’s perspective (the server logs the event). Alternative clients should pace high-frequency traffic accordingly.
+When the burst threshold is crossed, the server sends one `System` `text` notice to that connection, then ignores further incoming JSON until the cooldown elapses (the server still logs drops). Messages received during the cooldown window are dropped without an extra notice. Alternative clients should pace high-frequency traffic accordingly.
 
 ---
 

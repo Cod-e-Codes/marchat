@@ -294,6 +294,28 @@ func (m *model) shouldNotify(msg shared.Message) (bool, NotificationLevel) {
 	return true, NotificationLevelInfo
 }
 
+// messageIncrementsUnread is true when an inbound message should bump the footer
+// unread count while the transcript viewport is not at the bottom. Ephemeral or
+// in-place update types (typing, reactions, edits, etc.) must not increment.
+func messageIncrementsUnread(m *model, v shared.Message) bool {
+	if v.Sender == m.cfg.Username {
+		return false
+	}
+	switch v.Type {
+	case shared.TypingMessage, shared.ReadReceiptType, shared.ReactionMessage,
+		shared.EditMessageType, shared.DeleteMessage, shared.PinMessage,
+		shared.SearchMessage, shared.AdminCommandType,
+		shared.JoinChannelType, shared.LeaveChannelType, shared.ListChannelsType:
+		return false
+	case shared.TextMessage, shared.DirectMessage, shared.FileMessageType:
+		return true
+	case "":
+		return true
+	default:
+		return false
+	}
+}
+
 type themeStyles struct {
 	User        lipgloss.Style
 	Time        lipgloss.Style
@@ -746,7 +768,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if wasAtBottom {
 			m.viewport.GotoBottom()
 			m.unreadCount = 0
-		} else {
+		} else if messageIncrementsUnread(m, v) {
 			m.unreadCount++
 		}
 		m.sending = false
@@ -1925,6 +1947,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							return m, m.listenWebSocket()
 						}
 						m.banner = ""
+						m.sending = false
 					} else if m.useE2E {
 						log.Printf("DEBUG: Attempting to send global encrypted message: '%s'", text)
 
@@ -1958,6 +1981,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 						log.Printf("DEBUG: Global encrypted message sent successfully")
 						m.banner = ""
+						m.sending = false
 					} else {
 						// Send plain text message
 						msg := shared.Message{Sender: m.cfg.Username, Content: text}
@@ -1968,6 +1992,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							return m, m.listenWebSocket()
 						}
 						m.banner = ""
+						m.sending = false
 					}
 				}
 				m.textarea.SetValue("")

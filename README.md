@@ -87,7 +87,7 @@ Screen recordings of a current build (GIF autoplay depends on the viewer).
 - **Docker Support** - Containerized deployment with `docker-compose.yml` for local dev; optional **TLS reverse proxy** via Caddy ([guide](deploy/CADDY-REVERSE-PROXY.md))
 - **Health Monitoring** - `/health` and `/health/simple` endpoints with system metrics
 - **Structured Logging** - JSON logs with component separation and user tracking
-- **UX Enhancements** - Stable status footer (connection, unread, optional E2E and channel), banner for command feedback, tab completion for @mentions, multi-line input, chat export
+- **UX Enhancements** - Stable status footer (connection, unread for others' new chat lines when scrolled above the tail, optional E2E and channel), banner for command feedback, tab completion for @mentions, multi-line input, chat export
 - **Cross-Platform** - Runs on Linux, macOS, Windows, and Android/Termux
 - **Diagnostics** - `marchat-client -doctor` and `marchat-server -doctor` (or `-doctor-json`) summarize environment, resolved paths, and configuration health
 
@@ -766,7 +766,8 @@ The TUI client can spawn **optional** external programs on send/receive and pass
 | SQL syntax error after backend switch | Ensure tables were created by the current server version and restart after changing `MARCHAT_DB_PATH`. |
 | Message history looks incomplete | History depends on **channel**, **per-user message state**, and server filters. **Ban/unban** and related flows can reset stored state so scrollback differs from the raw DB. |
 | Transcript resets after reconnect | On each successful WebSocket connect the reference client clears local messages and rebuilds from the server handshake replay (up to 50 recent lines). That avoids duplicates when the server comes back while the client stayed open. Lines older than that replay window are not shown again in that session unless you saved them with **`:export`** earlier. Third-party clients should replace or dedupe history on handshake; see **PROTOCOL.md** (Server Behavior). |
-| Banner stuck on `[Sending...]` after a bogus `:` command | Use a current **client**: it clears the sending state after a successful server-command write. Use a current **server** if you want a `System` line for unknown admin commands (`Unknown command:` plus the token). Older servers sent nothing for that case for admins. |
+| Banner stuck on `[Sending...]` | Current **client** clears sending after each successful WebSocket write for normal chat and for `admin_command`, so dropped or slow server work does not leave the banner stuck. Current **server** sends a `System` line for unknown admin `:` commands (`Unknown command:` plus the token) and one `System` line when per-connection message rate burst is exceeded (see **PROTOCOL.md** Rate Limiting). |
+| Footer unread looks wrong | The reference client increments unread only for other users' new `text`, `dm`, or `file` while the transcript is not at the bottom. It does not increment for typing, reactions, read receipts, edits, deletes, or your own echoed sends. See **ARCHITECTURE.md** (client). |
 | Ban history gaps not working | Set `MARCHAT_BAN_HISTORY_GAPS=true` (default off). The server creates the **`ban_history`** table when using a database backend that runs marchat migrations. |
 | TLS certificate errors | For dev/self-signed certs, pass **`--skip-tls-verify`** on the client (or enable **Skip TLS verify** in the profile / interactive setup). |
 | Plugin installation fails | Check registry URL (`MARCHAT_PLUGIN_REGISTRY_URL`), network access, and JSON validity; commercial plugins need a valid license for the **plugin name** (see **PLUGIN_ECOSYSTEM.md**). |

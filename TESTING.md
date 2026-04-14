@@ -36,7 +36,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `client/config/interactive_ui_test.go` | Client interactive UI components | TUI forms, profile selection, authentication prompts |
 | `client/code_snippet_test.go` | Client code snippet functionality | Text editing, selection, clipboard, syntax highlighting |
 | `client/file_picker_test.go` | Client file picker functionality | File browsing, selection, size validation, directory navigation |
-| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling, encryption functions, flag validation, `wsConnected` transcript reset on reconnect |
+| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling, encryption functions, flag validation, `wsConnected` transcript reset on reconnect, `TestMessageIncrementsUnread` |
 | `client/websocket_sanitize_test.go` | WebSocket URL / TLS hints | Sanitization helpers for display and connection hints |
 | `client/exthook/exthook_test.go` | Client hook helpers | Executable validation, hook JSON shaping, path rules |
 | `internal/doctor/db_checks_test.go` | Doctor DB probes | SQLite connectivity and version checks used by `-doctor` |

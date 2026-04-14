@@ -70,7 +70,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - URL detection and external opening
 - Tab completion for @mentions
 - Connection status indicator
-- Unread message count
+- Unread count in the footer: increments only for other users' new `text`, `dm`, or `file` lines while the transcript viewport is scrolled up (not for typing, reactions, read receipts, edits, deletes, or your own echoed sends)
 - Optional debounced `read_receipt` to the server when the viewport follows the newest messages; failures surface in the banner only
 - Footer shows `E2E` when encryption is on, and `#channel` when the current room is not `general`; plaintext sessions omit an explicit `Unencrypted` label in the footer
 - Automatic WebSocket reconnect with exponential backoff (capped); on each successful connect (`wsConnected`), the reference client clears the in-memory transcript and related UI state before processing server history replay, so a server restart or network drop does not duplicate messages that were already on screen
@@ -104,7 +104,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - System metrics collection and health monitoring
 - Web-based admin panel with CSRF protection
 - Health check endpoints for monitoring systems
-- WebSocket message rate limiting
+- WebSocket per-connection message rate limiting; when the configured burst is exceeded the server sends one `System` `text` notice to that client, then ignores inbound JSON until cooldown (see **PROTOCOL.md**)
 - **Diagnostics**: `-doctor` and `-doctor-json` without binding ports (`internal/doctor`)
 
 ### Server Library (`server/`)

@@ -16,6 +16,33 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 )
 
+func TestMessageIncrementsUnread(t *testing.T) {
+	m := &model{cfg: config.Config{Username: "me"}}
+	tests := []struct {
+		name string
+		msg  shared.Message
+		want bool
+	}{
+		{"own_text", shared.Message{Sender: "me", Type: shared.TextMessage}, false},
+		{"other_text", shared.Message{Sender: "you", Type: shared.TextMessage}, true},
+		{"typing", shared.Message{Sender: "you", Type: shared.TypingMessage}, false},
+		{"reaction", shared.Message{Sender: "you", Type: shared.ReactionMessage}, false},
+		{"read_receipt", shared.Message{Sender: "you", Type: shared.ReadReceiptType}, false},
+		{"edit", shared.Message{Sender: "you", Type: shared.EditMessageType}, false},
+		{"delete", shared.Message{Sender: "you", Type: shared.DeleteMessage}, false},
+		{"other_dm", shared.Message{Sender: "you", Type: shared.DirectMessage}, true},
+		{"other_file", shared.Message{Sender: "you", Type: shared.FileMessageType}, true},
+		{"legacy_empty_type", shared.Message{Sender: "you", Type: ""}, true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := messageIncrementsUnread(m, tt.msg); got != tt.want {
+				t.Errorf("got %v want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestWsConnectedClearsTranscript(t *testing.T) {
 	vp := viewport.New(80, 20)
 	vp.SetContent("stale viewport body")
