@@ -48,6 +48,8 @@ After release assets are uploaded, the `publish-downstream-packages` job in [`.g
 
 Fork names are derived from [`github.repository_owner`](https://docs.github.com/en/actions/writing-workflows/choosing-what-your-workflow-does/accessing-contextual-information-about-workflow-runs#github_context): `homebrew-marchat`, `scoop-marchat`, and `winget-pkgs` under the same owner as this repo. Chocolatey is not automated here (API key and moderation are separate).
 
+**If `publish-downstream-packages` fails with `403` when pushing:** The workflow cannot use the default `GITHUB_TOKEN` to push to other repos (even under the same account). **`PACKAGING_GITHUB_PAT`** must be a personal access token that can write to those repositories. **Fine-grained:** grant **Contents: Read and write** on each of `homebrew-marchat`, `scoop-marchat`, and `winget-pkgs`, plus **Pull requests: Read and write** on `winget-pkgs` so the job can open a PR to `microsoft/winget-pkgs`. **Classic PAT:** **`repo`** scope is enough for those pushes. Re-run the failed workflow after updating the secret, or publish manifests manually from `packaging/` (see below).
+
 ## Homebrew
 
 Published tap: [homebrew-marchat](https://github.com/Cod-e-Codes/homebrew-marchat). Formula source in marchat: `packaging/homebrew/marchat.rb`. Submitting to `Homebrew/homebrew-core` instead is possible but usually slower; a tap fits pre-releases and fast iteration.

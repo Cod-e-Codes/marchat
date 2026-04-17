@@ -6,7 +6,7 @@
   "architecture": {
     "64bit": {
       "url": "https://github.com/Cod-e-Codes/marchat/releases/download/v1.0.0/marchat-v1.0.0-windows-amd64.zip",
-      "hash": "0000000000000000000000000000000000000000000000000000000000000000"
+      "hash": "1b0d7a60ef1926dbcb7e071e6a16214a48e6c743fd02e134fb1200101d3ed01b"
     }
   },
   "bin": [
