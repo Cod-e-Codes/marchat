@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
   <metadata>
-    <!-- Chocolatey version: avoid dots inside prerelease labels when possible; 0.11.0-beta5 matches common community feed style -->
     <id>marchat</id>
-    <version>0.11.0-beta5</version>
-    <title>marchat</title>
+    <version>1.0.0</version>
+    <title>marchat (terminal chat)</title>
     <authors>Cod-e-Codes</authors>
     <projectUrl>https://github.com/Cod-e-Codes/marchat</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/assets/marchat-transparent.png</iconUrl>
     <packageSourceUrl>https://github.com/Cod-e-Codes/marchat</packageSourceUrl>
     <docsUrl>https://github.com/Cod-e-Codes/marchat/blob/main/README.md</docsUrl>
     <bugTrackerUrl>https://github.com/Cod-e-Codes/marchat/issues</bugTrackerUrl>
@@ -14,7 +14,7 @@
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <summary>Terminal chat with WebSockets, optional E2E encryption, and plugins</summary>
     <description>marchat is a self-hosted terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a plugin ecosystem. This package unpacks the official Windows amd64 release zip and adds marchat-client and marchat-server to PATH.</description>
-    <releaseNotes>https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.5</releaseNotes>
+    <releaseNotes>https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0</releaseNotes>
     <tags>chat websocket terminal tui cli admin foss</tags>
   </metadata>
   <files>

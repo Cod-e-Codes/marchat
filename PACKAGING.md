@@ -8,7 +8,7 @@ The `packaging/` directory holds **templates** (and pinned checksums for the cur
 |-----------|-------|---------|
 | **Homebrew** (macOS, Linux) | [Tap repo](https://github.com/Cod-e-Codes/homebrew-marchat) | `brew tap cod-e-codes/marchat` then `brew install marchat` |
 | **Scoop** (Windows) | [Bucket repo](https://github.com/Cod-e-Codes/scoop-marchat) | `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat` |
-| **winget** (Windows) | Listed in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) after merge; track [PR #358094](https://github.com/microsoft/winget-pkgs/pull/358094) while pending | `winget install Cod-e-Codes.Marchat` |
+| **winget** (Windows) | Community manifests in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) ([initial package PR #358094](https://github.com/microsoft/winget-pkgs/pull/358094)); new versions ship via PR from your fork or the release workflow | `winget install Cod-e-Codes.Marchat` |
 | **Chocolatey** | [community package](https://community.chocolatey.org/packages/marchat); templates in `packaging/chocolatey/`; prereleases use automated review | `choco install marchat` (when listed) |
 | **AUR** (Arch) | [marchat-bin](https://aur.archlinux.org/packages/marchat-bin) on the AUR | `yay -S marchat-bin` or `paru -S marchat-bin` (or any AUR helper) |
 
@@ -56,7 +56,11 @@ Published tap: [homebrew-marchat](https://github.com/Cod-e-Codes/homebrew-marcha
 
 Upstream is [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). Maintainers use a fork, add `manifests/c/Cod-e-Codes/Marchat/<PackageVersion>/`, run `winget validate` on that folder, and open a PR. Package identifier: `Cod-e-Codes.Marchat`. The installer is a zip with `NestedInstallerType: portable` and two `PortableCommandAlias` entries for client and server. Microsoft may prompt first-time contributors to accept the CLA on the PR; follow the bot instructions there.
 
-Example template path in this repo: `packaging/winget/manifests/c/Cod-e-Codes/Marchat/0.11.0-beta.5/` (duplicate the folder layout for new versions).
+Example template path in this repo: `packaging/winget/manifests/c/Cod-e-Codes/Marchat/1.0.0/` (duplicate the folder layout for new versions).
+
+**Checksums vs GitHub release timing:** Portable zip manifests embed SHA256. After you publish a release and the five platform zips exist on GitHub, run [`packaging/ci/render-release-manifests.sh`](packaging/ci/render-release-manifests.sh) with `RELEASE_TAG` set and copy `packaging-out/` into `packaging/` (and into your tap, bucket, winget fork, or AUR clone as needed) so local `winget validate`, `brew audit`, and `choco pack` match real bytes. The committed templates may carry placeholder hashes until that sync step.
+
+**Windows Defender / VirusTotal:** Go-built portable zips are occasionally flagged as generic ML detections. If WinGet manual validation or Chocolatey scanning reports a trojan-style detection on an official release asset, submit the file and URL to [Microsoft Security Intelligence](https://www.microsoft.com/en-us/wdsi/filesubmission) (Defender) and reply on the WinGet PR with the submission id and SHA256, as in community triage threads. Chocolatey may show low VirusTotal counts on prereleases; stable packages still benefit from a clear upstream URL and checksum alignment.
 
 ## Scoop
 

@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v0.11.0--beta.5-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.5)
+[![Version](https://img.shields.io/badge/version-v1.0.0-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -15,7 +15,16 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 
 ## Latest Updates
 
-### v0.11.0-beta.5 (Current)
+### v1.0.0 (Current)
+
+**Released 2026-04-17.** Since **[v0.11.0-beta.5](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.5)**; compare [`v0.11.0-beta.5...v1.0.0`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.5...v1.0.0). Commits: **`git log v0.11.0-beta.5..v1.0.0 --oneline`**.
+
+- **Client**: Terminal-native **footer and banner** chrome; **read receipts** in the transcript; **reconnect** clears stale transcript state; **sending** indicator and **unread** count refinements; **rate limit** notice when the server throttles; theme loader updates and **THEMES.md** examples.
+- **Server**: Clearer handling for unknown **admin** commands over the admin connection; related client/server **sending-state** fixes after chat writes.
+- **Docs / protocol**: **ARCHITECTURE**, **PROTOCOL**, **README**, **TESTING** aligned with TUI behavior and coverage.
+- **Packaging**: **v1.0.0** templates across Homebrew, Scoop, winget, Chocolatey, and AUR; **Chocolatey** nuspec **iconUrl** (repo logo on `main`) and clearer **title**; refresh **zip SHA256** values from published release assets before `choco pack` / local manifest validation (see **PACKAGING.md**).
+
+### v0.11.0-beta.5
 
 **Released 2026-04-10.** Since **[v0.11.0-beta.4](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.4)**; compare [`v0.11.0-beta.4...v0.11.0-beta.5`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.4...v0.11.0-beta.5). Commits: **`git log v0.11.0-beta.4..v0.11.0-beta.5 --oneline`**.
 
@@ -157,12 +166,12 @@ Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQ
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.5/marchat-v0.11.0-beta.5-linux-amd64.zip
-unzip marchat-v0.11.0-beta.5-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.0.0/marchat-v1.0.0-linux-amd64.zip
+unzip marchat-v1.0.0-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v0.11.0-beta.5/marchat-v0.11.0-beta.5-darwin-amd64.zip
-unzip marchat-v0.11.0-beta.5-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.0.0/marchat-v1.0.0-darwin-amd64.zip
+unzip marchat-v1.0.0-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -188,11 +197,11 @@ See [PACKAGING.md](PACKAGING.md) and `packaging/` for AUR, winget manifests, Cho
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v0.11.0-beta.5
+docker pull codecodesxyz/marchat:v1.0.0
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v0.11.0-beta.5
+  codecodesxyz/marchat:v1.0.0
 ```
 
 **Docker Compose (local development):**

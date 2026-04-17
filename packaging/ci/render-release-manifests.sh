@@ -4,7 +4,7 @@
 # Requires: bash 4+, curl, sha256sum.
 set -euo pipefail
 
-RELEASE_TAG="${RELEASE_TAG:?set RELEASE_TAG to the git tag (e.g. v0.11.0-beta.5)}"
+RELEASE_TAG="${RELEASE_TAG:?set RELEASE_TAG to the git tag (e.g. v1.0.0)}"
 GITHUB_REPOSITORY="${GITHUB_REPOSITORY:-Cod-e-Codes/marchat}"
 OUTPUT_DIR="${OUTPUT_DIR:-packaging-out}"
 
