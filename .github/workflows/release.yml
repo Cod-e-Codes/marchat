@@ -350,7 +350,9 @@ jobs:
           chmod 600 ~/.ssh/aur_marchat_ci
           ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null || true
           export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur_marchat_ci -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new"
-          git clone ssh://aur@aur.archlinux.org/marchat-bin.git /tmp/marchat-aur
+          # Clone over HTTPS (anonymous read). SSH is only required for push and would fail clone if the key is wrong/unregistered.
+          git clone https://aur.archlinux.org/marchat-bin.git /tmp/marchat-aur
+          git -C /tmp/marchat-aur remote set-url origin ssh://aur@aur.archlinux.org/marchat-bin.git
           cp "${GITHUB_WORKSPACE}/packaging-out/aur/PKGBUILD" /tmp/marchat-aur/PKGBUILD
           cp "${GITHUB_WORKSPACE}/packaging-out/aur/.SRCINFO" /tmp/marchat-aur/.SRCINFO
           cd /tmp/marchat-aur
