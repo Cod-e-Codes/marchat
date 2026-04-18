@@ -8,8 +8,8 @@ The `packaging/` directory holds **templates** (and pinned checksums for the cur
 |-----------|-------|---------|
 | **Homebrew** (macOS, Linux) | [Tap repo](https://github.com/Cod-e-Codes/homebrew-marchat) | `brew tap cod-e-codes/marchat` then `brew install marchat` |
 | **Scoop** (Windows) | [Bucket repo](https://github.com/Cod-e-Codes/scoop-marchat) | `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat` |
-| **winget** (Windows) | Community manifests in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs) ([initial package PR #358094](https://github.com/microsoft/winget-pkgs/pull/358094)); new versions ship via PR from your fork or the release workflow | `winget install Cod-e-Codes.Marchat` |
-| **Chocolatey** | [community package](https://community.chocolatey.org/packages/marchat); templates in `packaging/chocolatey/`; prereleases use automated review | `choco install marchat` (when listed) |
+| **winget** (Windows) | Listed as **Cod-e-Codes.Marchat**. Manifests live in [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs); new versions ship via PR from your fork or [release automation](.github/workflows/release.yml) | `winget install Cod-e-Codes.Marchat` |
+| **Chocolatey** | [Community package](https://community.chocolatey.org/packages/marchat); source templates in `packaging/chocolatey/` | `choco install marchat` |
 | **AUR** (Arch) | [marchat-bin](https://aur.archlinux.org/packages/marchat-bin) on the AUR | `yay -S marchat-bin` or `paru -S marchat-bin` (or any AUR helper) |
 
 Other install paths (zip, `install.sh` / `install.ps1`, Docker) stay in [README.md](README.md).

@@ -22,7 +22,7 @@ Pick one:
 - **Docker**: `docker pull codecodesxyz/marchat` (pin a tag in production; see [README.md](README.md#installation)).
 - **Homebrew** ([tap](https://github.com/Cod-e-Codes/homebrew-marchat)): `brew tap cod-e-codes/marchat` then `brew install marchat`.
 - **Scoop** ([bucket](https://github.com/Cod-e-Codes/scoop-marchat)): `scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat` then `scoop install marchat`.
-- **winget**: `winget install Cod-e-Codes.Marchat` when listed; status, manifests, and PR workflow: [PACKAGING.md](PACKAGING.md#installing-marchat).
+- **winget**: `winget install Cod-e-Codes.Marchat`. Maintainer workflow and checksums: [PACKAGING.md](PACKAGING.md#installing-marchat).
 
 ## 2. Create secrets
 

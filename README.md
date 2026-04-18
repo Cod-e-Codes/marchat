@@ -166,9 +166,9 @@ scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat
 scoop install marchat
 ```
 
-**winget:** `winget install Cod-e-Codes.Marchat` when the community manifest is available; status and paths: [PACKAGING.md](PACKAGING.md#installing-marchat).
+**winget:** `winget install Cod-e-Codes.Marchat` (listed on winget). Maintainer notes and checksum alignment: [PACKAGING.md](PACKAGING.md#installing-marchat).
 
-See [PACKAGING.md](PACKAGING.md) and `packaging/` for AUR, winget manifests, Chocolatey packaging templates (not published to the community gallery yet), and how releases line up with those channels.
+See [PACKAGING.md](PACKAGING.md) and `packaging/` for Homebrew, Scoop, winget, Chocolatey, and AUR: canonical manifest templates here, installs available on those ecosystems, and how each release lines up with downstream publishes.
 
 **Docker:**
 ```bash
@@ -836,7 +836,7 @@ go test ./...
 - **[docs/README.md](docs/README.md)** - Index of all documentation
 - **[CHANGELOG.md](CHANGELOG.md)** - Narrative release history
 - **[QUICKSTART.md](QUICKSTART.md)** - Short path from install to first client connection
-- **[PACKAGING.md](PACKAGING.md)** - Package manager installs (Homebrew, winget, Scoop, AUR), Chocolatey templates, and release alignment
+- **[PACKAGING.md](PACKAGING.md)** - winget, Chocolatey, Homebrew, Scoop, AUR installs, in-repo templates, and release alignment
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Components, data flow, config paths, diagnostics
 - **[PROTOCOL.md](PROTOCOL.md)** - WebSocket message types and payloads
 - **[deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md)** - Optional TLS reverse proxy (Caddy) for local or LAN `wss://`

@@ -5,7 +5,7 @@
 | Install to first message | [QUICKSTART.md](../QUICKSTART.md) |
 | Full user and operator reference | [README.md](../README.md) |
 | Release history (narrative) | [CHANGELOG.md](../CHANGELOG.md) |
-| Package managers and manifests | [PACKAGING.md](../PACKAGING.md) |
+| Package managers (winget, Chocolatey, Homebrew, Scoop, AUR) | [PACKAGING.md](../PACKAGING.md) |
 | Components, config paths, diagnostics | [ARCHITECTURE.md](../ARCHITECTURE.md) |
 | WebSocket JSON shapes | [PROTOCOL.md](../PROTOCOL.md) |
 | TLS reverse proxy (Caddy) | [deploy/CADDY-REVERSE-PROXY.md](../deploy/CADDY-REVERSE-PROXY.md) |
