@@ -1,68 +1,79 @@
 # Contributing to marchat
 
-Thank you for your interest in contributing! This guide explains how to contribute effectively.
+Thank you for your interest in contributing. This guide explains how to contribute effectively and what CI expects.
 
-## Types of Contributions
+## Types of contributions
 
-### Bug Reports (GitHub Issues)
-- Use the issue tracker for bugs and problems only
-- Include:
-  - Clear description of the problem
-  - Steps to reproduce
-  - Expected vs actual behavior
-  - Your OS and marchat version
-  - Any relevant logs or screenshots
+### Bug reports (GitHub Issues)
 
-### Ideas and Questions (GitHub Discussions)
-- Start a discussion for:
-  - Feature requests and suggestions
-  - Questions about setup or usage
-  - General feedback and ideas
-  - Sharing your experience
-  - Showing off customizations
+- Use the issue tracker for bugs and regressions.
+- Include: clear description, steps to reproduce, expected vs actual behavior, OS and marchat version, and relevant logs or screenshots.
 
-### Code Contributions
+### Ideas and questions (GitHub Discussions)
 
-1. **Fork & Clone**
-   - Fork the repo on GitHub
-   - Clone your fork locally
-   - Keep your fork in sync with upstream
+- Use discussions for feature ideas, setup questions, feedback, and show-and-tell.
 
-2. **Create a Branch**
-   - Branch from `main`
-   - Use a clear, descriptive name
-   - One feature/fix per branch
+### Code contributions
 
-3. **Code Style**
-   - Use `gofmt` or `go fmt`
-   - Follow idiomatic Go patterns
-   - Keep code readable and well-commented
-   - Write clear commit messages
+1. **Fork and clone** the repo; keep your fork in sync with `main`.
+2. **Branch from `main`** with a descriptive name; one logical change per PR.
+3. **Read before you hack (suggested order):** [QUICKSTART.md](QUICKSTART.md) (mental model), [ARCHITECTURE.md](ARCHITECTURE.md) (components and data flow), [PROTOCOL.md](PROTOCOL.md) if you touch wire types or handlers, then [TESTING.md](TESTING.md) before you add tests.
+4. **Implement** with focused diffs; match existing style and patterns in the packages you touch.
+5. **Open a PR** against `main` with a clear description and links to issues.
 
-4. **Testing**
-   - Add tests for new features
-   - Ensure all tests pass locally
-   - Run `go test ./...`
+## Local checks (match CI)
 
-5. **Submit Pull Request**
-   - Push to your fork
-   - Open a PR against `main`
-   - Describe your changes clearly
-   - Link related issues
+From the repo root, with Go 1.25.9+ and `golangci-lint` and `govulncheck` on your `PATH`:
+
+```bash
+go fmt ./...
+golangci-lint run ./...
+govulncheck ./...
+go vet ./...
+go test -race ./...
+```
+
+CI also requires a clean `gofmt` tree (`gofmt -l` empty on the root module). Nested modules are **not** included in root `./...`:
+
+```bash
+cd plugin/sdk
+go mod tidy
+go fmt ./...
+golangci-lint run ./...
+govulncheck ./...
+go vet ./...
+go test -race ./...
+cd ../examples/echo
+go mod tidy
+go fmt ./...
+golangci-lint run ./...
+govulncheck ./...
+go vet ./...
+go test -race ./...
+cd ../../..
+```
+
+On Windows, you can run the same commands from `cmd` or PowerShell; see [TESTING.md](TESTING.md) for coverage profiles (use a profile filename **without** a `.out` suffix in PowerShell so `go tool cover -func=` parses correctly).
+
+## Code style
+
+- Run `go fmt` / `go fmt ./...`; follow idiomatic Go.
+- Fix new warnings from `go vet` and `golangci-lint`.
+- Prefer table-driven tests where they clarify cases; avoid `t.Parallel()` in tests that swap global doctor env hooks (see [TESTING.md](TESTING.md)).
+
+## Testing
+
+- Add or extend tests for behavior you change; run the full root suite and nested modules as above.
+- For coverage and package-level metrics, see [TESTING.md](TESTING.md).
 
 ## Automation
 
-- GitHub Actions runs CI on all PRs
-- Tests must pass before merge
-- Dependabot handles dependency updates
-- Do not manually update dependencies unless needed for a fix
+- GitHub Actions runs CI on PRs; tests and linters must pass.
+- Dependabot proposes dependency updates; do not bump `go.mod` manually for routine upgrades unless you are fixing a specific issue.
 
 ## Communication
 
-- Be respectful and constructive
-- Follow the [Code of Conduct](CODE_OF_CONDUCT.md)
-- All contributions are welcome; no idea is too small!
+- Be respectful and constructive.
+- Follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
----
-
-Thank you for helping make marchat better! 
+Thank you for helping improve marchat.

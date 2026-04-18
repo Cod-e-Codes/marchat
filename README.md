@@ -11,48 +11,23 @@
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
-**Quick start:** [QUICKSTART.md](QUICKSTART.md) for a single-page walkthrough (install → server → client → next docs).
+**Quick start:** [QUICKSTART.md](QUICKSTART.md) for a single-page walkthrough (install, server, client, and where to read next).
 
-## Latest Updates
+**E2E in one sentence:** Optional chat encryption uses a **shared symmetric key** (ChaCha20-Poly1305) distributed out of band (`MARCHAT_GLOBAL_E2E_KEY`, keystore, or equivalent). It is **not** pairwise Signal-style key exchange: anyone who holds the key can decrypt message and file payloads. See [SECURITY.md](SECURITY.md) and [PROTOCOL.md](PROTOCOL.md).
 
-### v1.0.0 (Current)
+**Good fit:** self-hosted teams, terminal-first chat, SQLite or Postgres/MySQL, and optional plugins. **Poor fit:** hosted SaaS you do not run, or a threat model that requires per-user forward secrecy without a shared secret.
 
-**Released 2026-04-17.** Since **[v0.11.0-beta.5](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.5)**; compare [`v0.11.0-beta.5...v1.0.0`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.5...v1.0.0). Commits: **`git log v0.11.0-beta.5..v1.0.0 --oneline`**.
+| If you are... | Start here |
+|---------------|------------|
+| Trying marchat | [QUICKSTART.md](QUICKSTART.md) |
+| Running a server in production | [QUICKSTART.md](QUICKSTART.md), [deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md), [PACKAGING.md](PACKAGING.md) |
+| Writing a plugin | [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md), [plugin/README.md](plugin/README.md) |
+| Contributing code | [CONTRIBUTING.md](CONTRIBUTING.md), [TESTING.md](TESTING.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Reviewing security | [SECURITY.md](SECURITY.md), [PROTOCOL.md](PROTOCOL.md) |
 
-- **Client**: Terminal-native **footer and banner** chrome; **read receipts** in the transcript; **reconnect** clears stale transcript state; **sending** indicator and **unread** count refinements; **rate limit** notice when the server throttles; theme loader updates and **THEMES.md** examples.
-- **Server**: Clearer handling for unknown **admin** commands over the admin connection; related client/server **sending-state** fixes after chat writes.
-- **Docs / protocol**: **ARCHITECTURE**, **PROTOCOL**, **README**, **TESTING** aligned with TUI behavior and coverage.
-- **Packaging**: **v1.0.0** templates across Homebrew, Scoop, winget, Chocolatey, and AUR; **Chocolatey** nuspec **iconUrl** (repo logo on `main`) and clearer **title**; refresh **zip SHA256** values from published release assets before `choco pack` / local manifest validation (see **PACKAGING.md**).
+## Release notes
 
-### v0.11.0-beta.5
-
-**Released 2026-04-10.** Since **[v0.11.0-beta.4](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.4)**; compare [`v0.11.0-beta.4...v0.11.0-beta.5`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.4...v0.11.0-beta.5). Commits: **`git log v0.11.0-beta.4..v0.11.0-beta.5 --oneline`**.
-
-- **Server**: RFC 6455 WebSocket close frames on handshake errors; hub stays off plugin IPC with bounded, best-effort, at-most-once plugin chat fan-out.
-- **Client**: Experimental env-driven **exthook** and **`-doctor`** integration.
-- **Plugin SDK**: **`RunStdio`** / **`HandlePluginRequest`** stdio loop; echo sample uses the SDK; docs and **README** plugin examples aligned (**GetConfig**, **Marshal**); **`plugin/sdk/cov`** gitignored; CI runs nested plugin modules (**fmt**, **govulncheck**).
-- **Tests / CI**: Server loadverify benches and rate-limit coverage; **`-doctor`** tests use the injectable **`osEnviron`** hook under **`environMu`** (no parallel **`buildEnvLines`** tests that swap it); **plugin host** **`StopPlugin`** waits for stdout/stderr reader goroutines before reuse so **`-race`** is clean on disable/enable; Dependabot Node 20 note in **`.github/dependabot.yml`**.
-- **Docs**: **TESTING** bench section; coverage/LoC tables refreshed from **`go test -coverprofile=mergedcoverage ./...`** (overall **38.1%** statements, main module); hook example lives under **`_example_hook`**; prose uses ASCII hyphens where edited.
-- **Deps**: **`golang.org/x/crypto`**, **`golang.org/x/term`**, **`modernc.org/sqlite`**.
-
-### v0.11.0-beta.4
-
-**Released 2026-04-09.** [Compare from beta.3](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.3...v0.11.0-beta.4). E2E edit consistency; deterministic theme cycle; security scanner vs **govulncheck** docs; **`.gitattributes`** LF normalization.
-
-### v0.11.0-beta.3
-
-**Released 2026-04-09.** [Compare from beta.2](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.2...v0.11.0-beta.3). Keystore v3 and config/path fixes; web admin refresh; plugin SDK context and host fixes; DB smoke CI; Go 1.25.9; demos, E2E docs, and release asset workflow updates.
-
-### v0.11.0-beta.2
-
-Go 1.25.8 toolchain/docs; **`-doctor`** and env reflection improvements; terminal chrome and **`:msginfo`** metadata; license cache and server hardening; static release zips + **linux-arm64** for Termux.
-
-### Earlier
-
-- **v0.11.0-beta.1**: Multi-DB (SQLite / Postgres / MySQL), reactions, read receipts, message state, serialized WS writes, admin TUI ([PR #83](https://github.com/Cod-e-Codes/marchat/pull/83)).
-- **v0.10.x**: Core chat features (edit/delete/pin/search, DMs, channels, E2E files, plugins), **`-doctor`**, Docker, Caddy TLS proxy docs ([**deploy/CADDY-REVERSE-PROXY.md**](deploy/CADDY-REVERSE-PROXY.md)), **`config/.env`** precedence.
-
-Full changelog on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
+**Current:** [v1.0.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0) (2026-04-17). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 ## Demos
 
@@ -191,7 +166,7 @@ scoop bucket add marchat https://github.com/Cod-e-Codes/scoop-marchat
 scoop install marchat
 ```
 
-**winget:** When [microsoft/winget-pkgs#358094](https://github.com/microsoft/winget-pkgs/pull/358094) is merged, install with `winget install Cod-e-Codes.Marchat`.
+**winget:** `winget install Cod-e-Codes.Marchat` when the community manifest is available; status and paths: [PACKAGING.md](PACKAGING.md#installing-marchat).
 
 See [PACKAGING.md](PACKAGING.md) and `packaging/` for AUR, winget manifests, Chocolatey packaging templates (not published to the community gallery yet), and how releases line up with those channels.
 
@@ -823,7 +798,7 @@ cd plugin/sdk && go test ./...   # Nested SDK module (separate go.mod)
 - **Windows**: `.\test.ps1`
 
 ### Coverage Summary
-Percentages are **statement coverage** from a merged profile (`go test -coverprofile=... ./...` then `go tool cover -func=...`). **Size** is non-test `.go` lines per package (approximate). See [TESTING.md](TESTING.md) for file-level tables and how to regenerate from your `coverage` / `coverage.out` file. The nested **`plugin/sdk`** module is measured separately (about **59%** statements); see [TESTING.md](TESTING.md) for the exact figure and commands.
+Percentages are **statement coverage** from a merged profile (`go test -coverprofile=... ./...` then `go tool cover -func=...`). **Size** is non-test `.go` lines per package (approximate). Authoritative tables and regeneration steps: [TESTING.md](TESTING.md). The nested **`plugin/sdk`** module is measured separately (**58.8%** statements); see [TESTING.md](TESTING.md).
 
 | Package | Coverage | Size | Status |
 |---------|----------|------|--------|
@@ -836,23 +811,19 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `internal/doctor` | 52.5% | 809 LOC | Medium |
 | `plugin/store` | 47.0% | 552 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 36.3% | 7217 LOC | Low |
+| `server` | 36.3% | 7229 LOC | Low |
 | `plugin/manager` | 32.1% | 747 LOC | Low |
 | `client/exthook` | 24.1% | 204 LOC | Low |
-| `client` | 23.1% | 5555 LOC | Low |
+| `client` | 26.2% | 5936 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 38.1%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 38.8%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 
-We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Development setup instructions
-- Code style guidelines and conventions
-- Pull request process and requirements
-- Testing expectations
+We welcome contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for workflow, required checks, and a suggested reading order before your first PR.
 
-**Quick Start:**
+**Clone and test:**
 ```bash
 git clone https://github.com/Cod-e-Codes/marchat.git
 cd marchat
@@ -862,6 +833,8 @@ go test ./...
 
 ## Documentation
 
+- **[docs/README.md](docs/README.md)** - Index of all documentation
+- **[CHANGELOG.md](CHANGELOG.md)** - Narrative release history
 - **[QUICKSTART.md](QUICKSTART.md)** - Short path from install to first client connection
 - **[PACKAGING.md](PACKAGING.md)** - Package manager installs (Homebrew, winget, Scoop, AUR), Chocolatey templates, and release alignment
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - Components, data flow, config paths, diagnostics
