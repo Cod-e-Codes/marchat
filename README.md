@@ -594,6 +594,7 @@ E2E encryption enabled with keystore: config/keystore.dat
 ## Plugin System
 
 Extend functionality with remote plugins from configured registry.
+Default registry source: [Cod-e-Codes/marchat-plugins](https://github.com/Cod-e-Codes/marchat-plugins).
 
 ### Configuration
 ```bash
@@ -633,7 +634,7 @@ export MARCHAT_PLUGIN_REGISTRY_URL="https://my-registry.com/plugins.json"
 - **weather** (v1.0.0): Get weather information and forecasts using wttr.in (`:weather [location]`, `:forecast [location]`)
 - **githooks** (v1.0.0): Git repository management with status, log, branch, and diff commands (`:git-status`, `:git-log`, `:git-branch`, `:git-diff`, `:git-watch` admin-only)
 
-See [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md) for development guide.
+See [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md) for the development guide and [marchat-plugins](https://github.com/Cod-e-Codes/marchat-plugins) for the default plugin catalog repository.
 
 ## Moderation System
 

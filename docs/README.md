@@ -13,7 +13,7 @@
 | Notifications | [NOTIFICATIONS.md](../NOTIFICATIONS.md) |
 | Client hooks (experimental) | [CLIENT_HOOKS.md](../CLIENT_HOOKS.md) |
 | Themes | [THEMES.md](../THEMES.md) |
-| Plugins | [PLUGIN_ECOSYSTEM.md](../PLUGIN_ECOSYSTEM.md), [plugin/README.md](../plugin/README.md) |
+| Plugins | [PLUGIN_ECOSYSTEM.md](../PLUGIN_ECOSYSTEM.md), [plugin/README.md](../plugin/README.md), [marchat-plugins](https://github.com/Cod-e-Codes/marchat-plugins) |
 | Tests and CI | [TESTING.md](../TESTING.md) |
 | Contributing | [CONTRIBUTING.md](../CONTRIBUTING.md) |
 | Security | [SECURITY.md](../SECURITY.md) |

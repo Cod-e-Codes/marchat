@@ -132,7 +132,7 @@ Use `-doctor-json` for machine-readable output. To skip the GitHub “latest rel
 | Threat model, reporting | [SECURITY.md](SECURITY.md) |
 | Themes | [THEMES.md](THEMES.md) |
 | Desktop / bell / quiet hours | [NOTIFICATIONS.md](NOTIFICATIONS.md) |
-| Plugins | [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md), [plugin/README.md](plugin/README.md) |
+| Plugins | [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md), [plugin/README.md](plugin/README.md), [marchat-plugins](https://github.com/Cod-e-Codes/marchat-plugins) |
 | Tests and CI expectations | [TESTING.md](TESTING.md) |
 | Package managers | [PACKAGING.md](PACKAGING.md) |
 | Contributing | [CONTRIBUTING.md](CONTRIBUTING.md) |
