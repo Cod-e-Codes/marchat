@@ -24,6 +24,16 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 | Writing a plugin | [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md), [plugin/README.md](plugin/README.md) |
 | Contributing code | [CONTRIBUTING.md](CONTRIBUTING.md), [TESTING.md](TESTING.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Reviewing security | [SECURITY.md](SECURITY.md), [PROTOCOL.md](PROTOCOL.md) |
+| Prefer a graphical client | [marchat_flutter](https://github.com/Cod-e-Codes/marchat_flutter), [marchat-gui](https://github.com/Cod-e-Codes/marchat-gui) |
+
+## Optional graphical clients
+
+`marchat` stays terminal-first in this repository, with the TUI as the reference client.
+
+- [marchat_flutter](https://github.com/Cod-e-Codes/marchat_flutter): Recommended GUI path and the main graphical client focus.
+- [marchat-gui](https://github.com/Cod-e-Codes/marchat-gui): Go and Fyne companion client for desktop use.
+
+Both clients follow the same wire format documented in [PROTOCOL.md](PROTOCOL.md).
 
 ## Release notes
 

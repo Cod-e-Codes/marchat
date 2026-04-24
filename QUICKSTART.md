@@ -89,6 +89,8 @@ Default URL: `ws://localhost:8080/ws`.
 
 Or run `./marchat-client` with no flags and use the interactive config flow.
 
+For optional graphical clients, see [README.md](README.md#optional-graphical-clients).
+
 **TLS / `wss://`:** Set `MARCHAT_TLS_CERT_FILE` and `MARCHAT_TLS_KEY_FILE` on the server, or put Caddy (or another proxy) in front. Local Caddy + helper scripts: [deploy/CADDY-REVERSE-PROXY.md](deploy/CADDY-REVERSE-PROXY.md).
 
 ## 5. Build from source (optional)
