@@ -193,6 +193,7 @@ type model struct {
 
 	typingUsers    map[string]time.Time
 	typingScopeDM  map[string]bool // latest typing from this sender was DM-scoped (non-empty recipient)
+	typingChannel  map[string]string
 	typingTimeout  time.Duration
 	dmRecipient    string
 	activeDMThread string
@@ -356,11 +357,20 @@ func dmPartnerForMessage(msg shared.Message, me string) string {
 	return ""
 }
 
+func normalizeChannel(channel string) string {
+	normalized := strings.ToLower(strings.TrimSpace(channel))
+	if normalized == "" {
+		return "general"
+	}
+	return normalized
+}
+
 func (m *model) visibleMessages() []shared.Message {
 	if strings.TrimSpace(m.activeDMThread) == "" {
 		filtered := make([]shared.Message, 0, len(m.messages))
+		currentChannel := normalizeChannel(m.currentChannel)
 		for _, msg := range m.messages {
-			if msg.Type != shared.DirectMessage {
+			if msg.Type != shared.DirectMessage && normalizeChannel(msg.Channel) == currentChannel {
 				filtered = append(filtered, msg)
 			}
 		}
@@ -787,6 +797,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.reactions = make(map[int64]map[string]map[string]bool)
 		m.typingUsers = make(map[string]time.Time)
 		m.typingScopeDM = make(map[string]bool)
+		m.typingChannel = make(map[string]string)
 		m.receivedFiles = nil
 		m.unreadCount = 0
 		m.refreshTranscript()
@@ -919,9 +930,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.showFilePicker = false
 		return m, m.listenWebSocket()
 	case shared.Message:
-		if ch := strings.TrimSpace(v.Channel); ch != "" {
-			m.currentChannel = strings.ToLower(ch)
-		}
 		if shouldNotify, level := m.shouldNotify(v); shouldNotify {
 			m.notificationManager.Notify(v.Sender, v.Content, level)
 		}
@@ -949,8 +957,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.typingScopeDM == nil {
 					m.typingScopeDM = make(map[string]bool)
 				}
+				if m.typingChannel == nil {
+					m.typingChannel = make(map[string]string)
+				}
 				m.typingUsers[v.Sender] = time.Now()
 				m.typingScopeDM[v.Sender] = strings.TrimSpace(v.Recipient) != ""
+				m.typingChannel[v.Sender] = normalizeChannel(v.Channel)
 			}
 		case shared.ReactionMessage:
 			if v.Reaction != nil {
@@ -2365,6 +2377,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				typingMsg := shared.Message{Type: shared.TypingMessage, Sender: m.cfg.Username}
 				if r := strings.TrimSpace(m.dmRecipient); r != "" {
 					typingMsg.Recipient = r
+				} else {
+					typingMsg.Channel = normalizeChannel(m.currentChannel)
 				}
 				go func(c *websocket.Conn) {
 					_ = c.WriteJSON(typingMsg)
@@ -2482,7 +2496,23 @@ func (m *model) View() string {
 		if now.Sub(lastTyped) >= m.typingTimeout {
 			continue
 		}
-		if m.typingScopeDM != nil && m.typingScopeDM[user] && !strings.EqualFold(strings.TrimSpace(m.activeDMThread), user) {
+		isDMScope := m.typingScopeDM != nil && m.typingScopeDM[user]
+		if isDMScope && !strings.EqualFold(strings.TrimSpace(m.activeDMThread), user) {
+			continue
+		}
+		if !isDMScope && strings.TrimSpace(m.activeDMThread) != "" {
+			continue
+		}
+		if !isDMScope {
+			typingChannel := "general"
+			if m.typingChannel != nil {
+				typingChannel = normalizeChannel(m.typingChannel[user])
+			}
+			if typingChannel != normalizeChannel(m.currentChannel) {
+				continue
+			}
+		}
+		if strings.EqualFold(strings.TrimSpace(user), strings.TrimSpace(m.cfg.Username)) {
 			continue
 		}
 		activeTypers = append(activeTypers, user)
@@ -3109,6 +3139,7 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 		selectedUserIndex:   -1,
 		typingUsers:         make(map[string]time.Time),
 		typingScopeDM:       make(map[string]bool),
+		typingChannel:       make(map[string]string),
 		typingTimeout:       3 * time.Second,
 		dmUnread:            make(map[string]int),
 		dmLastSeenID:        make(map[string]int64),

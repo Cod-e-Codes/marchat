@@ -94,6 +94,32 @@ func TestVisibleMessagesFiltersDMThread(t *testing.T) {
 	}
 }
 
+func TestVisibleMessagesFiltersByCurrentChannel(t *testing.T) {
+	m := &model{
+		cfg:            config.Config{Username: "alice"},
+		currentChannel: "general",
+		messages: []shared.Message{
+			{Sender: "alice", Content: "general one", Type: shared.TextMessage, Channel: "general"},
+			{Sender: "bob", Content: "ops one", Type: shared.TextMessage, Channel: "ops"},
+			{Sender: "carol", Content: "legacy", Type: shared.TextMessage},
+		},
+	}
+
+	generalView := m.visibleMessages()
+	if len(generalView) != 2 {
+		t.Fatalf("expected 2 general messages, got %d", len(generalView))
+	}
+
+	m.currentChannel = "ops"
+	opsView := m.visibleMessages()
+	if len(opsView) != 1 {
+		t.Fatalf("expected 1 ops message, got %d", len(opsView))
+	}
+	if !strings.EqualFold(opsView[0].Channel, "ops") {
+		t.Fatalf("expected ops channel message, got %+v", opsView[0])
+	}
+}
+
 func TestDMContacts(t *testing.T) {
 	m := &model{
 		cfg: config.Config{Username: "alice"},

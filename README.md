@@ -71,8 +71,8 @@ Screen recordings of a current build (GIF autoplay depends on the viewer).
 - **Real-time Chat** - Fast WebSocket messaging with SQLite, PostgreSQL, or MySQL backends
 - **Message Management** - Edit, delete, pin, react to, and search messages
 - **Direct Messages** - Private DM conversations between users, persisted server-side and replayed on reconnect for sender and recipient
-- **Channels** - Multiple chat rooms with join/leave and per-channel messaging (channel membership is tracked; channel room lifecycle itself is not yet persisted across full server restarts)
-- **Typing Indicators** - See when other users are typing
+- **Channels** - Multiple chat rooms with join/leave, persisted channel metadata on messages, and fast local channel switching with filtered transcript history
+- **Typing Indicators** - Channel and DM typing indicators are scoped to the active view
 - **Read Receipts** - Server stores per-user read rows; the reference client sends debounced `read_receipt` when the transcript is scrolled to the newest messages
 - **Plugin System** - Remote registry with text commands and Alt+key hotkeys
 - **E2E Encryption** - ChaCha20-Poly1305 with a shared global key (`MARCHAT_GLOBAL_E2E_KEY`), including file transfers
@@ -141,7 +141,7 @@ Runs a guided wizard **only when** `MARCHAT_ADMIN_KEY` or `MARCHAT_USERS` is not
 ## Database Schema
 
 Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQL):
-- **messages**: Core message storage with `message_id`, encryption fields, edit/delete/pin flags
+- **messages**: Core message storage with `message_id`, encryption fields, edit/delete/pin flags, recipient, and persisted `channel`
 - **user_message_state**: Per-user message history state and last-seen timestamp
 - **ban_history**: Ban/unban event tracking for history gaps
 - **message_reactions**: Durable emoji reactions (unique per message + user + emoji)
@@ -832,13 +832,13 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `internal/doctor` | 66.5% | 826 LOC | Medium |
 | `plugin/store` | 47.0% | 552 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 38.4% | 7295 LOC | Low |
+| `server` | 38.5% | 7309 LOC | Low |
 | `plugin/manager` | 32.1% | 747 LOC | Low |
 | `client/exthook` | 24.1% | 204 LOC | Low |
-| `client` | 25.8% | 6299 LOC | Low |
+| `client` | 25.9% | 6330 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 39.6%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 39.7%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 
