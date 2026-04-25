@@ -130,6 +130,7 @@ func CreateSchema(db *sql.DB) {
 	blobType := "BLOB"
 	textType := "TEXT"
 	keyedTextType := "TEXT"
+	channelColumnType := "TEXT"
 	switch dialect {
 	case DialectPostgres:
 		idColumn = "id BIGSERIAL PRIMARY KEY"
@@ -143,6 +144,7 @@ func CreateSchema(db *sql.DB) {
 		blobType = "LONGBLOB"
 		textType = "LONGTEXT"
 		keyedTextType = "VARCHAR(191)"
+		channelColumnType = keyedTextType
 	}
 
 	// First, create the basic messages table if it doesn't exist
@@ -161,7 +163,7 @@ func CreateSchema(db *sql.DB) {
 		nonce %s,
 		recipient %s,
 		channel %s NOT NULL DEFAULT 'general'
-	);`, idColumn, textType, textType, dateTimeType, boolDefault, boolDefault, boolDefault, boolDefault, blobType, blobType, textType, textType)
+	);`, idColumn, textType, textType, dateTimeType, boolDefault, boolDefault, boolDefault, boolDefault, blobType, blobType, textType, channelColumnType)
 
 	_, err := dbExec(db, basicSchema)
 	if err != nil {
@@ -177,7 +179,7 @@ func CreateSchema(db *sql.DB) {
 		{"edited", `ALTER TABLE messages ADD COLUMN edited BOOLEAN DEFAULT 0`},
 		{"deleted", `ALTER TABLE messages ADD COLUMN deleted BOOLEAN DEFAULT 0`},
 		{"pinned", `ALTER TABLE messages ADD COLUMN pinned BOOLEAN DEFAULT 0`},
-		{"channel", `ALTER TABLE messages ADD COLUMN channel TEXT NOT NULL DEFAULT 'general'`},
+		{"channel", fmt.Sprintf("ALTER TABLE messages ADD COLUMN channel %s NOT NULL DEFAULT 'general'", channelColumnType)},
 	}
 
 	for _, m := range migrations {
