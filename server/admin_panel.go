@@ -1012,6 +1012,10 @@ func (ap *AdminPanel) handleScroll(direction int) {
 		if ap.logsScroll < 0 {
 			ap.logsScroll = 0
 		}
+		maxScroll := ap.maxLogsScroll()
+		if ap.logsScroll > maxScroll {
+			ap.logsScroll = maxScroll
+		}
 	}
 }
 
@@ -1030,8 +1034,12 @@ func (ap *AdminPanel) renderScrollableContent(content string, scrollOffset int) 
 
 	// Apply scroll offset
 	startLine := scrollOffset
-	if startLine >= len(lines) {
-		startLine = len(lines) - 1
+	maxScroll := len(lines) - maxLines
+	if maxScroll < 0 {
+		maxScroll = 0
+	}
+	if startLine > maxScroll {
+		startLine = maxScroll
 	}
 	if startLine < 0 {
 		startLine = 0
@@ -1046,6 +1054,32 @@ func (ap *AdminPanel) renderScrollableContent(content string, scrollOffset int) 
 	// Join the visible lines
 	visibleLines := lines[startLine:endLine]
 	return strings.Join(visibleLines, "\n")
+}
+
+func (ap *AdminPanel) maxLogsScroll() int {
+	// Logs tab renders title + separator + one line per log entry.
+	totalLines := len(ap.logs) + 2
+	maxLines := ap.maxScrollableLines()
+	if maxLines < 1 {
+		maxLines = 1
+	}
+	maxScroll := totalLines - maxLines
+	if maxScroll < 0 {
+		return 0
+	}
+	return maxScroll
+}
+
+func (ap *AdminPanel) maxScrollableLines() int {
+	availableHeight := ap.height - 8 // Reserve space for title, tabs, help, and message
+	if availableHeight < 10 {
+		availableHeight = 10
+	}
+	maxLines := availableHeight - 2 // Reserve space for borders
+	if maxLines < 1 {
+		maxLines = 1
+	}
+	return maxLines
 }
 
 func (ap *AdminPanel) contentWidth() int {

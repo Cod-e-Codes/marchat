@@ -192,8 +192,14 @@ type model struct {
 	pendingPluginAction string // e.g., "install", "uninstall", "enable", "disable"
 
 	typingUsers    map[string]time.Time
+	typingScopeDM  map[string]bool // latest typing from this sender was DM-scoped (non-empty recipient)
 	typingTimeout  time.Duration
 	dmRecipient    string
+	activeDMThread string
+	dmUnread       map[string]int
+	dmLastSeenID   map[string]int64
+	dmHidden       map[string]bool
+	dmStatePath    string
 	reactions      map[int64]map[string]map[string]bool
 	lastTypingSent time.Time
 	unreadCount    int
@@ -203,6 +209,11 @@ type model struct {
 	// Read receipts: debounced tail cursor sent to the server.
 	lastReadReceiptSentID     int64
 	readReceiptFlushScheduled bool
+}
+
+type dmUIState struct {
+	LastSeen map[string]int64 `json:"last_seen"`
+	Hidden   map[string]bool  `json:"hidden"`
 }
 
 // configToNotificationConfig converts Config to NotificationConfig
@@ -314,6 +325,215 @@ func messageIncrementsUnread(m *model, v shared.Message) bool {
 	default:
 		return false
 	}
+}
+
+// dmTypingVisibleForTranscript returns whether inbound typing should update the typing footer.
+// Empty recipient means channel or global typing: show only when not focused on a DM thread,
+// so channel typing does not appear to be part of the private DM. Non-empty recipient means
+// DM-scoped typing (sender composing toward that recipient); show only while the active DM
+// thread is with the sender.
+func dmTypingVisibleForTranscript(msg shared.Message, activeDMThread string) bool {
+	if msg.Type != shared.TypingMessage {
+		return false
+	}
+	active := strings.TrimSpace(activeDMThread)
+	if strings.TrimSpace(msg.Recipient) == "" {
+		return active == ""
+	}
+	return strings.EqualFold(active, strings.TrimSpace(msg.Sender))
+}
+
+func dmPartnerForMessage(msg shared.Message, me string) string {
+	if msg.Type != shared.DirectMessage {
+		return ""
+	}
+	if strings.EqualFold(msg.Sender, me) {
+		return strings.TrimSpace(msg.Recipient)
+	}
+	if strings.EqualFold(msg.Recipient, me) {
+		return strings.TrimSpace(msg.Sender)
+	}
+	return ""
+}
+
+func (m *model) visibleMessages() []shared.Message {
+	if strings.TrimSpace(m.activeDMThread) == "" {
+		filtered := make([]shared.Message, 0, len(m.messages))
+		for _, msg := range m.messages {
+			if msg.Type != shared.DirectMessage {
+				filtered = append(filtered, msg)
+			}
+		}
+		return filtered
+	}
+
+	filtered := make([]shared.Message, 0, len(m.messages))
+	for _, msg := range m.messages {
+		partner := dmPartnerForMessage(msg, m.cfg.Username)
+		if partner != "" && strings.EqualFold(partner, m.activeDMThread) {
+			filtered = append(filtered, msg)
+		}
+	}
+	return filtered
+}
+
+func (m *model) dmContacts() []string {
+	set := make(map[string]struct{})
+	for _, msg := range m.messages {
+		if partner := dmPartnerForMessage(msg, m.cfg.Username); partner != "" {
+			set[partner] = struct{}{}
+		}
+	}
+	out := make([]string, 0, len(set))
+	for user := range set {
+		out = append(out, user)
+	}
+	sort.Strings(out)
+	return out
+}
+
+func (m *model) dmThreadMaxMessageID(user string) int64 {
+	var maxID int64
+	for _, msg := range m.messages {
+		partner := dmPartnerForMessage(msg, m.cfg.Username)
+		if partner == "" || !strings.EqualFold(partner, user) {
+			continue
+		}
+		if msg.MessageID > maxID {
+			maxID = msg.MessageID
+		}
+	}
+	return maxID
+}
+
+func normalizeDMUser(user string) string {
+	return strings.ToLower(strings.TrimSpace(user))
+}
+
+func (m *model) markDMThreadRead(user string) {
+	if strings.TrimSpace(user) == "" {
+		return
+	}
+	if m.dmUnread == nil {
+		m.dmUnread = make(map[string]int)
+	}
+	if m.dmLastSeenID == nil {
+		m.dmLastSeenID = make(map[string]int64)
+	}
+	key := normalizeDMUser(user)
+	maxID := m.dmThreadMaxMessageID(user)
+	if maxID > 0 {
+		m.dmLastSeenID[key] = maxID
+	}
+	m.dmUnread[key] = 0
+	m.saveDMUIState()
+}
+
+func (m *model) rebuildDMUnreadCounts() {
+	if m.dmUnread == nil {
+		m.dmUnread = make(map[string]int)
+	}
+	if m.dmLastSeenID == nil {
+		m.dmLastSeenID = make(map[string]int64)
+	}
+	for k := range m.dmUnread {
+		delete(m.dmUnread, k)
+	}
+	for _, msg := range m.messages {
+		partner := dmPartnerForMessage(msg, m.cfg.Username)
+		if partner == "" {
+			continue
+		}
+		key := normalizeDMUser(partner)
+		if m.activeDMThread != "" && strings.EqualFold(partner, m.activeDMThread) {
+			continue
+		}
+		if strings.EqualFold(msg.Sender, m.cfg.Username) {
+			continue
+		}
+		if msg.MessageID > 0 && msg.MessageID <= m.dmLastSeenID[key] {
+			continue
+		}
+		m.dmUnread[key]++
+	}
+}
+
+func (m *model) sidebarDMThreads() []dmSidebarEntry {
+	latest := make(map[string]string)
+	for _, msg := range m.messages {
+		partner := dmPartnerForMessage(msg, m.cfg.Username)
+		if partner == "" {
+			continue
+		}
+		latest[normalizeDMUser(partner)] = partner
+	}
+
+	entries := make([]dmSidebarEntry, 0, len(latest))
+	for key, user := range latest {
+		if m.dmHidden[key] {
+			continue
+		}
+		entries = append(entries, dmSidebarEntry{
+			User:   user,
+			Unread: m.dmUnread[key],
+			Active: strings.EqualFold(user, m.activeDMThread),
+		})
+	}
+	sort.Slice(entries, func(i, j int) bool {
+		if entries[i].Unread != entries[j].Unread {
+			return entries[i].Unread > entries[j].Unread
+		}
+		return strings.ToLower(entries[i].User) < strings.ToLower(entries[j].User)
+	})
+	return entries
+}
+
+func (m *model) updateSidebar() {
+	sidebarWidth := m.userListViewport.Width
+	if sidebarWidth <= 0 {
+		sidebarWidth = userListWidth
+	}
+	m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, sidebarWidth, *isAdmin, m.selectedUserIndex, m.sidebarDMThreads()))
+}
+
+func (m *model) loadDMUIState() {
+	if strings.TrimSpace(m.dmStatePath) == "" {
+		return
+	}
+	data, err := os.ReadFile(m.dmStatePath)
+	if err != nil {
+		return
+	}
+	var state dmUIState
+	if err := json.Unmarshal(data, &state); err != nil {
+		return
+	}
+	if state.LastSeen != nil {
+		m.dmLastSeenID = state.LastSeen
+	}
+	if state.Hidden != nil {
+		m.dmHidden = state.Hidden
+	}
+}
+
+func (m *model) saveDMUIState() {
+	if strings.TrimSpace(m.dmStatePath) == "" {
+		return
+	}
+	state := dmUIState{
+		LastSeen: m.dmLastSeenID,
+		Hidden:   m.dmHidden,
+	}
+	data, err := json.MarshalIndent(state, "", "  ")
+	if err != nil {
+		return
+	}
+	_ = os.WriteFile(m.dmStatePath, data, 0600)
+}
+
+func (m *model) refreshTranscript() {
+	m.viewport.SetContent(renderMessages(m.visibleMessages(), m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+	m.updateSidebar()
 }
 
 type themeStyles struct {
@@ -566,9 +786,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.messages = nil
 		m.reactions = make(map[int64]map[string]map[string]bool)
 		m.typingUsers = make(map[string]time.Time)
+		m.typingScopeDM = make(map[string]bool)
 		m.receivedFiles = nil
 		m.unreadCount = 0
-		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+		m.refreshTranscript()
 		return m, m.listenWebSocket()
 	case readReceiptFlushMsg:
 		m.readReceiptFlushScheduled = false
@@ -580,8 +801,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			var ul UserList
 			if err := json.Unmarshal(v.Data, &ul); err == nil {
 				m.users = ul.Users
-				userListWidth := 18
-				m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, userListWidth, *isAdmin, m.selectedUserIndex))
+				m.updateSidebar()
 			}
 			return m, m.listenWebSocket()
 		}
@@ -725,8 +945,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 		case shared.TypingMessage:
-			if v.Sender != m.cfg.Username {
+			if v.Sender != m.cfg.Username && dmTypingVisibleForTranscript(v, m.activeDMThread) {
+				if m.typingScopeDM == nil {
+					m.typingScopeDM = make(map[string]bool)
+				}
 				m.typingUsers[v.Sender] = time.Now()
+				m.typingScopeDM[v.Sender] = strings.TrimSpace(v.Recipient) != ""
 			}
 		case shared.ReactionMessage:
 			if v.Reaction != nil {
@@ -761,10 +985,25 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 				m.receivedFiles[v.Sender+"/"+v.File.Filename] = v.File
 			}
+
+			if v.Type == shared.DirectMessage {
+				partner := dmPartnerForMessage(v, m.cfg.Username)
+				if partner != "" {
+					if m.dmHidden != nil && strings.EqualFold(v.Sender, partner) && !strings.EqualFold(v.Sender, m.cfg.Username) {
+						delete(m.dmHidden, normalizeDMUser(partner))
+						m.saveDMUIState()
+					}
+					if strings.EqualFold(m.activeDMThread, partner) {
+						m.markDMThreadRead(partner)
+					}
+				}
+			}
 		}
 
+		m.rebuildDMUnreadCounts()
+
 		wasAtBottom := m.viewport.AtBottom()
-		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+		m.refreshTranscript()
 		if wasAtBottom {
 			m.viewport.GotoBottom()
 			m.unreadCount = 0
@@ -954,8 +1193,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.banner = fmt.Sprintf("Theme: %s", themeInfo)
 
 			// Redraw viewport and user list with new theme
-			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
-			m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
+			m.refreshTranscript()
 			return m, nil
 		case key.Matches(v, m.keys.TimeFormatHotkey):
 			// Toggle time format
@@ -963,17 +1201,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.cfg.TwentyFourHour = m.twentyFourHour
 			_ = config.SaveConfig(m.configFilePath, m.cfg)
 			m.banner = "Timestamp format: " + map[bool]string{true: "24h", false: "12h"}[m.twentyFourHour]
-			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+			m.refreshTranscript()
 			return m, nil
 		case key.Matches(v, m.keys.MessageInfoHotkey):
 			m.showMessageMetadata = !m.showMessageMetadata
 			m.banner = "Msg info: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
-			m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+			m.refreshTranscript()
 			return m, nil
 		case key.Matches(v, m.keys.ClearHotkey):
 			// Clear chat history
 			m.messages = nil
 			m.viewport.SetContent("")
+			m.updateSidebar()
 			m.banner = "Chat cleared."
 			return m, nil
 		case key.Matches(v, m.keys.CodeSnippetHotkey):
@@ -1388,7 +1627,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.messages = m.messages[len(m.messages)-maxMessages+1:]
 				}
 				m.messages = append(m.messages, systemMsg)
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+				m.refreshTranscript()
 				m.viewport.GotoBottom()
 
 				m.textarea.SetValue("")
@@ -1434,8 +1673,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.banner = fmt.Sprintf("Theme changed to: %s", GetThemeInfo(actualThemeName))
 
 						// Redraw viewport and user list with new theme
-						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
-						m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, m.width, *isAdmin, m.selectedUserIndex))
+						m.refreshTranscript()
 					}
 				} else {
 					m.banner = "Please provide a theme name. Use :themes to list available themes."
@@ -1446,6 +1684,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if text == ":clear" {
 				m.messages = nil
 				m.viewport.SetContent("")
+				m.updateSidebar()
 				m.banner = "Chat cleared."
 				m.textarea.SetValue("")
 				return m, nil
@@ -1461,7 +1700,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.cfg.TwentyFourHour = m.twentyFourHour
 				_ = config.SaveConfig(m.configFilePath, m.cfg)
 				m.banner = "Timestamp format: " + map[bool]string{true: "24h", false: "12h"}[m.twentyFourHour]
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+				m.refreshTranscript()
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
 				return m, nil
@@ -1469,7 +1708,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if text == ":msginfo" {
 				m.showMessageMetadata = !m.showMessageMetadata
 				m.banner = "Msg info: " + map[bool]string{true: "full", false: "minimal"}[m.showMessageMetadata]
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+				m.refreshTranscript()
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
 				return m, nil
@@ -1711,7 +1950,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+				m.refreshTranscript()
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
 				return m, nil
@@ -1731,24 +1970,99 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 					}
 				}
-				m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+				m.refreshTranscript()
 				m.viewport.GotoBottom()
 				m.textarea.SetValue("")
+				return m, nil
+			}
+			// :dmhide and :dms before :dm — ":dmhide" and ":dms" have prefix ":dm" and would otherwise be parsed as :dm.
+			if strings.HasPrefix(text, ":dmhide") {
+				parts := strings.Fields(text)
+				target := ""
+				if len(parts) >= 2 {
+					target = parts[1]
+				} else {
+					target = m.activeDMThread
+				}
+				if strings.TrimSpace(target) == "" {
+					m.banner = "[ERROR] Usage: :dmhide <user> (or run while viewing a DM thread)"
+				} else {
+					if m.dmHidden == nil {
+						m.dmHidden = make(map[string]bool)
+					}
+					key := normalizeDMUser(target)
+					m.dmHidden[key] = true
+					if strings.EqualFold(m.activeDMThread, target) {
+						m.activeDMThread = ""
+						m.dmRecipient = ""
+					}
+					m.saveDMUIState()
+					m.banner = fmt.Sprintf("DM thread hidden: %s", target)
+				}
+				m.textarea.SetValue("")
+				m.refreshTranscript()
+				m.viewport.GotoBottom()
+				return m, nil
+			}
+			if text == ":dms" {
+				threads := m.sidebarDMThreads()
+				if len(threads) == 0 {
+					m.messages = append(m.messages, shared.Message{
+						Sender:    "System",
+						Content:   "No DM conversations yet.",
+						CreatedAt: time.Now(),
+						Type:      shared.TextMessage,
+					})
+				} else {
+					lines := make([]string, 0, len(threads))
+					for _, thread := range threads {
+						if thread.Unread > 0 {
+							lines = append(lines, fmt.Sprintf("%s (%d unread)", thread.User, thread.Unread))
+						} else {
+							lines = append(lines, thread.User)
+						}
+					}
+					m.messages = append(m.messages, shared.Message{
+						Sender:    "System",
+						Content:   "DM conversations: " + strings.Join(lines, ", "),
+						CreatedAt: time.Now(),
+						Type:      shared.TextMessage,
+					})
+				}
+				m.textarea.SetValue("")
+				m.refreshTranscript()
+				m.viewport.GotoBottom()
 				return m, nil
 			}
 			if strings.HasPrefix(text, ":dm") {
 				parts := strings.Fields(text)
 				if len(parts) == 1 {
 					m.dmRecipient = ""
-					m.banner = "DM mode disabled"
+					m.activeDMThread = ""
+					m.banner = "DM mode disabled, switched to global chat"
 				} else if len(parts) == 2 {
 					target := parts[1]
+					if strings.EqualFold(target, "off") || strings.EqualFold(target, "exit") || strings.EqualFold(target, "general") {
+						m.dmRecipient = ""
+						m.activeDMThread = ""
+						m.banner = "DM mode disabled, switched to global chat"
+						m.textarea.SetValue("")
+						m.refreshTranscript()
+						m.viewport.GotoBottom()
+						return m, nil
+					}
 					if m.dmRecipient == target {
 						m.dmRecipient = ""
-						m.banner = "DM mode disabled"
+						m.activeDMThread = ""
+						m.banner = "DM mode disabled, switched to global chat"
 					} else {
 						m.dmRecipient = target
-						m.banner = fmt.Sprintf("DM mode: messages go to %s", target)
+						m.activeDMThread = target
+						if m.dmHidden != nil {
+							delete(m.dmHidden, normalizeDMUser(target))
+						}
+						m.markDMThreadRead(target)
+						m.banner = fmt.Sprintf("DM mode: conversation with %s", target)
 					}
 				} else {
 					target := parts[1]
@@ -1757,8 +2071,17 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if m.conn != nil {
 						_ = m.conn.WriteJSON(dmMsg)
 					}
+					m.dmRecipient = target
+					m.activeDMThread = target
+					if m.dmHidden != nil {
+						delete(m.dmHidden, normalizeDMUser(target))
+					}
+					m.markDMThreadRead(target)
 				}
 				m.textarea.SetValue("")
+				m.rebuildDMUnreadCounts()
+				m.refreshTranscript()
+				m.viewport.GotoBottom()
 				return m, nil
 			}
 			if strings.HasPrefix(text, ":search ") {
@@ -1770,7 +2093,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					}
 				} else {
 					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :search <query>", CreatedAt: time.Now(), Type: shared.TextMessage})
-					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+					m.refreshTranscript()
 					m.viewport.GotoBottom()
 				}
 				m.textarea.SetValue("")
@@ -1780,13 +2103,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				parts := strings.Fields(text)
 				if len(parts) < 3 {
 					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :react <message_id> <emoji>", CreatedAt: time.Now(), Type: shared.TextMessage})
-					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+					m.refreshTranscript()
 					m.viewport.GotoBottom()
 				} else {
 					id, err := strconv.ParseInt(parts[1], 10, 64)
 					if err != nil {
 						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
-						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+						m.refreshTranscript()
 						m.viewport.GotoBottom()
 					} else {
 						emoji := resolveReactionEmoji(parts[2])
@@ -1810,13 +2133,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				parts := strings.Fields(text)
 				if len(parts) < 2 {
 					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :pin <message_id>", CreatedAt: time.Now(), Type: shared.TextMessage})
-					m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+					m.refreshTranscript()
 					m.viewport.GotoBottom()
 				} else {
 					id, err := strconv.ParseInt(parts[1], 10, 64)
 					if err != nil {
 						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
-						m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+						m.refreshTranscript()
 						m.viewport.GotoBottom()
 					} else {
 						pinMsg := shared.Message{Type: shared.PinMessage, MessageID: id, Sender: m.cfg.Username}
@@ -1899,7 +2222,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.conn != nil {
 					// Check if this is a server-side command (admin/plugin) that should bypass encryption
 					// Client-side commands are handled above and never reach this point
-					clientOnlyCommands := []string{":theme", ":time", ":msginfo", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":search", ":react", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
+					clientOnlyCommands := []string{":theme", ":time", ":msginfo", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":dms", ":dmhide", ":search", ":react", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
 					isClientCommand := false
 					for _, cmd := range clientOnlyCommands {
 						// Check if text is exactly the command or starts with "command "
@@ -2040,6 +2363,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if time.Since(m.lastTypingSent) > 2*time.Second && m.conn != nil {
 				m.lastTypingSent = time.Now()
 				typingMsg := shared.Message{Type: shared.TypingMessage, Sender: m.cfg.Username}
+				if r := strings.TrimSpace(m.dmRecipient); r != "" {
+					typingMsg.Recipient = r
+				}
 				go func(c *websocket.Conn) {
 					_ = c.WriteJSON(typingMsg)
 				}(m.conn)
@@ -2082,9 +2408,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.helpViewport.Width = helpWidth
 		m.helpViewport.Height = helpHeight
 
-		m.viewport.SetContent(renderMessages(m.messages, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+		m.refreshTranscript()
 		m.viewport.GotoBottom()
-		m.userListViewport.SetContent(renderUserList(m.users, m.cfg.Username, m.styles, userListWidth, *isAdmin, m.selectedUserIndex))
 		return m, nil
 	case quitMsg:
 		return m, tea.Quit
@@ -2120,7 +2445,7 @@ func (m *model) View() string {
 	headerText := fmt.Sprintf(" marchat %s ", shared.ClientVersion)
 	header := m.styles.Header.Width(m.viewport.Width + userListWidth + 4).Render(headerText)
 
-	footerText := buildStatusFooter(m.connected, m.showHelp, m.unreadCount, m.useE2E, m.currentChannel)
+	footerText := buildStatusFooter(m.connected, m.showHelp, m.unreadCount, m.useE2E, m.currentChannel, m.activeDMThread)
 	footer := m.styles.Footer.Width(m.viewport.Width + userListWidth + 4).Render(footerText)
 
 	// Banner
@@ -2154,9 +2479,13 @@ func (m *model) View() string {
 	now := time.Now()
 	var activeTypers []string
 	for user, lastTyped := range m.typingUsers {
-		if now.Sub(lastTyped) < m.typingTimeout {
-			activeTypers = append(activeTypers, user)
+		if now.Sub(lastTyped) >= m.typingTimeout {
+			continue
 		}
+		if m.typingScopeDM != nil && m.typingScopeDM[user] && !strings.EqualFold(strings.TrimSpace(m.activeDMThread), user) {
+			continue
+		}
+		activeTypers = append(activeTypers, user)
 	}
 	if len(activeTypers) > 0 {
 		sort.Strings(activeTypers)
@@ -2707,7 +3036,7 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	vp := viewport.New(80, 20)
 
 	userListVp := viewport.New(18, 10) // height will be set on resize
-	userListVp.SetContent(renderUserList([]string{cfg.Username}, cfg.Username, getThemeStyles(cfg.Theme), 18, cfg.IsAdmin, -1))
+	userListVp.SetContent(renderUserList([]string{cfg.Username}, cfg.Username, getThemeStyles(cfg.Theme), 18, cfg.IsAdmin, -1, nil))
 
 	helpVp := viewport.New(70, 20) // initial size, will be adjusted on resize
 
@@ -2779,9 +3108,17 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 		keys:                newKeyMap(),
 		selectedUserIndex:   -1,
 		typingUsers:         make(map[string]time.Time),
+		typingScopeDM:       make(map[string]bool),
 		typingTimeout:       3 * time.Second,
+		dmUnread:            make(map[string]int),
+		dmLastSeenID:        make(map[string]int64),
+		dmHidden:            make(map[string]bool),
+		dmStatePath:         filepath.Join(getClientConfigDir(), "dm_state.json"),
 		reactions:           make(map[int64]map[string]map[string]bool),
 	}
+	m.loadDMUIState()
+	m.rebuildDMUnreadCounts()
+	m.updateSidebar()
 
 	// Initialize notification manager with config settings
 	notifConfig := configToNotificationConfig(*cfg)

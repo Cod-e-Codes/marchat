@@ -127,9 +127,9 @@ These values of `type` extend the core chat protocol:
 |--------|---------|
 | `edit` | Replace the text of an existing message. Requires `message_id` and new body in `content`. Set `encrypted` to `true` when `content` is E2E ciphertext (same base64 **nonce ‖ ciphertext** layout as `text`); the server persists that flag to `is_encrypted` so history and reconnects stay consistent. Only the original sender may edit; admins cannot edit someone else's message (unlike `delete`, where an admin may remove any message). Enforced by matching WebSocket `sender` to the stored row. |
 | `delete` | Soft-delete a message. Requires `message_id`. Authors may delete their own messages; admins may delete any message. |
-| `typing` | Typing indicator; `content` is not required. The server sets `sender` and broadcasts to clients (see [Channels](#channels) for delivery scope when `channel` is set). |
+| `typing` | Typing indicator; `content` is not required. The server sets `sender`. Optional `recipient` scopes typing to a DM partner only (same delivery as `dm`: sender and recipient). Empty `recipient` keeps channel/global behavior (see [Channels](#channels) when `channel` is set). The reference client sets `recipient` while composing in DM mode; it only applies DM-scoped typing when that DM thread is open, and it does not show channel/global typing while a DM thread is open (so channel typing is not mistaken for the active DM). |
 | `reaction` | Add or remove a reaction. Requires the `reaction` object (`emoji`, `target_id`, optional `is_removal`). |
-| `dm` | Direct message. Requires `recipient` (target username). Delivered only to sender and recipient. |
+| `dm` | Direct message. Requires `recipient` (target username). Delivered only to sender and recipient. Persisted by the server and included in reconnect history only for those two participants. |
 | `search` | Full-text search. `content` is the search query; the server replies with a private `text` message from `System` listing up to 20 matches (not broadcast). |
 | `pin` | Toggle pinned state for `message_id`. **Admin only**; non-admins receive an error `text` from `System`. On success, a `System` `text` notice is broadcast. |
 | `read_receipt` | Read receipt. Clients may send `read_receipt` with `message_id` set to the latest persisted chat line they have read while the transcript viewport is scrolled to the tail (the reference client debounces bursts). The server sets `sender` from the connection, persists when `message_id` is positive (`read_receipts` table), and broadcasts the message. Receivers may ignore or surface receipts in UI; the reference TUI does not print them in the transcript. |
@@ -170,7 +170,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
 ## Server Behavior
 
 - On successful handshake:
-  - Sends up to 50 recent messages from history (newest first; clients typically display in chronological order). The same replay happens on every new WebSocket session after a disconnect. Clients that keep a local transcript in memory should **replace** or **dedupe** against that replay instead of appending it blindly, or they will show duplicate lines. The reference TUI clears its transcript (messages, reactions, typing state, and cached received-file metadata) when a connection succeeds so the replay is the single source of truth for the visible scrollback window.
+  - Sends up to 50 recent messages from history (newest first; clients typically display in chronological order). The same replay happens on every new WebSocket session after a disconnect. Clients that keep a local transcript in memory should **replace** or **dedupe** against that replay instead of appending it blindly, or they will show duplicate lines. DM history in this replay is scoped to the authenticated user (their sent DMs and DMs addressed to them). The reference TUI clears its transcript (messages, reactions, typing state, and cached received-file metadata) when a connection succeeds so the replay is the single source of truth for the visible scrollback window.
   - Sends current user list.
 - On user connect/disconnect:
   - Broadcasts updated user list.
@@ -178,6 +178,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
   - Persists eligible messages to the configured SQL backend selected by `MARCHAT_DB_PATH` (SQLite path, PostgreSQL DSN, or MySQL DSN).
   - Delivers to all connected clients **or** only to members of a channel when `channel` is non-empty and `sender` is not `System` (see [Channels](#channels)). Direct messages use a separate path (sender and recipient only).
 - Reactions, read receipts, and last channel per user may be persisted server-side and replayed to reconnecting clients.
+- DM unread counters and DM thread hide/archive state are client-side UI state in the reference TUI, not server protocol fields. The reference client stores this local state under its client config directory. Opening a DM thread marks that thread read immediately in the reference client.
 - Message history is capped at 1000 messages.
 - On successful `type`: `edit`, the server updates `content`, sets `edited`, and sets stored encryption metadata from the incoming `encrypted` field (so edited ciphertext rows remain ciphertext with `is_encrypted` aligned to the wire).
 - `:`-prefixed input and `admin_command` messages go through the server command path (plugins first, then built-in admin commands for admins). Non-admins may receive a `System` `text` line when a command requires admin privileges. Admins receive a `System` `text` line when no plugin handler and no built-in handler matches the first token (content includes `Unknown command:` and that token).

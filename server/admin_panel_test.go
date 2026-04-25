@@ -3,6 +3,7 @@ package server
 import (
 	"path/filepath"
 	"testing"
+	"time"
 
 	appcfg "github.com/Cod-e-Codes/marchat/config"
 )
@@ -40,5 +41,37 @@ func TestAdminPanel_InitAndRefresh(t *testing.T) {
 	// userTable rows should be set (possibly empty) and not nil
 	if panel.userTable.Rows() == nil {
 		t.Errorf("expected user table rows initialized")
+	}
+}
+
+func TestAdminPanelLogsScrollClamp(t *testing.T) {
+	panel, cleanup := setupPanelEnv(t)
+	defer cleanup()
+
+	panel.applyLayout(120, 20)
+	panel.activeTab = tabLogs
+	panel.logs = make([]logEntry, 0, 40)
+	for i := 0; i < 40; i++ {
+		panel.logs = append(panel.logs, logEntry{
+			Timestamp: time.Unix(int64(i), 0),
+			Level:     "INFO",
+			Message:   "m",
+			Component: "Test",
+		})
+	}
+
+	// Try to overscroll far beyond the end.
+	for i := 0; i < 200; i++ {
+		panel.handleScroll(1)
+	}
+	maxScroll := panel.maxLogsScroll()
+	if panel.logsScroll != maxScroll {
+		t.Fatalf("expected logsScroll clamped to %d, got %d", maxScroll, panel.logsScroll)
+	}
+
+	// The rendered window should stay full-height and not collapse to one trailing line.
+	content := panel.renderScrollableContent("a\nb\nc\nd\ne\nf\ng\nh\ni\nj", 1000)
+	if content == "j" {
+		t.Fatalf("expected clamped scroll window, got trailing single line: %q", content)
 	}
 }

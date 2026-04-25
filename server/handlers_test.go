@@ -254,6 +254,51 @@ func TestGetMessagesAfter(t *testing.T) {
 	}
 }
 
+func TestGetRecentMessagesForUserFiltersDMs(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	now := time.Now()
+	seed := []shared.Message{
+		{Sender: "alice", Content: "public 1", CreatedAt: now.Add(-5 * time.Minute)},
+		{Sender: "alice", Recipient: "bob", Type: shared.DirectMessage, Content: "dm to bob", CreatedAt: now.Add(-4 * time.Minute)},
+		{Sender: "alice", Recipient: "carol", Type: shared.DirectMessage, Content: "dm to carol", CreatedAt: now.Add(-3 * time.Minute)},
+		{Sender: "bob", Content: "public 2", CreatedAt: now.Add(-2 * time.Minute)},
+	}
+	for _, msg := range seed {
+		if _, err := InsertMessage(db, msg); err != nil {
+			t.Fatalf("InsertMessage failed: %v", err)
+		}
+	}
+
+	bobMessages, _ := GetRecentMessagesForUser(db, "bob", 50, false)
+	for _, msg := range bobMessages {
+		if msg.Type == shared.DirectMessage {
+			if !strings.EqualFold(msg.Sender, "bob") && !strings.EqualFold(msg.Recipient, "bob") {
+				t.Fatalf("bob received unrelated dm: %+v", msg)
+			}
+		}
+	}
+
+	carolMessages, _ := GetRecentMessagesForUser(db, "carol", 50, false)
+	foundCarolDM := false
+	for _, msg := range carolMessages {
+		if msg.Type == shared.DirectMessage && strings.EqualFold(msg.Recipient, "carol") {
+			foundCarolDM = true
+		}
+		if msg.Type == shared.DirectMessage && strings.EqualFold(msg.Recipient, "bob") {
+			t.Fatalf("carol should not receive bob dm: %+v", msg)
+		}
+	}
+	if !foundCarolDM {
+		t.Fatal("expected carol to receive her direct message")
+	}
+}
+
 func TestSortMessagesByTimestamp(t *testing.T) {
 	now := time.Now()
 	messages := []shared.Message{

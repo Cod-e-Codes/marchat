@@ -15,6 +15,7 @@
 *.out
 coverage
 mergedcoverage
+cm
 cover_sdk
 plugin/sdk/cov
 

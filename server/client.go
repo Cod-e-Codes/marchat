@@ -147,7 +147,11 @@ func (c *Client) readPump() {
 
 		if msg.Type == shared.TypingMessage {
 			msg.Sender = c.username
-			c.hub.broadcast <- msg
+			if strings.TrimSpace(msg.Recipient) != "" {
+				c.hub.broadcastDM(msg)
+			} else {
+				c.hub.broadcast <- msg
+			}
 			continue
 		}
 
@@ -162,6 +166,11 @@ func (c *Client) readPump() {
 		if msg.Type == shared.DirectMessage && msg.Recipient != "" {
 			msg.Sender = c.username
 			msg.CreatedAt = time.Now()
+			if msgID, err := InsertMessage(c.db, msg); err != nil {
+				log.Printf("Failed to persist DM from %s to %s: %v", c.username, msg.Recipient, err)
+			} else {
+				msg.MessageID = msgID
+			}
 			c.hub.broadcastDM(msg)
 			continue
 		}

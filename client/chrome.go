@@ -83,7 +83,7 @@ func (s themeStyles) BannerStrip(kind bannerStripKind) lipgloss.Style {
 // buildStatusFooter returns a single footer line: connection, optional unread,
 // optional E2E when enabled, optional channel when not general, and help text
 // only when disconnected or when help overlay is open (stable while open).
-func buildStatusFooter(connected, showHelp bool, unread int, useE2E bool, currentChannel string) string {
+func buildStatusFooter(connected, showHelp bool, unread int, useE2E bool, currentChannel, activeDMThread string) string {
 	var parts []string
 	if connected {
 		parts = append(parts, "Connected")
@@ -99,6 +99,9 @@ func buildStatusFooter(connected, showHelp bool, unread int, useE2E bool, curren
 	ch := strings.TrimSpace(strings.ToLower(currentChannel))
 	if ch != "" && ch != "general" {
 		parts = append(parts, "#"+ch)
+	}
+	if dm := strings.TrimSpace(activeDMThread); dm != "" {
+		parts = append(parts, "DM:"+dm)
 	}
 	if showHelp && connected {
 		parts = append(parts, "Press Ctrl+H to close help")

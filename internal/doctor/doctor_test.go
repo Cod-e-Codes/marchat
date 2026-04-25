@@ -297,6 +297,68 @@ func TestReportJSON_roundTrip(t *testing.T) {
 	}
 }
 
+func TestRunClientDoctor_IncludesDMStateAndE2EKeySource(t *testing.T) {
+	t.Setenv("MARCHAT_DOCTOR_NO_NETWORK", "1")
+	tmp := t.TempDir()
+	t.Setenv("MARCHAT_CONFIG_DIR", tmp)
+	t.Setenv("MARCHAT_GLOBAL_E2E_KEY", "c29tZS1ub3QtcmVhbC1iYXNlNjQ=")
+
+	if err := os.WriteFile(filepath.Join(tmp, "dm_state.json"), []byte(`{"last_seen":{"bob":10}}`), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	if err := RunClient(Options{JSON: true, Out: &buf}); err != nil {
+		t.Fatalf("RunClient: %v", err)
+	}
+	var rep Report
+	if err := json.Unmarshal(buf.Bytes(), &rep); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+
+	foundDMState := false
+	foundE2ESource := false
+	for _, c := range rep.Checks {
+		if c.ID == "dm_state" && strings.Contains(c.Message, "dm_state.json") {
+			foundDMState = true
+		}
+		if c.ID == "e2e_key_source" && strings.Contains(c.Message, "MARCHAT_GLOBAL_E2E_KEY is set") {
+			foundE2ESource = true
+		}
+	}
+	if !foundDMState {
+		t.Fatal("expected dm_state check in client doctor output")
+	}
+	if !foundE2ESource {
+		t.Fatal("expected e2e_key_source check in client doctor output")
+	}
+}
+
+func TestRunServerDoctor_IncludesDMHistoryCheck(t *testing.T) {
+	t.Setenv("MARCHAT_DOCTOR_NO_NETWORK", "1")
+	tmp := t.TempDir()
+	dbPath := filepath.Join(tmp, "doctor.sqlite")
+	envBody := "MARCHAT_ADMIN_KEY=mysecretkey123456789012\nMARCHAT_USERS=alice,bob\nMARCHAT_DB_PATH=" + dbPath + "\n"
+	if err := os.WriteFile(filepath.Join(tmp, ".env"), []byte(envBody), 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	var buf bytes.Buffer
+	if err := RunServer(Options{JSON: true, Out: &buf, ServerConfigDirFlag: tmp}); err != nil {
+		t.Fatalf("RunServer: %v", err)
+	}
+	var rep Report
+	if err := json.Unmarshal(buf.Bytes(), &rep); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	for _, c := range rep.Checks {
+		if c.ID == "dm_history" {
+			return
+		}
+	}
+	t.Fatal("expected dm_history check in server doctor output")
+}
+
 type roundTripFunc func(*http.Request) (*http.Response, error)
 
 func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) {

@@ -57,6 +57,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - Real-time chat with message history and user list
 - Message editing, deletion, pinning, and reactions
 - Direct messages between users
+- DM thread sidebar with per-user unread counters
 - Channel-based messaging (join/leave channels)
 - Typing indicators (throttled, with timeout)
 - Message search (server-side)
@@ -73,6 +74,9 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - Unread count in the footer: increments only for other users' new `text`, `dm`, or `file` lines while the transcript viewport is scrolled up (not for typing, reactions, read receipts, edits, deletes, or your own echoed sends)
 - Optional debounced `read_receipt` to the server when the viewport follows the newest messages; failures surface in the banner only
 - Footer shows `E2E` when encryption is on, and `#channel` when the current room is not `general`; plaintext sessions omit an explicit `Unencrypted` label in the footer
+- Footer shows `DM:<user>` when a DM thread is active
+- While a DM thread is open, the typing footer ignores channel or global typing (empty `recipient` on `typing` messages) so someone typing in the channel is not shown as typing inside the DM view; only DM-scoped typing for the open peer is shown
+- DM unread and hidden-thread UI state is local client state in `dm_state.json` under the client config directory; opening a DM thread marks it read, and a hidden thread reappears on the next inbound DM from that user
 - Automatic WebSocket reconnect with exponential backoff (capped); on each successful connect (`wsConnected`), the reference client clears the in-memory transcript and related UI state before processing server history replay, so a server restart or network drop does not duplicate messages that were already on screen
 - Multi-line input via Alt+Enter / Ctrl+J
 - **Diagnostics**: `-doctor` and `-doctor-json` for environment, paths, and config checks (`internal/doctor`)

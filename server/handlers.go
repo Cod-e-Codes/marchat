@@ -318,8 +318,8 @@ func CreateSchema(db *sql.DB) {
 func InsertMessage(db *sql.DB, msg shared.Message) (int64, error) {
 	var id int64
 	if supportsLastInsertID(db) {
-		result, err := dbExec(db, `INSERT INTO messages (sender, content, created_at, is_encrypted) VALUES (?, ?, ?, ?)`,
-			msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted)
+		result, err := dbExec(db, `INSERT INTO messages (sender, content, created_at, is_encrypted, recipient) VALUES (?, ?, ?, ?, ?)`,
+			msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted, msg.Recipient)
 		if err != nil {
 			log.Println("Insert error:", err)
 			return 0, fmt.Errorf("insert message: %w", err)
@@ -331,8 +331,8 @@ func InsertMessage(db *sql.DB, msg shared.Message) (int64, error) {
 			return 0, fmt.Errorf("last insert id: %w", errID)
 		}
 	} else {
-		err := dbQueryRow(db, `INSERT INTO messages (sender, content, created_at, is_encrypted) VALUES (?, ?, ?, ?) RETURNING id`,
-			msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted).Scan(&id)
+		err := dbQueryRow(db, `INSERT INTO messages (sender, content, created_at, is_encrypted, recipient) VALUES (?, ?, ?, ?, ?) RETURNING id`,
+			msg.Sender, msg.Content, msg.CreatedAt, msg.Encrypted, msg.Recipient).Scan(&id)
 		if err != nil {
 			log.Println("Insert returning error:", err)
 			return 0, fmt.Errorf("insert message returning: %w", err)
@@ -397,7 +397,7 @@ func GetRecentMessages(db *sql.DB) []shared.Message {
 	}
 	recentMessagesCacheMutex.RUnlock()
 
-	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages ORDER BY created_at DESC LIMIT 50`)
+	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, '') FROM messages ORDER BY created_at DESC LIMIT 50`)
 	if err != nil {
 		log.Println("Query error:", err)
 		return nil
@@ -408,10 +408,13 @@ func GetRecentMessages(db *sql.DB) []shared.Message {
 	for rows.Next() {
 		var msg shared.Message
 		var isEncrypted, edited, deleted bool
-		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted)
+		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted, &msg.Recipient)
 		if err == nil {
 			msg.Encrypted = isEncrypted
 			msg.Edited = edited
+			if strings.TrimSpace(msg.Recipient) != "" {
+				msg.Type = shared.DirectMessage
+			}
 			if deleted {
 				msg.Type = shared.DeleteMessage
 			}
@@ -511,6 +514,23 @@ func GetRecentMessagesForUser(db *sql.DB, username string, defaultLimit int, ban
 	// Note: SQL queries fetch newest messages first (DESC), but we sort chronologically (ASC) for display
 	sortMessagesByTimestamp(messages)
 
+	// Filter to messages visible to this user.
+	// Public/channel messages have empty recipient.
+	// DMs are visible only to sender and recipient.
+	visible := make([]shared.Message, 0, len(messages))
+	for _, msg := range messages {
+		recipient := strings.ToLower(strings.TrimSpace(msg.Recipient))
+		if recipient == "" {
+			visible = append(visible, msg)
+			continue
+		}
+		sender := strings.ToLower(strings.TrimSpace(msg.Sender))
+		if sender == lowerUsername || recipient == lowerUsername {
+			visible = append(visible, msg)
+		}
+	}
+	messages = visible
+
 	// Filter messages during ban periods if feature is enabled
 	if banGapsHistory {
 		banPeriods, err := getUserBanPeriods(db, lowerUsername)
@@ -545,7 +565,7 @@ func GetRecentMessagesForUser(db *sql.DB, username string, defaultLimit int, ban
 
 // GetMessagesAfter retrieves messages with ID > lastMessageID
 func GetMessagesAfter(db *sql.DB, lastMessageID int64, limit int) []shared.Message {
-	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0) FROM messages WHERE message_id > ? ORDER BY created_at DESC LIMIT ?`, lastMessageID, limit)
+	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, '') FROM messages WHERE message_id > ? ORDER BY created_at DESC LIMIT ?`, lastMessageID, limit)
 	if err != nil {
 		log.Println("Query error in GetMessagesAfter:", err)
 		return nil
@@ -556,10 +576,13 @@ func GetMessagesAfter(db *sql.DB, lastMessageID int64, limit int) []shared.Messa
 	for rows.Next() {
 		var msg shared.Message
 		var isEncrypted, edited, deleted bool
-		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted)
+		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted, &msg.Recipient)
 		if err == nil {
 			msg.Encrypted = isEncrypted
 			msg.Edited = edited
+			if strings.TrimSpace(msg.Recipient) != "" {
+				msg.Type = shared.DirectMessage
+			}
 			if deleted {
 				msg.Type = shared.DeleteMessage
 			}

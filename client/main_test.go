@@ -16,6 +16,29 @@ import (
 	"github.com/charmbracelet/bubbles/viewport"
 )
 
+func TestDmTypingVisibleForTranscript(t *testing.T) {
+	tests := []struct {
+		name     string
+		msg      shared.Message
+		activeDM string
+		want     bool
+	}{
+		{"global_typing", shared.Message{Type: shared.TypingMessage, Sender: "bob", Recipient: ""}, "", true},
+		{"global_typing_hidden_in_dm_thread", shared.Message{Type: shared.TypingMessage, Sender: "bob", Recipient: ""}, "bob", false},
+		{"dm_typing_active_thread", shared.Message{Type: shared.TypingMessage, Sender: "bob", Recipient: "alice"}, "bob", true},
+		{"dm_typing_global_view", shared.Message{Type: shared.TypingMessage, Sender: "bob", Recipient: "alice"}, "", false},
+		{"dm_typing_wrong_thread", shared.Message{Type: shared.TypingMessage, Sender: "bob", Recipient: "alice"}, "carol", false},
+		{"non_typing", shared.Message{Type: shared.TextMessage, Sender: "bob", Recipient: "alice"}, "bob", false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := dmTypingVisibleForTranscript(tt.msg, tt.activeDM); got != tt.want {
+				t.Fatalf("got %v want %v", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMessageIncrementsUnread(t *testing.T) {
 	m := &model{cfg: config.Config{Username: "me"}}
 	tests := []struct {
@@ -40,6 +63,77 @@ func TestMessageIncrementsUnread(t *testing.T) {
 				t.Errorf("got %v want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestVisibleMessagesFiltersDMThread(t *testing.T) {
+	m := &model{
+		cfg: config.Config{Username: "alice"},
+		messages: []shared.Message{
+			{Sender: "alice", Content: "public", Type: shared.TextMessage},
+			{Sender: "alice", Recipient: "bob", Content: "to bob", Type: shared.DirectMessage},
+			{Sender: "bob", Recipient: "alice", Content: "from bob", Type: shared.DirectMessage},
+			{Sender: "carol", Recipient: "alice", Content: "from carol", Type: shared.DirectMessage},
+		},
+	}
+
+	globalView := m.visibleMessages()
+	if len(globalView) != 1 || globalView[0].Type == shared.DirectMessage {
+		t.Fatalf("expected only non-DM messages in global view, got %+v", globalView)
+	}
+
+	m.activeDMThread = "bob"
+	bobThread := m.visibleMessages()
+	if len(bobThread) != 2 {
+		t.Fatalf("expected 2 bob DMs, got %d", len(bobThread))
+	}
+	for _, msg := range bobThread {
+		if partner := dmPartnerForMessage(msg, "alice"); !strings.EqualFold(partner, "bob") {
+			t.Fatalf("unexpected partner in bob thread: %+v", msg)
+		}
+	}
+}
+
+func TestDMContacts(t *testing.T) {
+	m := &model{
+		cfg: config.Config{Username: "alice"},
+		messages: []shared.Message{
+			{Sender: "alice", Recipient: "bob", Type: shared.DirectMessage},
+			{Sender: "bob", Recipient: "alice", Type: shared.DirectMessage},
+			{Sender: "alice", Recipient: "carol", Type: shared.DirectMessage},
+			{Sender: "alice", Content: "public", Type: shared.TextMessage},
+		},
+	}
+	contacts := m.dmContacts()
+	if len(contacts) != 2 {
+		t.Fatalf("expected 2 contacts, got %d: %v", len(contacts), contacts)
+	}
+	if contacts[0] != "bob" || contacts[1] != "carol" {
+		t.Fatalf("unexpected contacts order/content: %v", contacts)
+	}
+}
+
+func TestRebuildDMUnreadCounts(t *testing.T) {
+	m := &model{
+		cfg:          config.Config{Username: "alice"},
+		dmUnread:     make(map[string]int),
+		dmLastSeenID: map[string]int64{"bob": 2},
+		messages: []shared.Message{
+			{Sender: "bob", Recipient: "alice", Type: shared.DirectMessage, MessageID: 1},
+			{Sender: "bob", Recipient: "alice", Type: shared.DirectMessage, MessageID: 2},
+			{Sender: "bob", Recipient: "alice", Type: shared.DirectMessage, MessageID: 3},
+			{Sender: "alice", Recipient: "bob", Type: shared.DirectMessage, MessageID: 4},
+		},
+	}
+	m.rebuildDMUnreadCounts()
+	if got := m.dmUnread["bob"]; got != 1 {
+		t.Fatalf("expected 1 unread DM for bob, got %d", got)
+	}
+
+	m.activeDMThread = "bob"
+	m.rebuildDMUnreadCounts()
+	if got := m.dmUnread["bob"]; got != 0 {
+		t.Fatalf("expected active thread to show zero unread, got %d", got)
 	}
 }
 
@@ -921,7 +1015,7 @@ func TestRenderUserList(t *testing.T) {
 	isAdmin := true
 	selectedUserIndex := 1 // Select user2
 
-	result := renderUserList(users, me, styles, width, isAdmin, selectedUserIndex)
+	result := renderUserList(users, me, styles, width, isAdmin, selectedUserIndex, nil)
 	if result == "" {
 		t.Error("renderUserList should return non-empty result")
 	}
@@ -931,7 +1025,7 @@ func TestRenderUserList(t *testing.T) {
 	}
 
 	// Test with no admin
-	nonAdminResult := renderUserList(users, me, styles, width, false, -1)
+	nonAdminResult := renderUserList(users, me, styles, width, false, -1, nil)
 	if nonAdminResult == "" {
 		t.Error("renderUserList should work for non-admin users")
 	}
@@ -942,9 +1036,35 @@ func TestRenderUserList(t *testing.T) {
 		manyUsers[i] = fmt.Sprintf("user%d", i)
 	}
 
-	manyUsersResult := renderUserList(manyUsers, "user0", styles, width, false, -1)
+	manyUsersResult := renderUserList(manyUsers, "user0", styles, width, false, -1, nil)
 	if !strings.Contains(manyUsersResult, "more") {
 		t.Error("renderUserList should show 'more' indicator for many users")
+	}
+}
+
+func TestRenderUserListWithDMThreads(t *testing.T) {
+	styles := getThemeStyles("system")
+	output := renderUserList(
+		[]string{"alice"},
+		"alice",
+		styles,
+		30,
+		false,
+		-1,
+		[]dmSidebarEntry{
+			{User: "bob", Unread: 3, Active: true},
+			{User: "carol", Unread: 0, Active: false},
+		},
+	)
+
+	if !strings.Contains(output, "DMs") {
+		t.Fatalf("expected DMs section in sidebar, got: %q", output)
+	}
+	if !strings.Contains(output, "bob (3)") {
+		t.Fatalf("expected unread count for bob, got: %q", output)
+	}
+	if !strings.Contains(output, "carol") {
+		t.Fatalf("expected carol thread entry, got: %q", output)
 	}
 }
 

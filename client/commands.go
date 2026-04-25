@@ -48,6 +48,8 @@ func (m *model) generateHelpContent() string {
 	commands += "  :edit <id> <text>    Edit a message by ID\n"
 	commands += "  :delete <id>         Delete a message by ID\n"
 	commands += "  :dm [user] [msg]     Send DM or toggle DM mode\n"
+	commands += "  :dms                 List DM conversations seen in this session\n"
+	commands += "  :dmhide [user]       Hide a DM conversation from sidebar (reappears on new inbound DM)\n"
 	commands += "  :search <query>      Search message history\n"
 	commands += "  :react <id> <emoji>  React to a message (+1, heart, fire, party, etc.)\n"
 	commands += "  :pin <id>            Toggle pin on a message\n"

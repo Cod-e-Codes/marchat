@@ -37,7 +37,9 @@ Both clients follow the same wire format documented in [PROTOCOL.md](PROTOCOL.md
 
 ## Release notes
 
-**Current:** [v1.0.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0) (2026-04-17). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
+**Latest tagged release:** [v1.0.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0) (2026-04-17). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
+
+**`main` branch:** may include changes not yet in that tag (for example items under **Unreleased** in [CHANGELOG.md](CHANGELOG.md)). Feature descriptions elsewhere in this README match the tree you build from source; compare your binary’s `-doctor` / `-version` output to the release page when in doubt.
 
 ## Demos
 
@@ -68,8 +70,8 @@ Screen recordings of a current build (GIF autoplay depends on the viewer).
 - **Terminal UI** - Beautiful TUI built with Bubble Tea
 - **Real-time Chat** - Fast WebSocket messaging with SQLite, PostgreSQL, or MySQL backends
 - **Message Management** - Edit, delete, pin, react to, and search messages
-- **Direct Messages** - Private DM conversations between users
-- **Channels** - Multiple chat rooms with join/leave and per-channel messaging
+- **Direct Messages** - Private DM conversations between users, persisted server-side and replayed on reconnect for sender and recipient
+- **Channels** - Multiple chat rooms with join/leave and per-channel messaging (channel membership is tracked; channel room lifecycle itself is not yet persisted across full server restarts)
 - **Typing Indicators** - See when other users are typing
 - **Read Receipts** - Server stores per-user read rows; the reference client sends debounced `read_receipt` when the transcript is scrolled to the newest messages
 - **Plugin System** - Remote registry with text commands and Alt+key hotkeys
@@ -298,7 +300,7 @@ The repository’s `config/` directory holds **server** runtime files and the **
 
 ### Diagnostics (`-doctor`)
 
-Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, redacted `MARCHAT_*` secrets as length-only, other env values as shown, sanity checks). **Server** doctor lists `MARCHAT_*` **after** loading the resolved config directory’s **`.env`** (same as the running server), so values are not limited to what your shell exported. **Client** doctor only shows variables present in the client process (it does not read the server’s `config/.env`); it also lists **experimental client hook** env vars and validates receive/send hook paths when set (see [CLIENT_HOOKS.md](CLIENT_HOOKS.md)). **Server** doctor does **not** list those client-only hook variables, even if they are set in the shell (for example when you run client and server from the same session). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, and attempts a DB ping. On a **color-capable terminal** (stdout is a TTY), the text report uses **ANSI colors** aligned with the server pre-TUI banner; set **`NO_COLOR`** or redirect to a file/pipe for **plain** output. Use **`-doctor-json`** for machine-readable output (never colorized). If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text report (paths, redacted `MARCHAT_*` secrets as length-only, other env values as shown, sanity checks). **Server** doctor lists `MARCHAT_*` **after** loading the resolved config directory’s **`.env`** (same as the running server), so values are not limited to what your shell exported. **Client** doctor only shows variables present in the client process (it does not read the server’s `config/.env`); it also lists **experimental client hook** env vars and validates receive/send hook paths when set (see [CLIENT_HOOKS.md](CLIENT_HOOKS.md)). Client doctor now also reports local DM UI state file status (`dm_state.json`) and whether E2E key source for this run is env or keystore. **Server** doctor does **not** list those client-only hook variables, even if they are set in the shell (for example when you run client and server from the same session). Server doctor also reports the detected DB dialect, validates the configured DB connection string format, attempts a DB ping, and reports DM history privacy behavior. On a **color-capable terminal** (stdout is a TTY), the text report uses **ANSI colors** aligned with the server pre-TUI banner; set **`NO_COLOR`** or redirect to a file/pipe for **plain** output. Use **`-doctor-json`** for machine-readable output (never colorized). If both flags were passed, `-doctor-json` wins. Exits without starting the TUI or listening on a port. See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
 
 ## Admin Commands
 
@@ -338,11 +340,19 @@ Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text 
 |---------|-------------|
 | `:edit <id> <text>` | Edit your own message by ID (admins cannot edit others' messages; with E2E on, the new text is encrypted like normal chat and the server keeps `is_encrypted` in sync) |
 | `:delete <id>` | Delete a message by its ID |
-| `:dm [user] [msg]` | Send a DM or toggle DM mode (no args exits DM mode) |
+| `:dm [user] [msg]` | Send a DM, switch to a DM conversation (`:dm <user>`), or return to global chat (`:dm off`) |
+| `:dms` | List DM conversations currently visible in the sidebar (includes unread counts) |
+| `:dmhide [user]` | Hide a DM conversation from the sidebar (or hide the active DM thread when no user is provided) |
 | `:search <query>` | Search message history on the server |
 | `:react <id> <emoji>` | React to a message (supports aliases: `+1`, `heart`, `fire`, `party`, `laugh`, `eyes`, `check`, `rocket`, `think`, etc.) |
 | `:pin <id>` | Toggle pin on a message |
 | `:pinned` | List all pinned messages |
+
+DM unread rule in the reference TUI:
+- Unread for a DM thread counts inbound DM messages from that user while that thread is not active.
+- Opening a DM thread marks that thread as read immediately.
+- Unread tracking and hidden thread state are saved in the client config directory (`dm_state.json`) and restored on reconnect.
+- Hidden threads reappear automatically when a new inbound DM arrives from that user.
 
 ### Channels
 | Command | Description |
@@ -819,16 +829,16 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `config` | 73.2% | 339 LOC | High |
 | `plugin/host` | 64.6% | 721 LOC | Medium |
 | `client/config` | 58.0% | 1993 LOC | Medium |
-| `internal/doctor` | 52.5% | 809 LOC | Medium |
+| `internal/doctor` | 66.5% | 826 LOC | Medium |
 | `plugin/store` | 47.0% | 552 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 36.3% | 7229 LOC | Low |
+| `server` | 38.4% | 7295 LOC | Low |
 | `plugin/manager` | 32.1% | 747 LOC | Low |
 | `client/exthook` | 24.1% | 204 LOC | Low |
-| `client` | 26.2% | 5936 LOC | Low |
+| `client` | 25.8% | 6299 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 38.8%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 39.6%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

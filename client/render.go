@@ -280,7 +280,13 @@ func renderCodeBlocks(content string) string {
 	})
 }
 
-func renderUserList(users []string, me string, styles themeStyles, width int, isAdmin bool, selectedUserIndex int) string {
+type dmSidebarEntry struct {
+	User   string
+	Unread int
+	Active bool
+}
+
+func renderUserList(users []string, me string, styles themeStyles, width int, isAdmin bool, selectedUserIndex int, dmThreads []dmSidebarEntry) string {
 	var b strings.Builder
 	title := " Users "
 	b.WriteString(styles.UserList.Width(width).Render(title) + "\n")
@@ -308,6 +314,21 @@ func renderUserList(users []string, me string, styles themeStyles, width int, is
 		}
 
 		b.WriteString(userStyle.Render(prefix+u) + "\n")
+	}
+
+	if len(dmThreads) > 0 {
+		b.WriteString("\n")
+		b.WriteString(styles.User.Render(" DMs ") + "\n")
+		for _, dm := range dmThreads {
+			label := "• " + dm.User
+			if dm.Active {
+				label = "► " + dm.User
+			}
+			if dm.Unread > 0 {
+				label += fmt.Sprintf(" (%d)", dm.Unread)
+			}
+			b.WriteString(styles.Other.Render(label) + "\n")
+		}
 	}
 	return b.String()
 }

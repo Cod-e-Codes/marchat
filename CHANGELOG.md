@@ -2,7 +2,20 @@
 
 Narrative notes by release. Per-file binaries and assets: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
-## v1.0.0 (current)
+## Unreleased
+
+On **`main`** only; not part of **[v1.0.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0)** or its published binaries. Will ship in the next tagged release. Compare [`v1.0.0...main`](https://github.com/Cod-e-Codes/marchat/compare/v1.0.0...main). Commits since the tag: **`git log v1.0.0..HEAD --oneline`**.
+
+- **Packaging**: Sync **v1.0.0** zip SHA256 values in **PACKAGING.md**, **AUR**, Homebrew, Scoop, winget, and Chocolatey templates with hashes from published release assets.
+- **CI**: Downstream **AUR** publish job clones the packaging checkout over HTTPS instead of SSH.
+- **Dependencies**: **github.com/jackc/pgx/v5** to 5.9.2; **modernc.org/sqlite** to 1.49.1.
+- **Docs**: Changelog as the narrative hub; clearer onboarding via **QUICKSTART** and **docs/README**; refreshed coverage and LoC in **TESTING** and **README**; **CONTRIBUTING** and **PLUGIN_ECOSYSTEM** edits; call out **winget** and **Chocolatey** listings; link optional graphical clients from **README** and **PROTOCOL**; optional plugin discovery points at the **marchat-plugins** repository.
+- **Server**: Persist direct messages with `recipient` metadata; reconnect history replays DMs only to sender and recipient. Typing with non-empty `recipient` uses the same DM delivery path as chat DMs.
+- **Client**: DM thread sidebar (unread, hide/reappear), `dm_state.json` under the client config directory, footer shows the active DM peer, commands `:dm` / `:dm off` / `:dms` / `:dmhide`, transcript filtering per active DM thread. **Fix:** handle `:dmhide` / `:dms` before `:dm` so they are not mistaken for `:dm hide...` / `:dm s...` (prefix collision). **Typing:** while in DM compose mode, typing uses optional `recipient` on the wire; the server delivers only to that DM pair; the reference TUI hides DM-scoped typing unless that DM thread is open (no leak into global chat), and hides channel/global typing while a DM thread is open (no leak from general chat into the DM view).
+- **Diagnostics**: Client `-doctor` reports `dm_state.json` and E2E key source; server `-doctor` includes a DM history privacy note.
+- **Docs (DM and protocol)**: **ARCHITECTURE**, **PROTOCOL** (typing `recipient` and DM delivery), **README**, **TESTING**, and **CONTRIBUTING** updated for persistent DMs, typing scope, and doctor output. Install snippets and release badges still reference **v1.0.0** until the next release is cut.
+
+## v1.0.0
 
 **Released 2026-04-17.** Since **[v0.11.0-beta.5](https://github.com/Cod-e-Codes/marchat/releases/tag/v0.11.0-beta.5)**; compare [`v0.11.0-beta.5...v1.0.0`](https://github.com/Cod-e-Codes/marchat/compare/v0.11.0-beta.5...v1.0.0). Commits: **`git log v0.11.0-beta.5..v1.0.0 --oneline`**.
 

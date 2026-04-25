@@ -51,6 +51,7 @@ This file tracks implementation status. Completed items use `- [x]`; future idea
 - [x] Increase test coverage for client and server packages.
 
 ### Phase 7: Future Improvements
+- Persist channel room lifecycle and metadata across server restarts (not only per-user last channel state).
 - Consider using `sqlx` or a lightweight ORM to reduce SQL dialect handling.
 - Explore migrations tooling for schema changes.
 - Evaluate other client-server DB options based on user demand.

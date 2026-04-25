@@ -188,6 +188,8 @@ func RunServer(o Options) error {
 			}
 		}
 
+		appendCheck(&checks, "dm_history", "ok", "DM rows are persisted with recipient metadata; reconnect replay should include only sender/recipient DM rows per user")
+
 		if cfg.IsTLSEnabled() {
 			if _, err := os.Stat(cfg.TLSCertFile); err != nil {
 				appendCheck(&checks, "tls_cert", "error", fmt.Sprintf("TLS cert not readable: %v", err))
@@ -345,6 +347,21 @@ func RunClient(o Options) error {
 				appendCheck(&checks, "keystore_note", "ok", fmt.Sprintf("keystore is outside the config directory; new runs use %s first, with fallback to older per-user paths", primaryKs))
 			}
 		}
+	}
+
+	dmStatePath := filepath.Join(absDir, "dm_state.json")
+	if st, err := os.Stat(dmStatePath); err != nil {
+		appendCheck(&checks, "dm_state", "ok", fmt.Sprintf("no DM state file yet (expected at %s)", dmStatePath))
+	} else if st.IsDir() {
+		appendCheck(&checks, "dm_state", "warn", fmt.Sprintf("dm_state.json path is a directory: %s", dmStatePath))
+	} else {
+		appendCheck(&checks, "dm_state", "ok", fmt.Sprintf("DM state file present (%d bytes): %s", st.Size(), dmStatePath))
+	}
+
+	if strings.TrimSpace(os.Getenv("MARCHAT_GLOBAL_E2E_KEY")) != "" {
+		appendCheck(&checks, "e2e_key_source", "ok", "MARCHAT_GLOBAL_E2E_KEY is set; client will use env key for this run and not rewrite keystore automatically")
+	} else {
+		appendCheck(&checks, "e2e_key_source", "ok", "MARCHAT_GLOBAL_E2E_KEY is not set; client key source is keystore.dat when E2E is enabled")
 	}
 
 	if isTermux() {

@@ -15,6 +15,7 @@ func TestBuildStatusFooter(t *testing.T) {
 		unread          int
 		useE2E          bool
 		currentChannel  string
+		activeDMThread  string
 		wantContains    []string
 		wantNotContains []string
 	}{
@@ -25,6 +26,7 @@ func TestBuildStatusFooter(t *testing.T) {
 			unread:          0,
 			useE2E:          false,
 			currentChannel:  "general",
+			activeDMThread:  "",
 			wantContains:    []string{"Connected"},
 			wantNotContains: []string{"Unread", "E2E", "#general", "Ctrl+H", "Unencrypted", "Msg info"},
 		},
@@ -35,6 +37,7 @@ func TestBuildStatusFooter(t *testing.T) {
 			unread:          0,
 			useE2E:          false,
 			currentChannel:  "",
+			activeDMThread:  "",
 			wantContains:    []string{"Disconnected", "Press Ctrl+H for help"},
 			wantNotContains: []string{"Msg info"},
 		},
@@ -45,6 +48,7 @@ func TestBuildStatusFooter(t *testing.T) {
 			unread:          0,
 			useE2E:          false,
 			currentChannel:  "general",
+			activeDMThread:  "",
 			wantContains:    []string{"Connected", "Press Ctrl+H to close help"},
 			wantNotContains: []string{"Press Ctrl+H for help"},
 		},
@@ -55,13 +59,25 @@ func TestBuildStatusFooter(t *testing.T) {
 			unread:          3,
 			useE2E:          true,
 			currentChannel:  "dev",
+			activeDMThread:  "",
 			wantContains:    []string{"Connected", "3 unread", "E2E", "#dev"},
 			wantNotContains: []string{"Unencrypted", "Msg info"},
+		},
+		{
+			name:            "dm_thread",
+			connected:       true,
+			showHelp:        false,
+			unread:          0,
+			useE2E:          false,
+			currentChannel:  "general",
+			activeDMThread:  "alice",
+			wantContains:    []string{"Connected", "DM:alice"},
+			wantNotContains: []string{"#general"},
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := buildStatusFooter(tt.connected, tt.showHelp, tt.unread, tt.useE2E, tt.currentChannel)
+			got := buildStatusFooter(tt.connected, tt.showHelp, tt.unread, tt.useE2E, tt.currentChannel, tt.activeDMThread)
 			for _, s := range tt.wantContains {
 				if !strings.Contains(got, s) {
 					t.Errorf("footer %q should contain %q", got, s)
