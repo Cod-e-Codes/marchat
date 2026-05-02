@@ -16,7 +16,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	golang.org/x/crypto v0.50.0
 	golang.org/x/term v0.42.0
-	modernc.org/sqlite v1.49.1
+	modernc.org/sqlite v1.50.0
 )
 
 require (
