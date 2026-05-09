@@ -219,7 +219,7 @@ go build -o marchat-client ./client
 ```
 
 **Prerequisites for source build:**
-- Go 1.25.9 or later ([download](https://go.dev/dl/))
+- Go 1.25.10 or later ([download](https://go.dev/dl/))
 - Linux clipboard support: `sudo apt install xclip` (Ubuntu/Debian) or `sudo yum install xclip` (RHEL/CentOS)
 
 **Terminal colors:** The server startup banner and the client’s pre-chat output (connection, E2E status, profile picker tags such as `[Admin]` / `[E2E]`, and auth prompts) use [lipgloss](https://github.com/charmbracelet/lipgloss) for emphasis. Set **`NO_COLOR=1`** (or **`NO_COLOR`**) in the environment to disable colors on plain stdout/stderr.

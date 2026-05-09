@@ -8,6 +8,7 @@ On **`main`** only; not part of **[v1.0.0](https://github.com/Cod-e-Codes/marcha
 
 - **Packaging**: Sync **v1.0.0** zip SHA256 values in **PACKAGING.md**, **AUR**, Homebrew, Scoop, winget, and Chocolatey templates with hashes from published release assets.
 - **CI**: Downstream **AUR** publish job clones the packaging checkout over HTTPS instead of SSH.
+- **Toolchain / dependencies**: Go 1.25.10 in **go.mod**, CI, Docker, and docs; **golang.org/x/crypto** v0.51.0 and **golang.org/x/term** v0.43.0.
 - **Dependencies**: **github.com/jackc/pgx/v5** to 5.9.2; **modernc.org/sqlite** to 1.50.0; **github.com/go-sql-driver/mysql** to 1.10.0.
 - **Docs**: Changelog as the narrative hub; clearer onboarding via **QUICKSTART** and **docs/README**; refreshed coverage and LoC in **TESTING** and **README**; **CONTRIBUTING** and **PLUGIN_ECOSYSTEM** edits; call out **winget** and **Chocolatey** listings; link optional graphical clients from **README** and **PROTOCOL**; optional plugin discovery points at the **marchat-plugins** repository.
 - **Server**: Add `channel` column to the message schema for improved multi-channel flexibility; persist message channels so history replays into the correct channel. Persist direct messages with `recipient` metadata; reconnect history replays DMs only to sender and recipient. Typing with non-empty `recipient` uses the same DM delivery path as chat DMs.
