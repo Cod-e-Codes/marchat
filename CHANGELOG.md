@@ -4,17 +4,19 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 ## Unreleased
 
-On **`main`** only; not part of **[v1.0.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0)** or its published binaries. Will ship in the next tagged release. Compare [`v1.0.0...main`](https://github.com/Cod-e-Codes/marchat/compare/v1.0.0...main). Commits since the tag: **`git log v1.0.0..HEAD --oneline`**.
+On **`main`** only; not part of **[v1.1.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.1.0)** or its published binaries until you tag and publish. Compare [`v1.1.0...main`](https://github.com/Cod-e-Codes/marchat/compare/v1.1.0...main). Commits since the tag: **`git log v1.1.0..HEAD --oneline`**.
 
-- **Packaging**: Sync **v1.0.0** zip SHA256 values in **PACKAGING.md**, **AUR**, Homebrew, Scoop, winget, and Chocolatey templates with hashes from published release assets.
-- **CI**: Downstream **AUR** publish job clones the packaging checkout over HTTPS instead of SSH.
-- **Toolchain / dependencies**: Go 1.25.10 in **go.mod**, CI, Docker, and docs; **golang.org/x/crypto** v0.51.0 and **golang.org/x/term** v0.43.0.
-- **Dependencies**: **github.com/jackc/pgx/v5** to 5.9.2; **modernc.org/sqlite** to 1.50.0; **github.com/go-sql-driver/mysql** to 1.10.0.
-- **Docs**: Changelog as the narrative hub; clearer onboarding via **QUICKSTART** and **docs/README**; refreshed coverage and LoC in **TESTING** and **README**; **CONTRIBUTING** and **PLUGIN_ECOSYSTEM** edits; call out **winget** and **Chocolatey** listings; link optional graphical clients from **README** and **PROTOCOL**; optional plugin discovery points at the **marchat-plugins** repository.
-- **Server**: Add `channel` column to the message schema for improved multi-channel flexibility; persist message channels so history replays into the correct channel. Persist direct messages with `recipient` metadata; reconnect history replays DMs only to sender and recipient. Typing with non-empty `recipient` uses the same DM delivery path as chat DMs.
-- **Client**: Scope transcript and typing state by active channel view so switching channels shows only that channel's history and typing activity. DM thread sidebar (unread, hide/reappear), `dm_state.json` under the client config directory, footer shows the active DM peer, commands `:dm` / `:dm off` / `:dms` / `:dmhide`, transcript filtering per active DM thread. **Fix:** handle `:dmhide` / `:dms` before `:dm` so they are not mistaken for `:dm hide...` / `:dm s...` (prefix collision). **Typing:** while in DM compose mode, typing uses optional `recipient` on the wire; the server delivers only to that DM pair; the reference TUI hides DM-scoped typing unless that DM thread is open (no leak into global chat), and hides channel/global typing while a DM thread is open (no leak from general chat into the DM view).
-- **Diagnostics**: Client `-doctor` reports `dm_state.json` and E2E key source; server `-doctor` includes a DM history privacy note.
-- **Docs (DM and protocol)**: **ARCHITECTURE**, **PROTOCOL** (typing `recipient` and DM delivery), **README**, **TESTING**, and **CONTRIBUTING** updated for persistent DMs, typing scope, and doctor output. Install snippets and release badges still reference **v1.0.0** until the next release is cut.
+## v1.1.0
+
+**Released 2026-05-12.** Since **[v1.0.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.0.0)**; compare [`v1.0.0...v1.1.0`](https://github.com/Cod-e-Codes/marchat/compare/v1.0.0...v1.1.0). Commits: **`git log v1.0.0..v1.1.0 --oneline`**.
+
+- **Server**: **`messages.channel`** column (default **`general`**) with startup migration; channel messages persist and replay on the correct channel. Direct messages store **`recipient`**; reconnect history includes DM rows only for sender and recipient. **`TypingMessage`** with non-empty **`recipient`** uses the same DM delivery path as chat DMs.
+- **Client**: Transcript and typing scoped to the active channel; DM thread sidebar (unread, hide, reappear), **`dm_state.json`** under the client config directory, footer shows the active DM peer, commands **`:dm`** / **`:dm off`** / **`:dms`** / **`:dmhide`**. **Fix:** **`:dmhide`** and **`:dms`** handled before **`:dm`** (prefix collision). **Typing:** DM compose sends optional **`recipient`** on the wire; reference TUI hides DM-scoped typing unless that thread is open and hides channel typing while a DM thread is open.
+- **Diagnostics**: Client **`-doctor`** reports **`dm_state.json`** and E2E key source; server **`-doctor`** includes a DM history note.
+- **Docs / protocol**: **ARCHITECTURE**, **PROTOCOL**, **README**, **TESTING**, **CONTRIBUTING**, **QUICKSTART**, **PLUGIN_ECOSYSTEM**, **docs/README** for DMs, typing **`recipient`**, and doctor output; optional graphical clients and **marchat-plugins** discovery where relevant.
+- **Toolchain / dependencies**: Go **1.25.10** in **go.mod**, CI, **Dockerfile**; **golang.org/x/crypto** v0.51.0, **golang.org/x/term** v0.43.0; **github.com/jackc/pgx/v5** v5.9.2, **modernc.org/sqlite** v1.50.0, **github.com/go-sql-driver/mysql** v1.10.0.
+- **CI**: Downstream **AUR** publish clones **aur.archlinux.org** over HTTPS before SSH push.
+- **Packaging**: Version strings and URLs for **v1.1.0** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.1.0** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**). Regenerate **packaging/aur/.SRCINFO** on Arch after final **PKGBUILD** checksums (**`makepkg --printsrcinfo`**).
 
 ## v1.0.0
 
