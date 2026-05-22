@@ -69,6 +69,83 @@ func encryptGlobalTextWireContent(keystore *crypto.KeyStore, username, plaintext
 	return finalContent, nil
 }
 
+// decryptEncryptedChatContent decrypts opaque wire content (base64 nonce || ciphertext) using the global key.
+func decryptEncryptedChatContent(keystore *crypto.KeyStore, chatMsg shared.Message) (string, error) {
+	if keystore == nil {
+		return "", fmt.Errorf("keystore not initialized")
+	}
+	combinedData, err := base64.StdEncoding.DecodeString(chatMsg.Content)
+	if err != nil {
+		return "", fmt.Errorf("base64 decode: %w", err)
+	}
+	if len(combinedData) < 12 {
+		return "", fmt.Errorf("combined data too short (%d bytes)", len(combinedData))
+	}
+	encMsg := &shared.EncryptedMessage{
+		Sender:      chatMsg.Sender,
+		Nonce:       combinedData[:12],
+		Encrypted:   combinedData[12:],
+		IsEncrypted: true,
+	}
+	decrypted, err := keystore.DecryptMessage(encMsg, "global")
+	if err != nil {
+		return "", err
+	}
+	return decrypted.Content, nil
+}
+
+// buildEncryptedOutboundMessage returns a chat message with opaque E2E content (base64 nonce || ciphertext).
+func buildEncryptedOutboundMessage(keystore *crypto.KeyStore, username, plaintext string, msgType shared.MessageType, recipient string) (shared.Message, error) {
+	if msgType == "" {
+		msgType = shared.TextMessage
+	}
+	finalContent, err := encryptGlobalTextWireContent(keystore, username, plaintext)
+	if err != nil {
+		return shared.Message{}, err
+	}
+	msg := shared.Message{
+		Content:   finalContent,
+		Sender:    username,
+		CreatedAt: time.Now(),
+		Type:      msgType,
+		Encrypted: true,
+	}
+	if recipient != "" {
+		msg.Recipient = recipient
+	}
+	return msg, nil
+}
+
+func sendEncryptedChatMessage(ws *websocket.Conn, keystore *crypto.KeyStore, username, plaintext string, msgType shared.MessageType, recipient string) error {
+	if keystore == nil {
+		return fmt.Errorf("keystore not initialized")
+	}
+	msg, err := buildEncryptedOutboundMessage(keystore, username, plaintext, msgType, recipient)
+	if err != nil {
+		return err
+	}
+	return ws.WriteJSON(msg)
+}
+
+func sendDirectMessage(ws *websocket.Conn, keystore *crypto.KeyStore, username, recipient, content string, useE2E bool) error {
+	if recipient == "" {
+		return fmt.Errorf("dm recipient is required")
+	}
+	if useE2E {
+		if err := verifyKeystoreUnlocked(keystore); err != nil {
+			return err
+		}
+		return sendEncryptedChatMessage(ws, keystore, username, content, shared.DirectMessage, recipient)
+	}
+	return ws.WriteJSON(shared.Message{
+		Type:      shared.DirectMessage,
+		Sender:    username,
+		Recipient: recipient,
+		Content:   content,
+		CreatedAt: time.Now(),
+	})
+}
+
 func debugEncryptAndSend(recipients []string, plaintext string, ws *websocket.Conn, keystore *crypto.KeyStore, username string) error {
 	log.Printf("DEBUG: Starting global encryption for %d recipients", len(recipients))
 	log.Printf("DEBUG: Plaintext length: %d", len(plaintext))
@@ -86,26 +163,8 @@ func debugEncryptAndSend(recipients []string, plaintext string, ws *websocket.Co
 	}
 	log.Printf("DEBUG: Global key available (ID: %s)", globalKey.KeyID)
 
-	finalContent, err := encryptGlobalTextWireContent(keystore, username, plaintext)
-	if err != nil {
-		log.Printf("ERROR: Global encryption failed: %v", err)
-		return err
-	}
-	log.Printf("DEBUG: Base64 encoded nonce+ciphertext - length: %d", len(finalContent))
-
-	msg := shared.Message{
-		Content:   finalContent,
-		Sender:    username,
-		CreatedAt: time.Now(),
-		Type:      shared.TextMessage,
-		Encrypted: true,
-	}
-
-	log.Printf("DEBUG: Final message - Content length: %d, Type: %s",
-		len(msg.Content), msg.Type)
-
-	if err := ws.WriteJSON(msg); err != nil {
-		log.Printf("ERROR: WebSocket write failed: %v", err)
+	if err := sendEncryptedChatMessage(ws, keystore, username, plaintext, shared.TextMessage, ""); err != nil {
+		log.Printf("ERROR: Global encryption send failed: %v", err)
 		return err
 	}
 
@@ -352,34 +411,13 @@ func (m *model) connectWebSocket(serverURL string) error {
 						}
 					} else {
 						log.Printf("DEBUG: Attempting to decrypt message from %s", chatMsg.Sender)
-
-						combinedData, decodeErr := base64.StdEncoding.DecodeString(chatMsg.Content)
-						if decodeErr != nil {
-							log.Printf("ERROR: Base64 decode failed: %v", decodeErr)
-							chatMsg.Content = "[ENCRYPTED - DECRYPTION FAILED]"
-						} else if len(combinedData) < 12 {
-							log.Printf("ERROR: Combined data too short (%d bytes)", len(combinedData))
+						plaintext, decryptErr := decryptEncryptedChatContent(m.keystore, chatMsg)
+						if decryptErr != nil {
+							log.Printf("ERROR: Decryption failed for message from %s: %v", chatMsg.Sender, decryptErr)
 							chatMsg.Content = "[ENCRYPTED - DECRYPTION FAILED]"
 						} else {
-							nonce := combinedData[:12]
-							ciphertext := combinedData[12:]
-
-							encMsg := &shared.EncryptedMessage{
-								Sender:      chatMsg.Sender,
-								Nonce:       nonce,
-								Encrypted:   ciphertext,
-								IsEncrypted: true,
-							}
-
-							conversationID := "global"
-							decrypted, decryptErr := m.keystore.DecryptMessage(encMsg, conversationID)
-							if decryptErr != nil {
-								log.Printf("ERROR: Decryption failed for message from %s: %v", chatMsg.Sender, decryptErr)
-								chatMsg.Content = "[ENCRYPTED - DECRYPTION FAILED]"
-							} else {
-								log.Printf("DEBUG: Successfully decrypted message from %s", chatMsg.Sender)
-								chatMsg.Content = decrypted.Content
-							}
+							log.Printf("DEBUG: Successfully decrypted message from %s", chatMsg.Sender)
+							chatMsg.Content = plaintext
 						}
 					}
 				}

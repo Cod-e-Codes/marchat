@@ -65,7 +65,7 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - File sharing with configurable size limits (default 1MB), with optional E2E encryption
 - Theme system supporting built-in and custom themes
 - Administrative commands for user management
-- End-to-end encryption with global key support (text and file transfers)
+- End-to-end encryption with global key support (channel text, direct messages, and file transfers)
 - Code snippet rendering with syntax highlighting
 - Clipboard integration for text operations
 - URL detection and external opening
@@ -144,6 +144,7 @@ Chat end-to-end encryption uses a **global symmetric key** shared by all clients
 - **ChaCha20-Poly1305**: Authenticated encryption for message and file confidentiality and integrity
 - **Global E2E**: One 32-byte key per deployment; the client normally stores it in the passphrase-protected keystore (`EncryptMessage` / `DecryptMessage` in `shared`, orchestrated by `client/crypto/keystore.go`). If **`MARCHAT_GLOBAL_E2E_KEY`** is set, the client uses that key in memory for the process; it does **not** rewrite `keystore.dat` (see **README.md** → E2E Encryption).
 - **Keystore file**: Wrapped with **AES-GCM**; passphrase stretched with **PBKDF2** (SHA-256, 100k iterations). Current files embed a **random salt** in the file header so unlocking does not depend on the absolute path. Legacy files used the keystore path as PBKDF2 salt and are **migrated** to the embedded-salt format on first successful load (`client/crypto/keystore.go`).
+- **Wire encoding**: Channel `text` and `dm` messages set `encrypted` and carry base64 **nonce || ciphertext** in `content` when E2E is on (`client/websocket.go`)
 - **File transfer**: Raw byte encryption/decryption via `EncryptRaw`/`DecryptRaw` in the keystore using the same global key
 - **Key distribution UX**: Auto-generated global keys are stored in the encrypted keystore; the client does **not** print the raw key to stdout (see **README.md** / **SECURITY.md**).
 

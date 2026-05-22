@@ -548,7 +548,7 @@ export MARCHAT_USERS="admin1,admin2"
 Global encryption for secure group chat using shared keys across all clients.
 
 ### How It Works
-- **Shared Key Model**: All clients use the same 32-byte global key for encrypted chat (and optional encrypted files)
+- **Shared Key Model**: All clients use the same 32-byte global key for encrypted channel chat, direct messages, and optional encrypted files
 - **Simplified Management**: No per-user public-key exchange on the wire; distribute the key out-of-band (env var or copy from first client)
 - **ChaCha20-Poly1305**: Authenticated encryption for payloads; see **PROTOCOL.md** for the on-the-wire layout
 - **Environment Variable**: `MARCHAT_GLOBAL_E2E_KEY` (base64) for key distribution
@@ -835,10 +835,10 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `server` | 38.5% | 7309 LOC | Low |
 | `plugin/manager` | 32.1% | 747 LOC | Low |
 | `client/exthook` | 24.1% | 204 LOC | Low |
-| `client` | 25.9% | 6330 LOC | Low |
+| `client` | 28.1% | 6330 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 39.7%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 40.4%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

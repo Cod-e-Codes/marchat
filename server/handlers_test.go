@@ -161,6 +161,47 @@ func TestInsertEncryptedMessage(t *testing.T) {
 	}
 }
 
+func TestInsertMessageEncryptedDM(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+
+	CreateSchema(db)
+
+	msg := shared.Message{
+		Sender:    "alice",
+		Recipient: "bob",
+		Content:   "opaque-base64-ciphertext",
+		CreatedAt: time.Now(),
+		Type:      shared.DirectMessage,
+		Encrypted: true,
+	}
+
+	if _, err := InsertMessage(db, msg); err != nil {
+		t.Fatalf("InsertMessage encrypted DM: %v", err)
+	}
+
+	recent := GetRecentMessages(db)
+	if len(recent) != 1 {
+		t.Fatalf("expected 1 message, got %d", len(recent))
+	}
+	got := recent[0]
+	if got.Type != shared.DirectMessage {
+		t.Errorf("type = %q, want dm", got.Type)
+	}
+	if got.Recipient != "bob" {
+		t.Errorf("recipient = %q, want bob", got.Recipient)
+	}
+	if !got.Encrypted {
+		t.Error("expected encrypted flag on persisted DM")
+	}
+	if got.Content != msg.Content {
+		t.Errorf("content = %q, want opaque ciphertext preserved", got.Content)
+	}
+}
+
 func TestGetRecentMessages(t *testing.T) {
 	// Create a real database for this test
 	db, err := sql.Open("sqlite", ":memory:")

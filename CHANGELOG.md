@@ -6,6 +6,7 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of **[v1.1.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.1.0)** or its published binaries until you tag and publish. Compare [`v1.1.0...main`](https://github.com/Cod-e-Codes/marchat/compare/v1.1.0...main). Commits since the tag: **`git log v1.1.0..HEAD --oneline`**.
 
+- **Client**: Direct messages use the same E2E wire path as channel `text` when encryption is enabled (`encrypted` plus base64 nonce || ciphertext with the global key). Applies to `:dm <user> <msg>` and DM mode compose.
 - **Dependencies**: **golang.org/x/crypto** v0.52.0 (SSH advisories cleared at module level; marchat uses ChaCha20-Poly1305 and PBKDF2 only); **modernc.org/sqlite** v1.50.1 (was v1.50.0). Transitive **filippo.io/edwards25519** v1.2.0 (MySQL driver).
 
 ## v1.1.0

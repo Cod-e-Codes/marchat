@@ -2079,9 +2079,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					target := parts[1]
 					content := strings.Join(parts[2:], " ")
-					dmMsg := shared.Message{Type: shared.DirectMessage, Sender: m.cfg.Username, Recipient: target, Content: content}
 					if m.conn != nil {
-						_ = m.conn.WriteJSON(dmMsg)
+						dmMsg := shared.Message{Type: shared.DirectMessage, Sender: m.cfg.Username, Recipient: target, Content: content}
+						exthook.FireSend(dmMsg)
+						if err := sendDirectMessage(m.conn, m.keystore, m.cfg.Username, target, content, m.useE2E); err != nil {
+							m.banner = "[ERROR] Failed to send DM: " + err.Error()
+						}
 					}
 					m.dmRecipient = target
 					m.activeDMThread = target
@@ -2276,10 +2279,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							Content:   text,
 						}
 						exthook.FireSend(dmMsg)
-						if err := m.conn.WriteJSON(dmMsg); err != nil {
-							m.banner = "[ERROR] Failed to send DM (connection lost)"
+						if err := sendDirectMessage(m.conn, m.keystore, m.cfg.Username, m.dmRecipient, text, m.useE2E); err != nil {
+							m.banner = "[ERROR] Failed to send DM: " + err.Error()
 							m.sending = false
-							return m, m.listenWebSocket()
+							m.textarea.SetValue("")
+							return m, nil
 						}
 						m.banner = ""
 						m.sending = false
