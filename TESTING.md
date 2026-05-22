@@ -12,7 +12,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: Narrative release summaries live in **[CHANGELOG.md](CHANGELOG.md)** (and on GitHub Releases). This is a foundational test suite with good coverage for smaller utility packages and growing coverage for client and server components. **Overall statement coverage is 40.4%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage`, `coverage`, or per-package `ph` / `sv`) so the argument is not misparsed. The nested **`plugin/sdk`** module (separate `go.mod`) is not included in that merged number; its package statement coverage is **58.8%** when measured with `cd plugin/sdk && go test -coverprofile=sdkcover ./... && go tool cover -func=sdkcover`.
+**Note**: Narrative release summaries live in **[CHANGELOG.md](CHANGELOG.md)** (and on GitHub Releases). This is a foundational test suite with good coverage for smaller utility packages and growing coverage for client and server components. **Overall statement coverage is 40.8%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage`, `coverage`, or per-package `ph` / `sv`) so the argument is not misparsed. The nested **`plugin/sdk`** module (separate `go.mod`) is not included in that merged number; its package statement coverage is **58.8%** when measured with `cd plugin/sdk && go test -coverprofile=sdkcover ./... && go tool cover -func=sdkcover`.
 
 **Doctor env tests:** Production code reads process env via **`collectMarchatEnviron`** and the swappable **`osEnviron`** variable (see `internal/doctor/env.go`), guarded by **`environMu`**. Tests that replace **`osEnviron`** must capture the previous function while holding **`environMu`** and must not use **`t.Parallel()`** alongside other tests that also swap it, or **`go test -race`** can observe races and overlapping mocks. **`buildEnvLines`** tests are therefore sequential in the package.
 
@@ -214,18 +214,18 @@ go test -cover ./...
 | `config` | 73.2% | High | 339 | Small |
 | `plugin/host` | 64.6% | Medium | 721 | Medium |
 | `client/config` | 58.0% | Medium | 1993 | Medium |
-| `internal/doctor` | 66.5% | Medium | 826 | Medium |
+| `internal/doctor` | 66.5% | Medium | 828 | Medium |
 | `plugin/store` | 47.0% | Medium | 552 | Medium |
 | `cmd/license` | 42.2% | Medium | 160 | Small |
-| `server` | 38.5% | Low | 7309 | Large |
+| `server` | 39.8% | Low | 7495 | Large |
 | `plugin/manager` | 32.1% | Low | 747 | Medium |
 | `client/exthook` | 24.1% | Low | 204 | Small |
-| `client` | 28.1% | Low | 6330 | Large |
+| `client` | 28.1% | Low | 6372 | Large |
 | `cmd/server` | 13.7% | Low | 484 | Medium |
 
 ¹Non-test `.go` files only, physical line count (`wc -l` style), **only `.go` files in that package directory** (not subpackages such as `client/config` inside `client/`). Regenerate with the Python snippet in **Test Metrics** or `find` + `wc`.
 
-**Overall coverage: 40.4%** (all packages in the main module; merged profile `coverage` or another `-coverprofile` path)
+**Overall coverage: 40.8%** (all packages in the main module; merged profile `coverage` or another `-coverprofile` path)
 
 ### High Coverage (70%+)
 - **Shared Package**: Cryptographic operations, data types, message handling, version utilities (88.1%)
@@ -241,7 +241,7 @@ go test -cover ./...
 - **Command License**: CLI functions for license management (42.2%)
 
 ### Low Coverage (<40%)
-- **Server Package**: WebSocket handling, admin panel, database operations, message edit/delete/pin/search, channels, DMs (38.5%)
+- **Server Package**: WebSocket handling, origin/IP request context (`request_context.go`), admin panel, database operations, message edit/delete/pin/search, channels, DMs (39.8%)
 - **Plugin Manager**: Installation, store download paths, enable/disable with persisted state (32.1%)
 - **Client Hooks (`client/exthook`)**: Hook path validation and hook-safe message JSON (24.1%)
 - **Client Package**: Message rendering, user lists, encryption functions (including E2E DM wire helpers), flag validation, TUI entrypoints (28.1%)
@@ -271,6 +271,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 | `server/db_dialect.go` | 58.5% | server | SQL dialect helpers |
 | `server/hub.go` | 58.1% | server | WebSocket hub management, channels, DMs |
 | `client/code_snippet.go` | 53.4% | client | Code snippet TUI component |
+| `server/request_context.go` | 54.6% | server | WebSocket Origin checks, trusted-proxy client IP |
 | `server/handlers.go` | 50.5% | server | HTTP/WebSocket handlers, edit/delete/pin/search |
 | `plugin/store/store.go` | 47.0% | plugin/store | Plugin store operations |
 | `cmd/license/main.go` | 42.2% | cmd/license | License CLI tool |
@@ -287,7 +288,7 @@ Statement percentages below are from the merged profile (`go tool cover -func=co
 | `client/main.go` | 12.7% | client | Client main application |
 
 ### Areas for Future Testing
-- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 38.5%)
+- **Server Package**: Advanced WebSocket handling, complex message routing scenarios (current: 39.8%)
 - **Client Package**: WebSocket communication, full TUI integration (current: 28.1%)
 - **Plugin Host**: Broader command/response paths and failure modes beyond the minimal IPC test plugin (current: 64.6%)
 - **Plugin Manager**: Store download, checksum, and install edge cases (current: 32.1%)
@@ -453,10 +454,10 @@ When adding new functionality to Marchat:
 - **Top-level tests**: 373 `Test*` entrypoints from `go test -list . ./...` on the main module; the nested **`plugin/sdk`** module adds 22 more (`cd plugin/sdk && go test -list . ./...`).
 - **Test files**: 46 tracked `_test.go` files (`git ls-files '*_test.go'`), including `plugin/sdk/plugin_test.go` and `plugin/sdk/stdio_test.go` in the nested SDK module.
 - **Packages (`go list ./...`)**: 15 in the main module; `plugin/sdk` and `plugin/examples/echo` are nested modules with their own `go.mod` files (root `go test ./...` does not run their tests).
-- **Coverage by Package** (statement %, merged profile): 88.1% (`shared`), 87.1% (`plugin/license`), 80.3% (`client/crypto`), 73.2% (`config`), 64.6% (`plugin/host`), 58.0% (`client/config`), 66.5% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 38.5% (`server`), 32.1% (`plugin/manager`), 24.1% (`client/exthook`), 28.1% (`client`), 13.7% (`cmd/server`)
+- **Coverage by Package** (statement %, merged profile): 88.1% (`shared`), 87.1% (`plugin/license`), 80.3% (`client/crypto`), 73.2% (`config`), 64.6% (`plugin/host`), 58.0% (`client/config`), 66.5% (`internal/doctor`), 47.0% (`plugin/store`), 42.2% (`cmd/license`), 39.8% (`server`), 32.1% (`plugin/manager`), 24.1% (`client/exthook`), 28.1% (`client`), 13.7% (`cmd/server`)
 - **Nested `plugin/sdk` coverage**: **58.8%** statements (run inside `plugin/sdk`; not part of the root merged profile).
-- **Overall Coverage**: **40.4%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell use a profile path **without** a `.out` suffix, for example `mergedcoverage`, `ph`, or `sv`, so `-func=` is not misparsed)
-- **Lines of code (approx.)**: non-test `.go` lines per package directory, same totals as the **Current Coverage Status** table (e.g. `server` 7309, `client` 6330); re-count with:  
+- **Overall Coverage**: **40.8%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell use a profile path **without** a `.out` suffix, for example `mergedcoverage`, `ph`, or `sv`, so `-func=` is not misparsed)
+- **Lines of code (approx.)**: non-test `.go` lines per package directory, same totals as the **Current Coverage Status** table (e.g. `server` 7495, `client` 6372); re-count with:
   `python -c "import os; ..."` walking the tree and skipping `*_test.go`, or equivalent `find` + `wc -l`.
 - **Execution Time**: on the order of a few seconds for `go test ./...` on a typical dev machine
 - **Reliability**: deterministic; use `go test -race ./...` where supported (see CI)

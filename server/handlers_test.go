@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"encoding/binary"
-	"net/http"
 	"strings"
 	"testing"
 	"time"
@@ -13,71 +12,6 @@ import (
 	"github.com/gorilla/websocket"
 	_ "modernc.org/sqlite"
 )
-
-func TestGetClientIP(t *testing.T) {
-	tests := []struct {
-		name           string
-		request        *http.Request
-		expectedIP     string
-		expectedResult string
-	}{
-		{
-			name: "X-Forwarded-For single IP",
-			request: &http.Request{
-				Header: http.Header{
-					"X-Forwarded-For": []string{"192.168.1.1"},
-				},
-			},
-			expectedResult: "192.168.1.1",
-		},
-		{
-			name: "X-Forwarded-For multiple IPs",
-			request: &http.Request{
-				Header: http.Header{
-					"X-Forwarded-For": []string{"192.168.1.1, 10.0.0.1, 172.16.0.1"},
-				},
-			},
-			expectedResult: "192.168.1.1",
-		},
-		{
-			name: "X-Real-IP header",
-			request: &http.Request{
-				Header: http.Header{
-					"X-Real-Ip": []string{"203.0.113.1"},
-				},
-			},
-			expectedResult: "203.0.113.1",
-		},
-		{
-			name: "RemoteAddr fallback",
-			request: &http.Request{
-				RemoteAddr: "192.168.1.100:12345",
-			},
-			expectedResult: "192.168.1.100",
-		},
-		{
-			name: "RemoteAddr without port",
-			request: &http.Request{
-				RemoteAddr: "192.168.1.100",
-			},
-			expectedResult: "192.168.1.100",
-		},
-		{
-			name:           "No IP information",
-			request:        &http.Request{},
-			expectedResult: "unknown",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := getClientIP(tt.request)
-			if result != tt.expectedResult {
-				t.Errorf("Expected IP %s, got %s", tt.expectedResult, result)
-			}
-		})
-	}
-}
 
 func TestInsertMessage(t *testing.T) {
 	// Create a real in-memory database for testing

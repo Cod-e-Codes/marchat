@@ -109,6 +109,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - Web-based admin panel with CSRF protection
 - Health check endpoints for monitoring systems
 - WebSocket per-connection message rate limiting; when the configured burst is exceeded the server sends one `System` `text` notice to that client, then ignores inbound JSON until cooldown (see **PROTOCOL.md**)
+- WebSocket `Origin` checks (`server/request_context.go`): empty origin allowed for TUI clients; otherwise parsed hostname must match the request host, loopback aliases, or **`MARCHAT_ALLOWED_ORIGINS`**. Client IP for logs and connection metadata uses **`RemoteAddr`**; **`X-Forwarded-For`** / **`X-Real-IP`** apply only when the immediate peer is listed in **`MARCHAT_TRUSTED_PROXIES`** (same helper drives web-admin login rate limits)
 - **Diagnostics**: `-doctor` and `-doctor-json` without binding ports (`internal/doctor`)
 
 ### Server Library (`server/`)
@@ -117,7 +118,7 @@ The server package contains the core server logic and components that are used b
 
 #### Core Components
 
-- **WebSocket Handlers**: Connection management and message routing; failed handshakes close with **RFC 6455** close frames (registered status code + UTF-8 reason, not a raw text payload (see `PROTOCOL.md`)
+- **WebSocket Handlers**: Connection management and message routing; failed handshakes close with **RFC 6455** close frames (registered status code + UTF-8 reason, not a raw text payload (see `PROTOCOL.md`); **`CheckOrigin`** and **`getClientIP`** live in **`request_context.go`**
 - **Database Layer**: Pluggable SQL backends (SQLite/PostgreSQL/MySQL) with dialect-aware schema and query helpers
 - **Admin Interfaces**: Both TUI and web-based administrative panels
 - **Plugin Integration**: Plugin command handling and execution

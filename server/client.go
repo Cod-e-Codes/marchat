@@ -179,7 +179,7 @@ func (c *Client) readPump() {
 			results := SearchMessages(c.db, msg.Content, 20)
 			var sb strings.Builder
 			if len(results) == 0 {
-				sb.WriteString("No results found for: " + msg.Content)
+				fmt.Fprintf(&sb, "No results found for: %s", msg.Content)
 			} else {
 				sb.WriteString(fmt.Sprintf("Search results for '%s' (%d found):\n", msg.Content, len(results)))
 				for _, r := range results {

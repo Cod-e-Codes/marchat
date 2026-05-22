@@ -1188,7 +1188,8 @@ func (ap *AdminPanel) renderOverview() string {
 	// System status
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Status"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 
 	statusText := ap.systemInfo.ServerStatus
 	doc.WriteString(fmt.Sprintf("Status: %s\n", statusStyle.Render(statusText)))
@@ -1205,7 +1206,8 @@ func (ap *AdminPanel) renderOverview() string {
 	// Live Configuration Summary
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Live Configuration"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 	doc.WriteString(fmt.Sprintf("Port: %d\n", ap.config.Port))
 
 	// Show TLS status with live detection
@@ -1225,7 +1227,8 @@ func (ap *AdminPanel) renderOverview() string {
 	// Database info
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Database Information"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 	doc.WriteString(fmt.Sprintf("Database Path: %s\n", ap.config.DBPath))
 	doc.WriteString(fmt.Sprintf("Config Directory: %s\n", ap.config.ConfigDir))
 
@@ -1239,7 +1242,8 @@ func (ap *AdminPanel) renderUsers() string {
 
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("User Management"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 
 	// Show selected user info
 	if ap.userTable.Focused() {
@@ -1282,7 +1286,8 @@ func (ap *AdminPanel) renderSystem() string {
 
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Management"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 
 	doc.WriteString(infoStylePanel.Render("Use [c] Clear Database, [b] Backup Database, [s] Show Stats"))
 	doc.WriteString("\n\n")
@@ -1334,7 +1339,8 @@ func (ap *AdminPanel) renderLogs() string {
 
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("System Logs"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 
 	// Add logs content (oldest first so newest appear at the bottom)
 	for i := len(ap.logs) - 1; i >= 0; i-- {
@@ -1378,7 +1384,8 @@ func (ap *AdminPanel) renderPlugins() string {
 
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Plugin Management"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 
 	// Show selected plugin info
 	if ap.pluginTable.Focused() {
@@ -1456,7 +1463,8 @@ func (ap *AdminPanel) renderMetrics() string {
 
 	doc.WriteString(subtitleStyle.Width(contentWidth).Render("Performance Metrics"))
 	doc.WriteString("\n")
-	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)) + "\n")
+	doc.WriteString(strings.Repeat("─", min(20, contentWidth-2)))
+	doc.WriteString("\n")
 
 	doc.WriteString(infoStylePanel.Render("Use [G] Force GC, [R] Reset Metrics, [E] Export Logs"))
 	doc.WriteString("\n\n")

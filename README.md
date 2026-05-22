@@ -240,6 +240,8 @@ go build -o marchat-client ./client
 | `MARCHAT_MAX_FILE_BYTES` | No | `1048576` | Max file size in bytes (1MB default) |
 | `MARCHAT_MAX_FILE_MB` | No | `1` | Max file size in MB (alternative to bytes) |
 | `MARCHAT_ALLOWED_USERS` | No | - | Username allowlist (comma-separated) |
+| `MARCHAT_ALLOWED_ORIGINS` | No | - | Extra WebSocket `Origin` values (comma-separated URLs or hostnames) |
+| `MARCHAT_TRUSTED_PROXIES` | No | - | Reverse-proxy IPs/CIDRs; when set, `X-Forwarded-For` / `X-Real-IP` are honored for client IP and admin login rate limits |
 
 **Additional variables:** `MARCHAT_LOG_LEVEL`, `MARCHAT_CONFIG_DIR`, `MARCHAT_BAN_HISTORY_GAPS`, `MARCHAT_PLUGIN_REGISTRY_URL`
 
@@ -829,16 +831,16 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `config` | 73.2% | 339 LOC | High |
 | `plugin/host` | 64.6% | 721 LOC | Medium |
 | `client/config` | 58.0% | 1993 LOC | Medium |
-| `internal/doctor` | 66.5% | 826 LOC | Medium |
+| `internal/doctor` | 66.5% | 828 LOC | Medium |
 | `plugin/store` | 47.0% | 552 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 38.5% | 7309 LOC | Low |
+| `server` | 39.8% | 7495 LOC | Low |
 | `plugin/manager` | 32.1% | 747 LOC | Low |
 | `client/exthook` | 24.1% | 204 LOC | Low |
-| `client` | 28.1% | 6330 LOC | Low |
+| `client` | 28.1% | 6372 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 40.4%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 40.8%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

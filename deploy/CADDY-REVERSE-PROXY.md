@@ -322,4 +322,5 @@ These apply to the **server** and **client** behavior shipped with the Caddy / W
 
 - Terminate TLS with **Let's Encrypt** (or your CA) on Caddy using a **real DNS name**; drop **`--skip-tls-verify`** on clients.
 - Set **`MARCHAT_ALLOWED_USERS`** on the server to restrict usernames.
+- Behind Caddy, set **`MARCHAT_TRUSTED_PROXIES`** to the proxy peer IP or CIDR (for example **`127.0.0.1,::1`** or your Docker bridge) so client IP logging and web-admin login rate limits use **`X-Forwarded-For`** safely.
 - If you **both** mount **`config/.env`** **and** inject **`MARCHAT_*`** secrets, see **[Breaking changes](#breaking-changes)** - file values override env for keys listed in the file.

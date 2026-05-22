@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -22,35 +21,14 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// CheckOrigin policy:
+// CheckOrigin policy (see checkWebSocketOrigin in request_context.go):
 //   - Empty Origin is allowed because terminal/TUI clients do not send one.
-//   - Same-host and localhost/loopback are allowed for dev and browser-based admin panels.
-//   - All other origins are rejected. If you need to allow specific external
-//     origins (e.g. a web frontend on a different domain), add them to the
-//     allowlist below or set MARCHAT_ALLOWED_ORIGINS.
+//   - Same-host and loopback hostnames are allowed for dev and browser-based admin panels.
+//   - All other origins are rejected unless listed in MARCHAT_ALLOWED_ORIGINS.
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		origin := r.Header.Get("Origin")
-		if origin == "" {
-			return true
-		}
-		host := r.Host
-		if host == "" {
-			host = r.Header.Get("Host")
-		}
-		if strings.Contains(origin, host) {
-			return true
-		}
-		for _, local := range []string{"localhost", "127.0.0.1", "[::1]"} {
-			if strings.Contains(origin, local) {
-				return true
-			}
-		}
-		log.Printf("WebSocket origin rejected: %s (host: %s)", origin, host)
-		return false
-	},
+	CheckOrigin:     checkWebSocketOrigin,
 }
 
 var (
@@ -96,30 +74,6 @@ type WSMessage struct {
 
 type UserList struct {
 	Users []string `json:"users"`
-}
-
-// getClientIP extracts the real IP address from the request
-func getClientIP(r *http.Request) string {
-	// Check for forwarded headers first (for proxy/reverse proxy scenarios)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		if comma := strings.Index(xff, ","); comma != -1 {
-			return strings.TrimSpace(xff[:comma])
-		}
-		return strings.TrimSpace(xff)
-	}
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-	// Fall back to remote address
-	if r.RemoteAddr != "" {
-		host, _, err := net.SplitHostPort(r.RemoteAddr)
-		if err == nil {
-			return host
-		}
-		return r.RemoteAddr
-	}
-	return "unknown"
 }
 
 func CreateSchema(db *sql.DB) {

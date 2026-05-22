@@ -441,11 +441,7 @@ func (w *WebAdminServer) handleLogin(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get client IP for rate limiting
-	clientIP := r.RemoteAddr
-	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
-		clientIP = strings.Split(forwarded, ",")[0]
-	}
+	clientIP := getClientIP(r)
 
 	// Check rate limiting
 	if w.isRateLimited(clientIP) {
