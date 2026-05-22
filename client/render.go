@@ -91,7 +91,9 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 
 		dateStr := msg.CreatedAt.Format("January 2, 2006")
 		if dateStr != lastDate {
-			b.WriteString("\n" + styles.Info.Width(width).Align(lipgloss.Center).Render("─── "+dateStr+" ───") + "\n\n")
+			b.WriteString("\n")
+			b.WriteString(styles.Info.Width(width).Align(lipgloss.Center).Render("─── " + dateStr + " ───"))
+			b.WriteString("\n\n")
 			lastDate = dateStr
 		}
 
@@ -148,11 +150,30 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 
 		switch msg.Sender {
 		case "System":
-			b.WriteString(timestamp + " " + prefix + systemLineStyle(styles, content).Render(content) + metaSuffix + "\n")
+			b.WriteString(timestamp)
+			b.WriteString(" ")
+			b.WriteString(prefix)
+			b.WriteString(systemLineStyle(styles, content).Render(content))
+			b.WriteString(metaSuffix)
+			b.WriteString("\n")
 		case username:
-			b.WriteString(timestamp + " " + prefix + styles.Me.Render(msg.Sender) + ": " + content + metaSuffix + "\n")
+			b.WriteString(timestamp)
+			b.WriteString(" ")
+			b.WriteString(prefix)
+			b.WriteString(styles.Me.Render(msg.Sender))
+			b.WriteString(": ")
+			b.WriteString(content)
+			b.WriteString(metaSuffix)
+			b.WriteString("\n")
 		default:
-			b.WriteString(timestamp + " " + prefix + styles.Other.Render(msg.Sender) + ": " + content + metaSuffix + "\n")
+			b.WriteString(timestamp)
+			b.WriteString(" ")
+			b.WriteString(prefix)
+			b.WriteString(styles.Other.Render(msg.Sender))
+			b.WriteString(": ")
+			b.WriteString(content)
+			b.WriteString(metaSuffix)
+			b.WriteString("\n")
 		}
 
 		if reactionMap != nil && msg.MessageID > 0 {
@@ -165,7 +186,8 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 				}
 				if len(parts) > 0 {
 					reactionLine := "       " + lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Render(strings.Join(parts, "  "))
-					b.WriteString(reactionLine + "\n")
+					b.WriteString(reactionLine)
+					b.WriteString("\n")
 				}
 			}
 		}
@@ -289,11 +311,13 @@ type dmSidebarEntry struct {
 func renderUserList(users []string, me string, styles themeStyles, width int, isAdmin bool, selectedUserIndex int, dmThreads []dmSidebarEntry) string {
 	var b strings.Builder
 	title := " Users "
-	b.WriteString(styles.UserList.Width(width).Render(title) + "\n")
+	b.WriteString(styles.UserList.Width(width).Render(title))
+	b.WriteString("\n")
 	max := maxUsersDisplay
 	for i, u := range users {
 		if i >= max {
-			b.WriteString(lipgloss.NewStyle().Italic(true).Faint(true).Width(width).Render(fmt.Sprintf("+%d more", len(users)-max)) + "\n")
+			b.WriteString(lipgloss.NewStyle().Italic(true).Faint(true).Width(width).Render(fmt.Sprintf("+%d more", len(users)-max)))
+			b.WriteString("\n")
 			break
 		}
 
@@ -313,12 +337,14 @@ func renderUserList(users []string, me string, styles themeStyles, width int, is
 			}
 		}
 
-		b.WriteString(userStyle.Render(prefix+u) + "\n")
+		b.WriteString(userStyle.Render(prefix + u))
+		b.WriteString("\n")
 	}
 
 	if len(dmThreads) > 0 {
 		b.WriteString("\n")
-		b.WriteString(styles.User.Render(" DMs ") + "\n")
+		b.WriteString(styles.User.Render(" DMs "))
+		b.WriteString("\n")
 		for _, dm := range dmThreads {
 			label := "• " + dm.User
 			if dm.Active {
@@ -327,7 +353,8 @@ func renderUserList(users []string, me string, styles themeStyles, width int, is
 			if dm.Unread > 0 {
 				label += fmt.Sprintf(" (%d)", dm.Unread)
 			}
-			b.WriteString(styles.Other.Render(label) + "\n")
+			b.WriteString(styles.Other.Render(label))
+			b.WriteString("\n")
 		}
 	}
 	return b.String()

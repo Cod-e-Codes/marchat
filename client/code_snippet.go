@@ -507,7 +507,8 @@ func (m codeSnippetModel) View() string {
 		return m.langList.View() + "\n" + m.styles.Time.Render("Press Enter to select language, Esc to cancel.")
 	case stateInputCode:
 		var sb strings.Builder
-		sb.WriteString(m.styles.User.Render(fmt.Sprintf("Language: %s", m.selected)) + "\n\n")
+		sb.WriteString(m.styles.User.Render(fmt.Sprintf("Language: %s", m.selected)))
+		sb.WriteString("\n\n")
 
 		// Display all lines with cursor and selection
 		for i, line := range m.lines {
@@ -540,12 +541,15 @@ func (m codeSnippetModel) View() string {
 						selectedStyle := m.styles.Banner // Use banner style for selection
 						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("> %s", beforeSelection)))
 						sb.WriteString(selectedStyle.Render(selection))
-						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("%s|%s", afterSelection, afterCursor)) + "\n")
+						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("%s|%s", afterSelection, afterCursor)))
+						sb.WriteString("\n")
 					} else {
-						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("> %s|%s", beforeCursor, afterCursor)) + "\n")
+						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("> %s|%s", beforeCursor, afterCursor)))
+						sb.WriteString("\n")
 					}
 				} else {
-					sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("> %s|%s", beforeCursor, afterCursor)) + "\n")
+					sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("> %s|%s", beforeCursor, afterCursor)))
+					sb.WriteString("\n")
 				}
 			} else {
 				// Other lines - check if they have selection
@@ -572,17 +576,21 @@ func (m codeSnippetModel) View() string {
 						selectedStyle := m.styles.Banner // Use banner style for selection
 						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("  %s", beforeSelection)))
 						sb.WriteString(selectedStyle.Render(selection))
-						sb.WriteString(m.styles.Msg.Render(afterSelection) + "\n")
+						sb.WriteString(m.styles.Msg.Render(afterSelection))
+						sb.WriteString("\n")
 					} else {
-						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("  %s", line)) + "\n")
+						sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("  %s", line)))
+						sb.WriteString("\n")
 					}
 				} else {
-					sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("  %s", line)) + "\n")
+					sb.WriteString(m.styles.Msg.Render(fmt.Sprintf("  %s", line)))
+					sb.WriteString("\n")
 				}
 			}
 		}
 
-		sb.WriteString("\n" + m.styles.Time.Render("Press Ctrl+S to preview, Ctrl+C/V/X/A for copy/paste/cut/select all, Esc to cancel."))
+		sb.WriteString("\n")
+		sb.WriteString(m.styles.Time.Render("Press Ctrl+S to preview, Ctrl+C/V/X/A for copy/paste/cut/select all, Esc to cancel."))
 		return sb.String()
 	case stateConfirmSend:
 		return m.formatCodeBlock(m.selected, m.code, false)

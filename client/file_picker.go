@@ -255,12 +255,15 @@ func (m filePickerModel) View() string {
 	switch m.state {
 	case stateSelectFile:
 		var s strings.Builder
-		s.WriteString(m.styles.HelpTitle.Render("Select File to Send") + "\n\n")
+		s.WriteString(m.styles.HelpTitle.Render("Select File to Send"))
+		s.WriteString("\n\n")
 
 		if m.err != nil {
-			s.WriteString(m.styles.Banner.Render("[ERROR] "+m.err.Error()) + "\n\n")
+			s.WriteString(m.styles.Banner.Render("[ERROR] " + m.err.Error()))
+			s.WriteString("\n\n")
 		} else {
-			s.WriteString(m.styles.Time.Render("Navigate with arrow keys, Enter to select, Esc to cancel") + "\n\n")
+			s.WriteString(m.styles.Time.Render("Navigate with arrow keys, Enter to select, Esc to cancel"))
+			s.WriteString("\n\n")
 		}
 
 		s.WriteString(m.list.View())
@@ -271,10 +274,17 @@ func (m filePickerModel) View() string {
 		filename := filepath.Base(m.selectedFile)
 		fileSizeStr := formatFileSize(m.fileSize)
 
-		s.WriteString(m.styles.HelpTitle.Render("Confirm File Send") + "\n\n")
-		s.WriteString(m.styles.User.Render("File: ") + m.styles.Msg.Render(filename) + "\n")
-		s.WriteString(m.styles.User.Render("Path: ") + m.styles.Msg.Render(m.selectedFile) + "\n")
-		s.WriteString(m.styles.User.Render("Size: ") + m.styles.Msg.Render(fileSizeStr) + "\n\n")
+		s.WriteString(m.styles.HelpTitle.Render("Confirm File Send"))
+		s.WriteString("\n\n")
+		s.WriteString(m.styles.User.Render("File: "))
+		s.WriteString(m.styles.Msg.Render(filename))
+		s.WriteString("\n")
+		s.WriteString(m.styles.User.Render("Path: "))
+		s.WriteString(m.styles.Msg.Render(m.selectedFile))
+		s.WriteString("\n")
+		s.WriteString(m.styles.User.Render("Size: "))
+		s.WriteString(m.styles.Msg.Render(fileSizeStr))
+		s.WriteString("\n\n")
 		s.WriteString(m.styles.Time.Render("Press Enter to send, 'r' to select different file, Esc to cancel"))
 
 		return s.String()
