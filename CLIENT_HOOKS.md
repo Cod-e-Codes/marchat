@@ -62,7 +62,7 @@ Server doctor does **not** list client-only hook variables, even if they are set
 - **`version`:** Integer. Incremented when incompatible payload changes are introduced; until then, treat as `1`.
 - **`event`:**
   - **`message_received`:** Fired for each inbound `shared.Message` on the chat WebSocket path after the client has applied decrypt when E2E is on. Typing is **excluded** unless `MARCHAT_CLIENT_HOOK_RECEIVE_TYPING` is enabled.
-  - **`message_send`:** Fired for outbound text from the main composer path: global plaintext, global E2E (plaintext before encrypt), DMs, and `:` server/admin lines sent as `AdminCommandType`. Other UI actions (e.g. code snippet, file picker) may not invoke the send hook.
+  - **`message_send`:** Fired for outbound text from the main composer path: global plaintext, global E2E (plaintext before encrypt), DMs, and `:` server/admin lines sent as `AdminCommandType`. Code snippets sent while a DM thread is open also fire the hook (plaintext before encrypt when E2E is on). Channel code snippets and file picker sends do not invoke the send hook.
 
 ### `message` object
 

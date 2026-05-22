@@ -146,6 +146,25 @@ func sendDirectMessage(ws *websocket.Conn, keystore *crypto.KeyStore, username, 
 	})
 }
 
+// sendSnippetOutbound sends a code-snippet body as a DM when dmRecipient is set, otherwise as channel text.
+func sendSnippetOutbound(ws *websocket.Conn, keystore *crypto.KeyStore, username, dmRecipient, content string, useE2E bool, channelRecipients []string) error {
+	recipient := strings.TrimSpace(dmRecipient)
+	if recipient != "" {
+		return sendDirectMessage(ws, keystore, username, recipient, content, useE2E)
+	}
+	if useE2E {
+		recipients := channelRecipients
+		if len(recipients) == 0 {
+			recipients = []string{username}
+		}
+		return debugEncryptAndSend(recipients, content, ws, keystore, username)
+	}
+	return ws.WriteJSON(shared.Message{
+		Sender:  username,
+		Content: content,
+	})
+}
+
 func debugEncryptAndSend(recipients []string, plaintext string, ws *websocket.Conn, keystore *crypto.KeyStore, username string) error {
 	log.Printf("DEBUG: Starting global encryption for %d recipients", len(recipients))
 	log.Printf("DEBUG: Plaintext length: %d", len(plaintext))

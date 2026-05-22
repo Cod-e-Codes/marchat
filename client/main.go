@@ -828,26 +828,20 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		return m, m.listenWebSocket()
 	case codeSnippetMsg:
-		// Handle code snippet message from the code snippet interface
 		m.sending = true
 		if m.conn != nil {
-			if m.useE2E {
-				// Use E2E encryption for global chat
-				recipients := m.users
-				if len(recipients) == 0 {
-					recipients = []string{m.cfg.Username}
-				}
-				if err := debugEncryptAndSend(recipients, v.content, m.conn, m.keystore, m.cfg.Username); err != nil {
-					log.Printf("Failed to send code snippet: %v", err)
-					m.banner = "[ERROR] Failed to send code snippet"
-				}
-			} else {
-				// Send plain text message
-				msg := shared.Message{Sender: m.cfg.Username, Content: v.content}
-				if err := debugWebSocketWrite(m.conn, msg); err != nil {
-					log.Printf("Failed to send code snippet: %v", err)
-					m.banner = "[ERROR] Failed to send code snippet"
-				}
+			recipient := strings.TrimSpace(m.dmRecipient)
+			if recipient != "" {
+				exthook.FireSend(shared.Message{
+					Type:      shared.DirectMessage,
+					Sender:    m.cfg.Username,
+					Recipient: recipient,
+					Content:   v.content,
+				})
+			}
+			if err := sendSnippetOutbound(m.conn, m.keystore, m.cfg.Username, recipient, v.content, m.useE2E, m.users); err != nil {
+				log.Printf("Failed to send code snippet: %v", err)
+				m.banner = "[ERROR] Failed to send code snippet"
 			}
 		}
 		m.sending = false

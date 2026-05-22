@@ -142,6 +142,93 @@ func TestSendDirectMessagePlaintext(t *testing.T) {
 	time.Sleep(50 * time.Millisecond)
 }
 
+func TestSendSnippetOutboundDMEncrypted(t *testing.T) {
+	ks := crypto.NewKeyStore(t.TempDir() + "/keystore.dat")
+	if err := ks.Initialize("test-passphrase"); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		var got shared.Message
+		if err := conn.ReadJSON(&got); err != nil {
+			t.Errorf("ReadJSON: %v", err)
+			return
+		}
+		if got.Type != shared.DirectMessage {
+			t.Errorf("type = %q, want dm", got.Type)
+		}
+		if got.Recipient != "bob" {
+			t.Errorf("recipient = %q, want bob", got.Recipient)
+		}
+		if !got.Encrypted {
+			t.Error("expected encrypted dm on wire")
+		}
+	}))
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer conn.Close()
+
+	body := "func main() {}"
+	if err := sendSnippetOutbound(conn, ks, "alice", "bob", body, true, nil); err != nil {
+		t.Fatalf("sendSnippetOutbound: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+}
+
+func TestSendSnippetOutboundChannelNotDM(t *testing.T) {
+	ks := crypto.NewKeyStore(t.TempDir() + "/keystore.dat")
+	if err := ks.Initialize("test-passphrase"); err != nil {
+		t.Fatalf("Initialize: %v", err)
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		upgrader := websocket.Upgrader{CheckOrigin: func(*http.Request) bool { return true }}
+		conn, err := upgrader.Upgrade(w, r, nil)
+		if err != nil {
+			return
+		}
+		defer conn.Close()
+		var got shared.Message
+		if err := conn.ReadJSON(&got); err != nil {
+			t.Errorf("ReadJSON: %v", err)
+			return
+		}
+		if got.Type == shared.DirectMessage {
+			t.Errorf("type = %q, want channel text not dm", got.Type)
+		}
+		if got.Recipient != "" {
+			t.Errorf("recipient = %q, want empty for channel snippet", got.Recipient)
+		}
+		if !got.Encrypted {
+			t.Error("expected encrypted channel text on wire")
+		}
+	}))
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer conn.Close()
+
+	if err := sendSnippetOutbound(conn, ks, "alice", "", "fmt.Println()", true, []string{"bob"}); err != nil {
+		t.Fatalf("sendSnippetOutbound: %v", err)
+	}
+	time.Sleep(50 * time.Millisecond)
+}
+
 func TestEncryptedDMRoundtripDecrypt(t *testing.T) {
 	ks := crypto.NewKeyStore(t.TempDir() + "/keystore.dat")
 	if err := ks.Initialize("test-passphrase"); err != nil {
