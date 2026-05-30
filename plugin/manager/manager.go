@@ -12,7 +12,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -236,8 +238,6 @@ func (pm *PluginManager) InstallPluginWithPlatform(name, osName, arch string) er
 		return fmt.Errorf("failed to download plugin: %w", err)
 	}
 
-	// Checksum validation is now done during download
-
 	// Load plugin into host
 	if err := pm.host.LoadPlugin(name); err != nil {
 		return fmt.Errorf("failed to load plugin: %w", err)
@@ -372,177 +372,308 @@ func (pm *PluginManager) GetStore() *store.Store {
 
 // downloadPlugin downloads a plugin from the given URL
 func (pm *PluginManager) downloadPlugin(plugin *store.StorePlugin, pluginPath string) error {
-	var reader io.Reader
-	var tempFile *os.File
-
-	if strings.HasPrefix(plugin.DownloadURL, "file://") {
-		// Handle local file URLs
-		filePath := strings.TrimPrefix(plugin.DownloadURL, "file://")
-		filePath = strings.TrimPrefix(filePath, "/")
-		filePath = strings.ReplaceAll(filePath, "/", "\\")
-
-		file, err := os.Open(filePath)
-		if err != nil {
-			return fmt.Errorf("failed to open local plugin file: %w", err)
-		}
-		defer file.Close()
-		reader = file
-	} else {
-		// Handle HTTP URLs
-		resp, err := pluginHTTPClient.Get(plugin.DownloadURL)
-		if err != nil {
-			return fmt.Errorf("failed to download plugin: %w", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			return fmt.Errorf("download failed with status %d", resp.StatusCode)
-		}
-
-		// Create temporary file to store the download for checksum validation
-		tempFile, err = os.CreateTemp("", "plugin-download-*")
-		if err != nil {
-			return fmt.Errorf("failed to create temp file: %w", err)
-		}
-		defer os.Remove(tempFile.Name())
-		defer tempFile.Close()
-
-		// Cap download size to prevent resource exhaustion
-		limitedBody := io.LimitReader(resp.Body, maxPluginDownloadSize)
-		teeReader := io.TeeReader(limitedBody, tempFile)
-		reader = teeReader
-	}
-
-	// Determine file type and extract
-	var err error
-	if strings.HasSuffix(plugin.DownloadURL, ".zip") {
-		err = pm.extractZip(reader, pluginPath)
-	} else if strings.HasSuffix(plugin.DownloadURL, ".tar.gz") || strings.HasSuffix(plugin.DownloadURL, ".tgz") {
-		err = pm.extractTarGz(reader, pluginPath)
-	} else {
-		// Assume it's a single binary
-		err = pm.downloadBinary(reader, pluginPath, plugin.Name)
-	}
-
+	download, err := openPluginDownload(plugin.DownloadURL)
 	if err != nil {
 		return err
 	}
+	defer download.Close()
 
-	// Validate checksum if provided and we have a temp file
-	if plugin.Checksum != "" && tempFile != nil {
-		// Close and reopen temp file for reading
-		tempFile.Close()
-		tempFile, err = os.Open(tempFile.Name())
-		if err != nil {
-			return fmt.Errorf("failed to reopen temp file for checksum: %w", err)
-		}
-		defer tempFile.Close()
-
-		if err := pm.validateDownloadChecksum(tempFile, plugin.Checksum); err != nil {
+	if plugin.Checksum != "" {
+		if err := pm.validateDownloadChecksum(download.file, plugin.Checksum); err != nil {
 			return fmt.Errorf("checksum validation failed: %w", err)
 		}
 	}
+	if _, err := download.file.Seek(0, 0); err != nil {
+		return fmt.Errorf("failed to rewind plugin download: %w", err)
+	}
 
+	archivePath := plugin.DownloadURL
+	if parsedURL, err := url.Parse(plugin.DownloadURL); err == nil && parsedURL.Path != "" {
+		archivePath = parsedURL.Path
+	}
+	return pm.extractPluginDownload(download.file, archivePath, pluginPath, plugin.Name)
+}
+
+type pluginDownload struct {
+	file   *os.File
+	remove bool
+}
+
+func (d *pluginDownload) Close() error {
+	if d == nil || d.file == nil {
+		return nil
+	}
+	name := d.file.Name()
+	err := d.file.Close()
+	if d.remove {
+		if removeErr := os.Remove(name); err == nil && removeErr != nil {
+			err = removeErr
+		}
+	}
+	return err
+}
+
+func openPluginDownload(downloadURL string) (*pluginDownload, error) {
+	if parsedURL, err := url.Parse(downloadURL); err == nil && parsedURL.Scheme == "file" {
+		return openLocalPluginDownload(parsedURL)
+	}
+	return openRemotePluginDownload(downloadURL)
+}
+
+func openLocalPluginDownload(parsedURL *url.URL) (*pluginDownload, error) {
+	filePath, err := fileURLPath(parsedURL)
+	if err != nil {
+		return nil, err
+	}
+	file, err := os.Open(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open local plugin file: %w", err)
+	}
+	info, err := file.Stat()
+	if err != nil {
+		file.Close()
+		return nil, fmt.Errorf("failed to stat local plugin file: %w", err)
+	}
+	if info.IsDir() {
+		file.Close()
+		return nil, fmt.Errorf("local plugin file is a directory")
+	}
+	if info.Size() > maxPluginDownloadSize {
+		file.Close()
+		return nil, fmt.Errorf("plugin download exceeds maximum size of %d bytes", maxPluginDownloadSize)
+	}
+	return &pluginDownload{file: file}, nil
+}
+
+func openRemotePluginDownload(downloadURL string) (*pluginDownload, error) {
+	resp, err := pluginHTTPClient.Get(downloadURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to download plugin: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("download failed with status %d", resp.StatusCode)
+	}
+
+	tmp, err := os.CreateTemp("", "plugin-download-*")
+	if err != nil {
+		return nil, fmt.Errorf("failed to create temp file: %w", err)
+	}
+	ok := false
+	defer func() {
+		if !ok {
+			name := tmp.Name()
+			tmp.Close()
+			_ = os.Remove(name)
+		}
+	}()
+
+	written, err := io.Copy(tmp, io.LimitReader(resp.Body, maxPluginDownloadSize+1))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read plugin download: %w", err)
+	}
+	if written > maxPluginDownloadSize {
+		return nil, fmt.Errorf("plugin download exceeds maximum size of %d bytes", maxPluginDownloadSize)
+	}
+	if _, err := tmp.Seek(0, 0); err != nil {
+		return nil, fmt.Errorf("failed to rewind plugin download: %w", err)
+	}
+
+	ok = true
+	return &pluginDownload{file: tmp, remove: true}, nil
+}
+
+func fileURLPath(parsedURL *url.URL) (string, error) {
+	if parsedURL == nil || parsedURL.Scheme != "file" {
+		return "", fmt.Errorf("not a file URL")
+	}
+
+	host := parsedURL.Host
+	if host == "localhost" {
+		host = ""
+	}
+
+	var filePath string
+	switch {
+	case host == "":
+		var err error
+		filePath, err = url.PathUnescape(parsedURL.Path)
+		if err != nil {
+			return "", fmt.Errorf("invalid file URL path: %w", err)
+		}
+	case len(host) == 2 && host[1] == ':':
+		// file://C:/path on Windows (host is the drive letter)
+		filePath = host + parsedURL.Path
+	default:
+		return "", fmt.Errorf("unsupported file URL host %q", parsedURL.Host)
+	}
+
+	if filePath == "" {
+		return "", fmt.Errorf("file URL path cannot be empty")
+	}
+	if len(filePath) >= 3 && filePath[0] == '/' && filePath[2] == ':' {
+		filePath = filePath[1:]
+	}
+	return filepath.FromSlash(filePath), nil
+}
+
+func (pm *PluginManager) extractPluginDownload(download *os.File, archivePath, pluginPath, pluginName string) error {
+	parentDir := filepath.Dir(pluginPath)
+	if err := os.MkdirAll(parentDir, 0755); err != nil {
+		return fmt.Errorf("failed to create plugin parent directory: %w", err)
+	}
+
+	stagingDir, err := os.MkdirTemp(parentDir, ".plugin-staging-*")
+	if err != nil {
+		return fmt.Errorf("failed to create plugin staging directory: %w", err)
+	}
+	staged := false
+	defer func() {
+		if !staged {
+			_ = os.RemoveAll(stagingDir)
+		}
+	}()
+
+	switch {
+	case strings.HasSuffix(archivePath, ".zip"):
+		err = pm.extractZip(download, stagingDir)
+	case strings.HasSuffix(archivePath, ".tar.gz"), strings.HasSuffix(archivePath, ".tgz"):
+		err = pm.extractTarGz(download, stagingDir)
+	default:
+		err = pm.downloadBinary(download, stagingDir, pluginName)
+	}
+	if err != nil {
+		return err
+	}
+	if err := replacePluginDir(pluginPath, stagingDir); err != nil {
+		return err
+	}
+	staged = true
 	return nil
 }
 
-// isPathSafe validates that a path doesn't contain directory traversal elements
-func isPathSafe(path string) bool {
-	// Check for directory traversal attempts
-	if strings.Contains(path, "..") {
-		return false
+func replacePluginDir(pluginPath, stagingDir string) error {
+	if _, err := os.Stat(pluginPath); err != nil {
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("failed to inspect existing plugin directory: %w", err)
+		}
+		if err := os.Rename(stagingDir, pluginPath); err != nil {
+			return fmt.Errorf("failed to install staged plugin: %w", err)
+		}
+		return nil
 	}
 
-	// Check for absolute paths
-	if filepath.IsAbs(path) {
-		return false
+	backupDir, err := os.MkdirTemp(filepath.Dir(pluginPath), ".plugin-backup-*")
+	if err != nil {
+		return fmt.Errorf("failed to create plugin backup path: %w", err)
 	}
-
-	// Check for paths that start with common problematic patterns
-	cleanPath := filepath.Clean(path)
-	if strings.HasPrefix(cleanPath, "..") || strings.HasPrefix(cleanPath, "/") || strings.HasPrefix(cleanPath, "\\") {
-		return false
+	if err := os.Remove(backupDir); err != nil {
+		return fmt.Errorf("failed to prepare plugin backup path: %w", err)
 	}
+	backupActive := false
+	defer func() {
+		if backupActive {
+			if err := os.Rename(backupDir, pluginPath); err != nil {
+				return
+			}
+		}
+		_ = os.RemoveAll(backupDir)
+	}()
 
-	return true
+	if err := os.Rename(pluginPath, backupDir); err != nil {
+		return fmt.Errorf("failed to back up existing plugin directory: %w", err)
+	}
+	backupActive = true
+	if err := os.Rename(stagingDir, pluginPath); err != nil {
+		return fmt.Errorf("failed to install staged plugin: %w", err)
+	}
+	backupActive = false
+	return nil
 }
 
-// extractZip extracts a zip file
-func (pm *PluginManager) extractZip(reader io.Reader, pluginPath string) error {
-	// Create temporary file
-	tmpFile, err := os.CreateTemp("", "plugin-*.zip")
+func archiveFilePath(root, name string) (string, error) {
+	original := name
+	name = strings.ReplaceAll(name, `\`, "/")
+	if name == "" || strings.HasPrefix(name, "/") {
+		return "", fmt.Errorf("unsafe file path in archive: %s", original)
+	}
+
+	for _, part := range strings.Split(name, "/") {
+		if part == ".." || strings.Contains(part, ":") || filepath.VolumeName(part) != "" {
+			return "", fmt.Errorf("unsafe file path in archive: %s", original)
+		}
+	}
+
+	clean := path.Clean(name)
+	if clean == "." {
+		return "", fmt.Errorf("unsafe file path in archive: %s", original)
+	}
+
+	target := filepath.Join(root, filepath.FromSlash(clean))
+	rel, err := filepath.Rel(root, target)
+	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("unsafe file path in archive: %s", original)
+	}
+	return target, nil
+}
+
+// extractZip extracts a zip file.
+func (pm *PluginManager) extractZip(file *os.File, pluginPath string) error {
+	info, err := file.Stat()
 	if err != nil {
-		return fmt.Errorf("failed to create temp file: %w", err)
+		return fmt.Errorf("failed to stat zip file: %w", err)
 	}
-	defer os.Remove(tmpFile.Name())
-
-	// Write to temp file
-	if _, err := io.Copy(tmpFile, reader); err != nil {
-		return fmt.Errorf("failed to write temp file: %w", err)
-	}
-	tmpFile.Close()
-
-	// Open zip file
-	zipReader, err := zip.OpenReader(tmpFile.Name())
+	zipReader, err := zip.NewReader(file, info.Size())
 	if err != nil {
 		return fmt.Errorf("failed to open zip file: %w", err)
 	}
-	defer zipReader.Close()
 
-	// Extract files
 	for _, file := range zipReader.File {
-		// Validate path to prevent zip slip attacks
-		if !isPathSafe(file.Name) {
-			return fmt.Errorf("unsafe file path in archive: %s", file.Name)
+		filePath, err := archiveFilePath(pluginPath, file.Name)
+		if err != nil {
+			return err
 		}
-
-		filePath := filepath.Join(pluginPath, file.Name)
-
 		if file.FileInfo().IsDir() {
 			if err := os.MkdirAll(filePath, 0755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 			continue
 		}
-
-		// Create parent directories
 		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 			return fmt.Errorf("failed to create parent directory: %w", err)
 		}
-
-		// Extract file
-		fileReader, err := file.Open()
-		if err != nil {
-			return fmt.Errorf("failed to open file in zip: %w", err)
+		if err := extractZipFile(file, filePath); err != nil {
+			return err
 		}
-
-		fileWriter, err := os.Create(filePath)
-		if err != nil {
-			fileReader.Close()
-			return fmt.Errorf("failed to create file: %w", err)
-		}
-
-		if _, err := io.Copy(fileWriter, fileReader); err != nil {
-			fileReader.Close()
-			fileWriter.Close()
-			return fmt.Errorf("failed to copy file: %w", err)
-		}
-
-		fileReader.Close()
-		fileWriter.Close()
-
-		// Make executable if it's the main binary
 		if strings.HasSuffix(file.Name, filepath.Base(pluginPath)) {
 			if err := os.Chmod(filePath, 0755); err != nil {
 				return fmt.Errorf("failed to make executable: %w", err)
 			}
 		}
 	}
-
 	return nil
 }
 
-// extractTarGz extracts a tar.gz file
+func extractZipFile(file *zip.File, dst string) error {
+	src, err := file.Open()
+	if err != nil {
+		return fmt.Errorf("failed to open file in zip: %w", err)
+	}
+	defer src.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer out.Close()
+
+	if _, err := io.Copy(out, src); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+	return nil
+}
+
+// extractTarGz extracts a tar.gz file.
 func (pm *PluginManager) extractTarGz(reader io.Reader, pluginPath string) error {
 	gzReader, err := gzip.NewReader(reader)
 	if err != nil {
@@ -551,7 +682,6 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, pluginPath string) error
 	defer gzReader.Close()
 
 	tarReader := tar.NewReader(gzReader)
-
 	for {
 		header, err := tarReader.Next()
 		if err == io.EOF {
@@ -561,37 +691,22 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, pluginPath string) error
 			return fmt.Errorf("failed to read tar header: %w", err)
 		}
 
-		// Validate path to prevent zip slip attacks
-		if !isPathSafe(header.Name) {
-			return fmt.Errorf("unsafe file path in archive: %s", header.Name)
+		filePath, err := archiveFilePath(pluginPath, header.Name)
+		if err != nil {
+			return err
 		}
-
-		filePath := filepath.Join(pluginPath, header.Name)
-
 		switch header.Typeflag {
 		case tar.TypeDir:
 			if err := os.MkdirAll(filePath, 0755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		case tar.TypeReg:
-			// Create parent directories
 			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
 				return fmt.Errorf("failed to create parent directory: %w", err)
 			}
-
-			// Create file
-			file, err := os.Create(filePath)
-			if err != nil {
-				return fmt.Errorf("failed to create file: %w", err)
+			if err := extractTarFile(tarReader, filePath); err != nil {
+				return err
 			}
-
-			if _, err := io.Copy(file, tarReader); err != nil {
-				file.Close()
-				return fmt.Errorf("failed to copy file: %w", err)
-			}
-			file.Close()
-
-			// Make executable if it's the main binary
 			if strings.HasSuffix(header.Name, filepath.Base(pluginPath)) {
 				if err := os.Chmod(filePath, 0755); err != nil {
 					return fmt.Errorf("failed to make executable: %w", err)
@@ -599,31 +714,35 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, pluginPath string) error
 			}
 		}
 	}
-
 	return nil
 }
 
-// downloadBinary downloads a single binary file
+func extractTarFile(reader io.Reader, dst string) error {
+	out, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create file: %w", err)
+	}
+	defer out.Close()
+	if _, err := io.Copy(out, reader); err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+	return nil
+}
+
+// downloadBinary downloads a single binary file.
 func (pm *PluginManager) downloadBinary(reader io.Reader, pluginPath, pluginName string) error {
 	binaryPath := filepath.Join(pluginPath, pluginName)
-
-	// Create binary file
 	file, err := os.Create(binaryPath)
 	if err != nil {
 		return fmt.Errorf("failed to create binary file: %w", err)
 	}
 	defer file.Close()
-
-	// Copy data
 	if _, err := io.Copy(file, reader); err != nil {
 		return fmt.Errorf("failed to copy binary: %w", err)
 	}
-
-	// Make executable
 	if err := os.Chmod(binaryPath, 0755); err != nil {
 		return fmt.Errorf("failed to make executable: %w", err)
 	}
-
 	return nil
 }
 

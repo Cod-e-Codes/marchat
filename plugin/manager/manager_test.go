@@ -1,19 +1,21 @@
 package manager
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
+	"github.com/Cod-e-Codes/marchat/plugin/store"
 )
 
 func TestValidatePluginName(t *testing.T) {
@@ -109,237 +111,322 @@ func TestNewPluginManager(t *testing.T) {
 }
 
 func TestInstallPluginWithLocalFile(t *testing.T) {
-	// Create temporary directories
 	pluginDir := t.TempDir()
 	dataDir := t.TempDir()
-
-	// Create a test plugin binary
 	pluginName := "test-plugin"
-	var pluginBinary []byte
-	if runtime.GOOS == "windows" {
-		// Create a simple batch file for Windows
-		pluginBinary = []byte("@echo off\necho test plugin binary\nexit 0\n")
-	} else {
-		// Create a bash script for Unix-like systems
-		pluginBinary = []byte("#!/bin/bash\necho 'test plugin binary'\nexit 0\n")
-	}
+	zipPath := writeTempPluginZip(t, pluginName)
 
-	// Create a proper ZIP file for the plugin
-	var zipData []byte
-	{
-		var buf bytes.Buffer
-		zipWriter := zip.NewWriter(&buf)
+	registry := []map[string]interface{}{{
+		"name":         pluginName,
+		"version":      "1.0.0",
+		"description":  "Test plugin",
+		"author":       "Test Author",
+		"license":      "MIT",
+		"download_url": "file://" + zipPath,
+		"category":     "test",
+	}}
+	registryFile := writeRegistry(t, registry)
 
-		// Add the plugin binary to the ZIP
-		// The host expects the binary to be named exactly like the plugin
-		writer, err := zipWriter.Create(pluginName)
-		if err != nil {
-			t.Fatalf("Failed to create ZIP entry: %v", err)
-		}
-		if _, err := writer.Write(pluginBinary); err != nil {
-			t.Fatalf("Failed to write to ZIP: %v", err)
-		}
-
-		// Add a plugin manifest
-		manifest := sdk.PluginManifest{
-			Name:        pluginName,
-			Version:     "1.0.0",
-			Description: "Test plugin",
-			Author:      "Test Author",
-			License:     "MIT",
-		}
-
-		manifestData, err := json.Marshal(manifest)
-		if err != nil {
-			t.Fatalf("Failed to marshal manifest: %v", err)
-		}
-
-		manifestWriter, err := zipWriter.Create("plugin.json")
-		if err != nil {
-			t.Fatalf("Failed to create manifest ZIP entry: %v", err)
-		}
-		if _, err := manifestWriter.Write(manifestData); err != nil {
-			t.Fatalf("Failed to write manifest to ZIP: %v", err)
-		}
-
-		zipWriter.Close()
-		zipData = buf.Bytes()
-	}
-
-	// Create a temporary file for the plugin ZIP
-	tempFile, err := os.CreateTemp("", "test-plugin-*.zip")
-	if err != nil {
-		t.Fatalf("Failed to create temp file: %v", err)
-	}
-	defer os.Remove(tempFile.Name())
-
-	// Write the ZIP data to the temp file
-	if _, err := tempFile.Write(zipData); err != nil {
-		t.Fatalf("Failed to write plugin ZIP: %v", err)
-	}
-	tempFile.Close()
-
-	// Create a mock registry with local file URL
-	registry := []map[string]interface{}{
-		{
-			"name":         pluginName,
-			"version":      "1.0.0",
-			"description":  "Test plugin",
-			"author":       "Test Author",
-			"license":      "MIT",
-			"download_url": "file://" + tempFile.Name(),
-			"category":     "test",
-		},
-	}
-
-	// Create a temporary registry file
-	registryFile := filepath.Join(t.TempDir(), "registry.json")
-	registryData, err := json.Marshal(registry)
-	if err != nil {
-		t.Fatalf("Failed to marshal registry: %v", err)
-	}
-
-	if err := os.WriteFile(registryFile, registryData, 0644); err != nil {
-		t.Fatalf("Failed to write registry file: %v", err)
-	}
-
-	// Create plugin manager with local registry
-	absPath, err := filepath.Abs(registryFile)
-	if err != nil {
-		t.Fatalf("Failed to get absolute path: %v", err)
-	}
-	manager := NewPluginManager(pluginDir, dataDir, "file://"+absPath)
-
-	// Load the registry
+	manager := NewPluginManager(pluginDir, dataDir, "file://"+registryFile)
 	store := manager.GetStore()
 	if err := store.LoadFromCache(); err != nil {
 		t.Fatalf("Failed to load registry: %v", err)
 	}
-
-	// Manually set the plugins in the store for testing
 	_ = store.Refresh()
 
-	// Test installing the plugin (but skip the start part to avoid hanging)
-	// We'll test the store resolution instead
 	storePlugin := store.ResolvePlugin(pluginName, "", "")
 	if storePlugin == nil {
 		t.Fatal("Plugin not found in store")
 	}
-
 	if storePlugin.Name != pluginName {
 		t.Errorf("Expected plugin name %s, got %s", pluginName, storePlugin.Name)
 	}
-
-	// Test that the plugin can be resolved from the store
-	// (We don't actually install it to avoid hanging)
-	if storePlugin.DownloadURL != "file://"+tempFile.Name() {
-		t.Errorf("Expected download URL %s, got %s", "file://"+tempFile.Name(), storePlugin.DownloadURL)
+	if storePlugin.DownloadURL != "file://"+zipPath {
+		t.Errorf("Expected download URL %s, got %s", "file://"+zipPath, storePlugin.DownloadURL)
 	}
 }
 
 func TestInstallPluginWithHTTP(t *testing.T) {
-	// Create temporary directories
 	pluginDir := t.TempDir()
 	dataDir := t.TempDir()
+	pluginName := "http-plugin"
+	zipData := buildTestPluginZip(t, pluginName)
 
-	// Create a test plugin binary
-	var pluginBinary []byte
-	if runtime.GOOS == "windows" {
-		// Create a simple batch file for Windows
-		pluginBinary = []byte("@echo off\necho test plugin binary\nexit 0\n")
-	} else {
-		// Create a bash script for Unix-like systems
-		pluginBinary = []byte("#!/bin/bash\necho 'test plugin binary'\nexit 0\n")
-	}
-
-	// Create a proper ZIP file for the plugin
-	var zipData []byte
-	{
-		var buf bytes.Buffer
-		zipWriter := zip.NewWriter(&buf)
-
-		// Add the plugin binary to the ZIP
-		// The host expects the binary to be named exactly like the plugin
-		writer, err := zipWriter.Create("http-plugin")
-		if err != nil {
-			t.Fatalf("Failed to create ZIP entry: %v", err)
-		}
-		if _, err := writer.Write(pluginBinary); err != nil {
-			t.Fatalf("Failed to write to ZIP: %v", err)
-		}
-
-		// Add a plugin manifest
-		manifest := sdk.PluginManifest{
-			Name:        "http-plugin",
-			Version:     "1.0.0",
-			Description: "HTTP test plugin",
-			Author:      "Test Author",
-			License:     "MIT",
-		}
-
-		manifestData, err := json.Marshal(manifest)
-		if err != nil {
-			t.Fatalf("Failed to marshal manifest: %v", err)
-		}
-
-		manifestWriter, err := zipWriter.Create("plugin.json")
-		if err != nil {
-			t.Fatalf("Failed to create manifest ZIP entry: %v", err)
-		}
-		if _, err := manifestWriter.Write(manifestData); err != nil {
-			t.Fatalf("Failed to write manifest to ZIP: %v", err)
-		}
-
-		zipWriter.Close()
-		zipData = buf.Bytes()
-	}
-
-	// Create a mock HTTP server
 	var serverURL string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/registry.json":
-			// Return registry
-			registry := []map[string]interface{}{
-				{
-					"name":         "http-plugin",
-					"version":      "1.0.0",
-					"description":  "HTTP test plugin",
-					"author":       "Test Author",
-					"license":      "MIT",
-					"download_url": serverURL + "/plugin.zip",
-					"category":     "test",
-				},
-			}
-
+			registry := []map[string]interface{}{{
+				"name":         pluginName,
+				"version":      "1.0.0",
+				"description":  "HTTP test plugin",
+				"author":       "Test Author",
+				"license":      "MIT",
+				"download_url": serverURL + "/plugin.zip",
+				"category":     "test",
+			}}
 			registryData, _ := json.Marshal(registry)
 			w.Header().Set("Content-Type", "application/json")
 			_, _ = w.Write(registryData)
 		case "/plugin.zip":
-			// Return plugin ZIP file
 			_, _ = w.Write(zipData)
 		}
 	}))
 	defer server.Close()
 	serverURL = server.URL
 
-	// Create plugin manager with HTTP registry
 	manager := NewPluginManager(pluginDir, dataDir, server.URL+"/registry.json")
-
-	// Refresh the store to load the registry
 	if err := manager.RefreshStore(); err != nil {
 		t.Fatalf("Failed to refresh store: %v", err)
 	}
 
-	// Test plugin store resolution (without installation to avoid hanging)
-	store := manager.GetStore()
-	storePlugin := store.ResolvePlugin("http-plugin", "", "")
+	storePlugin := manager.GetStore().ResolvePlugin(pluginName, "", "")
 	if storePlugin == nil {
 		t.Fatal("Plugin not found in store")
 	}
+	if storePlugin.Name != pluginName {
+		t.Errorf("Expected plugin name %q, got %s", pluginName, storePlugin.Name)
+	}
+}
 
-	if storePlugin.Name != "http-plugin" {
-		t.Errorf("Expected plugin name 'http-plugin', got %s", storePlugin.Name)
+func TestDownloadPluginRejectsHTTPChecksumMismatchBeforeExtract(t *testing.T) {
+	pluginDir := t.TempDir()
+	dataDir := t.TempDir()
+	pluginName := "bad-plugin"
+	zipData := buildTestPluginZip(t, pluginName)
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write(zipData)
+	}))
+	defer server.Close()
+
+	manager := NewPluginManager(pluginDir, dataDir, "https://example.com/registry.json")
+	pluginPath := filepath.Join(pluginDir, pluginName)
+	err := manager.downloadPlugin(storePluginForTest(pluginName, server.URL+"/plugin.zip", strings.Repeat("0", 64)), pluginPath)
+	if err == nil || !strings.Contains(err.Error(), "checksum validation failed") {
+		t.Fatalf("expected checksum validation error, got %v", err)
+	}
+	assertPluginNotExtracted(t, pluginPath)
+}
+
+func TestDownloadPluginRejectsLocalFileChecksumMismatchBeforeExtract(t *testing.T) {
+	pluginDir := t.TempDir()
+	dataDir := t.TempDir()
+	pluginName := "bad-local"
+	zipData := buildTestPluginZip(t, pluginName)
+
+	zipPath := filepath.Join(t.TempDir(), "plugin.zip")
+	if err := os.WriteFile(zipPath, zipData, 0644); err != nil {
+		t.Fatalf("failed to write plugin zip: %v", err)
+	}
+
+	manager := NewPluginManager(pluginDir, dataDir, "https://example.com/registry.json")
+	pluginPath := filepath.Join(pluginDir, pluginName)
+	err := manager.downloadPlugin(storePluginForTest(pluginName, "file://"+filepath.ToSlash(zipPath), strings.Repeat("f", 64)), pluginPath)
+	if err == nil || !strings.Contains(err.Error(), "checksum validation failed") {
+		t.Fatalf("expected checksum validation error, got %v", err)
+	}
+	assertPluginNotExtracted(t, pluginPath)
+}
+
+func TestDownloadPluginAcceptsLocalFileURL(t *testing.T) {
+	pluginDir := t.TempDir()
+	dataDir := t.TempDir()
+	pluginName := "local-plugin"
+	zipData := buildTestPluginZip(t, pluginName)
+
+	zipPath := filepath.Join(t.TempDir(), "plugin.zip")
+	if err := os.WriteFile(zipPath, zipData, 0644); err != nil {
+		t.Fatalf("failed to write plugin zip: %v", err)
+	}
+
+	manager := NewPluginManager(pluginDir, dataDir, "https://example.com/registry.json")
+	pluginPath := filepath.Join(pluginDir, pluginName)
+	if err := manager.downloadPlugin(storePluginForTest(pluginName, "file://"+filepath.ToSlash(zipPath), ""), pluginPath); err != nil {
+		t.Fatalf("downloadPlugin failed for local file URL: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(pluginPath, "plugin.json")); err != nil {
+		t.Fatalf("expected plugin manifest to be extracted: %v", err)
+	}
+}
+
+func TestDownloadPluginRejectsArchiveTraversal(t *testing.T) {
+	tests := []struct {
+		name        string
+		downloadURL string
+	}{
+		{name: "zip parent", downloadURL: writeTempZip(t, "../escape")},
+		{name: "zip nested parent", downloadURL: writeTempZip(t, "nested/../../escape")},
+		{name: "zip backslash parent", downloadURL: writeTempZip(t, `..\escape`)},
+		{name: "tar parent", downloadURL: writeTempTarGz(t, "../escape")},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pluginDir := t.TempDir()
+			dataDir := t.TempDir()
+			pluginName := "unsafe-plugin"
+			manager := NewPluginManager(pluginDir, dataDir, "https://example.com/registry.json")
+			pluginPath := filepath.Join(pluginDir, pluginName)
+
+			err := manager.downloadPlugin(storePluginForTest(pluginName, tt.downloadURL, ""), pluginPath)
+			if err == nil || !strings.Contains(err.Error(), "unsafe file path in archive") {
+				t.Fatalf("expected unsafe path error, got %v", err)
+			}
+			assertPluginNotExtracted(t, pluginPath)
+			if _, err := os.Stat(filepath.Join(pluginDir, "escape")); !os.IsNotExist(err) {
+				t.Fatalf("expected escape file not to exist, stat err=%v", err)
+			}
+		})
+	}
+}
+
+func TestReplacePluginDirRestoresExistingPluginOnFailure(t *testing.T) {
+	root := t.TempDir()
+	pluginPath := filepath.Join(root, "plugin")
+	if err := os.MkdirAll(pluginPath, 0755); err != nil {
+		t.Fatalf("failed to create plugin dir: %v", err)
+	}
+	marker := filepath.Join(pluginPath, "plugin.json")
+	if err := os.WriteFile(marker, []byte(`{"name":"plugin"}`), 0644); err != nil {
+		t.Fatalf("failed to write marker: %v", err)
+	}
+
+	err := replacePluginDir(pluginPath, filepath.Join(root, "missing-staging"))
+	if err == nil || !strings.Contains(err.Error(), "failed to install staged plugin") {
+		t.Fatalf("expected staged install error, got %v", err)
+	}
+	if _, err := os.Stat(marker); err != nil {
+		t.Fatalf("expected existing plugin to be restored: %v", err)
+	}
+}
+
+func TestOpenPluginDownloadUsesLocalFileDirectly(t *testing.T) {
+	zipPath := writeTempPluginZip(t, "local-plugin")
+	download, err := openPluginDownload("file://" + filepath.ToSlash(zipPath))
+	if err != nil {
+		t.Fatalf("openPluginDownload failed: %v", err)
+	}
+	defer download.Close()
+	if download.remove {
+		t.Fatal("local plugin downloads should not be copied to removable temp files")
+	}
+	if download.file.Name() != zipPath {
+		t.Fatalf("expected local file %q, got %q", zipPath, download.file.Name())
+	}
+}
+
+func storePluginForTest(name, downloadURL, checksum string) *store.StorePlugin {
+	return &store.StorePlugin{Name: name, DownloadURL: downloadURL, Checksum: checksum}
+}
+
+func buildTestPluginZip(t *testing.T, pluginName string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+
+	binaryWriter, err := zipWriter.Create(pluginName)
+	if err != nil {
+		t.Fatalf("failed to create binary ZIP entry: %v", err)
+	}
+	if _, err := binaryWriter.Write([]byte("#!/bin/sh\necho test\n")); err != nil {
+		t.Fatalf("failed to write binary ZIP entry: %v", err)
+	}
+
+	manifest := sdk.PluginManifest{Name: pluginName, Version: "1.0.0", Description: "Test plugin", Author: "Test Author", License: "MIT"}
+	manifestData, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatalf("failed to marshal manifest: %v", err)
+	}
+	manifestWriter, err := zipWriter.Create("plugin.json")
+	if err != nil {
+		t.Fatalf("failed to create manifest ZIP entry: %v", err)
+	}
+	if _, err := manifestWriter.Write(manifestData); err != nil {
+		t.Fatalf("failed to write manifest ZIP entry: %v", err)
+	}
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("failed to close ZIP writer: %v", err)
+	}
+	return buf.Bytes()
+}
+
+func writeTempPluginZip(t *testing.T, pluginName string) string {
+	t.Helper()
+	zipPath := filepath.Join(t.TempDir(), pluginName+".zip")
+	if err := os.WriteFile(zipPath, buildTestPluginZip(t, pluginName), 0644); err != nil {
+		t.Fatalf("failed to write plugin zip: %v", err)
+	}
+	return zipPath
+}
+
+func writeRegistry(t *testing.T, registry []map[string]interface{}) string {
+	t.Helper()
+	registryFile := filepath.Join(t.TempDir(), "registry.json")
+	registryData, err := json.Marshal(registry)
+	if err != nil {
+		t.Fatalf("Failed to marshal registry: %v", err)
+	}
+	if err := os.WriteFile(registryFile, registryData, 0644); err != nil {
+		t.Fatalf("Failed to write registry file: %v", err)
+	}
+	absPath, err := filepath.Abs(registryFile)
+	if err != nil {
+		t.Fatalf("Failed to get absolute path: %v", err)
+	}
+	return filepath.ToSlash(absPath)
+}
+
+func writeTempZip(t *testing.T, name string) string {
+	t.Helper()
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+	writer, err := zipWriter.Create(name)
+	if err != nil {
+		t.Fatalf("failed to create ZIP entry: %v", err)
+	}
+	if _, err := writer.Write([]byte("escape")); err != nil {
+		t.Fatalf("failed to write ZIP entry: %v", err)
+	}
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("failed to close ZIP writer: %v", err)
+	}
+	zipPath := filepath.Join(t.TempDir(), "unsafe.zip")
+	if err := os.WriteFile(zipPath, buf.Bytes(), 0644); err != nil {
+		t.Fatalf("failed to write unsafe zip: %v", err)
+	}
+	return "file://" + filepath.ToSlash(zipPath)
+}
+
+func writeTempTarGz(t *testing.T, name string) string {
+	t.Helper()
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+	data := []byte("escape")
+	if err := tarWriter.WriteHeader(&tar.Header{Name: name, Mode: 0644, Size: int64(len(data))}); err != nil {
+		t.Fatalf("failed to write tar header: %v", err)
+	}
+	if _, err := tarWriter.Write(data); err != nil {
+		t.Fatalf("failed to write tar entry: %v", err)
+	}
+	if err := tarWriter.Close(); err != nil {
+		t.Fatalf("failed to close tar writer: %v", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		t.Fatalf("failed to close gzip writer: %v", err)
+	}
+	tarPath := filepath.Join(t.TempDir(), "unsafe.tar.gz")
+	if err := os.WriteFile(tarPath, buf.Bytes(), 0644); err != nil {
+		t.Fatalf("failed to write unsafe tar: %v", err)
+	}
+	return "file://" + filepath.ToSlash(tarPath)
+}
+
+func assertPluginNotExtracted(t *testing.T, pluginPath string) {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(pluginPath, "plugin.json")); !os.IsNotExist(err) {
+		t.Fatalf("expected plugin manifest not to be extracted, stat err=%v", err)
 	}
 }
 

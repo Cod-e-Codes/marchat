@@ -835,12 +835,12 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `plugin/store` | 47.0% | 552 LOC | Medium |
 | `cmd/license` | 42.2% | 160 LOC | Medium |
 | `server` | 39.8% | 7495 LOC | Low |
-| `plugin/manager` | 32.1% | 747 LOC | Low |
+| `plugin/manager` | 59.8% | 754 LOC | Medium |
 | `client/exthook` | 24.1% | 204 LOC | Low |
-| `client` | 28.1% | 6372 LOC | Low |
+| `client` | 29.4% | 6372 LOC | Low |
 | `cmd/server` | 13.7% | 484 LOC | Low |
 
-**Overall: 40.8%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 42.3%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

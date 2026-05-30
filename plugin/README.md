@@ -404,6 +404,8 @@ The community registry is a JSON file hosted on GitHub:
 ]
 ```
 
+When the registry entry includes `checksum`, the server validates the SHA-256 hash of the downloaded bytes **before** extracting the archive. HTTP downloads are capped at 100 MB; oversize or checksum failures abort without writing plugin files. Archive type (`.zip`, `.tar.gz`, `.tgz`, or raw binary) is determined from the URL path, so URLs with query strings still work (for example `.../plugin.zip?token=...`). Local `file://` download URLs are supported for development; on Unix use the three-slash form (`file:///path/to/plugin.zip`); on Windows both `file:///C:/path/to/plugin.zip` and `file://C:/path/to/plugin.zip` work.
+
 ### Submitting Plugins
 
 1. **Create plugin** following the structure above

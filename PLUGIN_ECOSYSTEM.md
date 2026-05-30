@@ -69,8 +69,11 @@ The plugin ecosystem consists of several interconnected components:
 
 **Features**:
 - Plugin installation from store
-- Archive extraction (ZIP, TAR.GZ)
-- Checksum validation
+- Archive extraction (ZIP, TAR.GZ) into a staging directory, then atomic replace with rollback on failure
+- SHA-256 checksum validation before extraction (HTTP and local `file://` downloads)
+- Download size cap (100 MB) for HTTP and local files
+- Archive type detection from the URL path (works when the URL has query parameters)
+- Zip-slip path checks on archive entries
 - Store integration
 - Command execution
 
