@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
@@ -124,6 +125,47 @@ func TestRefreshWithLocalFile(t *testing.T) {
 
 	if !found["test-plugin-1"] || !found["test-plugin-2"] {
 		t.Error("Not all expected plugins were found")
+	}
+}
+
+func TestRefreshWithThreeSlashFileURL(t *testing.T) {
+	registryFile := filepath.Join(t.TempDir(), "registry.json")
+	plugins := []StorePlugin{
+		{
+			Name:        "slash-test",
+			Version:     "1.0.0",
+			Description: "Three-slash file URL test",
+			Author:      "Test",
+			License:     "MIT",
+			DownloadURL: "https://example.com/plugin.zip",
+			Category:    "test",
+		},
+	}
+	registryData, err := json.MarshalIndent(plugins, "", "  ")
+	if err != nil {
+		t.Fatalf("Failed to marshal registry: %v", err)
+	}
+	if err := os.WriteFile(registryFile, registryData, 0644); err != nil {
+		t.Fatalf("Failed to write registry file: %v", err)
+	}
+
+	absPath, err := filepath.Abs(registryFile)
+	if err != nil {
+		t.Fatalf("Failed to get absolute path: %v", err)
+	}
+	slashPath := filepath.ToSlash(absPath)
+	registryURL := "file://" + slashPath
+	if !strings.HasPrefix(slashPath, "/") {
+		registryURL = "file:///" + slashPath
+	}
+
+	store := NewStore(registryURL, t.TempDir())
+	if err := store.Refresh(); err != nil {
+		t.Fatalf("Failed to refresh store: %v", err)
+	}
+	loaded := store.GetPlugins()
+	if len(loaded) != 1 || loaded[0].Name != "slash-test" {
+		t.Fatalf("expected one plugin slash-test, got %+v", loaded)
 	}
 }
 

@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Cod-e-Codes/marchat/plugin/fileurl"
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/spinner"
@@ -63,10 +64,11 @@ func (s *Store) Refresh() error {
 	var err error
 
 	if strings.HasPrefix(s.registryURL, "file://") {
-		// Handle local file URLs
-		filePath := strings.TrimPrefix(s.registryURL, "file://")
-		// Convert to native file path format
-		filePath = filepath.FromSlash(filePath)
+		var filePath string
+		filePath, err = fileurl.Parse(s.registryURL)
+		if err != nil {
+			return fmt.Errorf("failed to parse registry file URL: %w", err)
+		}
 		data, err = os.ReadFile(filePath)
 		if err != nil {
 			return fmt.Errorf("failed to read local registry: %w", err)

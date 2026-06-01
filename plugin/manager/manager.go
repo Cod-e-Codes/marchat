@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Cod-e-Codes/marchat/plugin/fileurl"
 	"github.com/Cod-e-Codes/marchat/plugin/host"
 	"github.com/Cod-e-Codes/marchat/plugin/license"
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
@@ -227,11 +228,7 @@ func (pm *PluginManager) InstallPluginWithPlatform(name, osName, arch string) er
 		return fmt.Errorf("plugin %s not found in store", name)
 	}
 
-	// Create plugin directory
 	pluginPath := filepath.Join(pm.pluginDir, name)
-	if err := os.MkdirAll(pluginPath, 0755); err != nil {
-		return fmt.Errorf("failed to create plugin directory: %w", err)
-	}
 
 	// Download plugin
 	if err := pm.downloadPlugin(plugin, pluginPath); err != nil {
@@ -421,7 +418,7 @@ func openPluginDownload(downloadURL string) (*pluginDownload, error) {
 }
 
 func openLocalPluginDownload(parsedURL *url.URL) (*pluginDownload, error) {
-	filePath, err := fileURLPath(parsedURL)
+	filePath, err := fileurl.Path(parsedURL)
 	if err != nil {
 		return nil, err
 	}
@@ -481,40 +478,6 @@ func openRemotePluginDownload(downloadURL string) (*pluginDownload, error) {
 
 	ok = true
 	return &pluginDownload{file: tmp, remove: true}, nil
-}
-
-func fileURLPath(parsedURL *url.URL) (string, error) {
-	if parsedURL == nil || parsedURL.Scheme != "file" {
-		return "", fmt.Errorf("not a file URL")
-	}
-
-	host := parsedURL.Host
-	if host == "localhost" {
-		host = ""
-	}
-
-	var filePath string
-	switch {
-	case host == "":
-		var err error
-		filePath, err = url.PathUnescape(parsedURL.Path)
-		if err != nil {
-			return "", fmt.Errorf("invalid file URL path: %w", err)
-		}
-	case len(host) == 2 && host[1] == ':':
-		// file://C:/path on Windows (host is the drive letter)
-		filePath = host + parsedURL.Path
-	default:
-		return "", fmt.Errorf("unsupported file URL host %q", parsedURL.Host)
-	}
-
-	if filePath == "" {
-		return "", fmt.Errorf("file URL path cannot be empty")
-	}
-	if len(filePath) >= 3 && filePath[0] == '/' && filePath[2] == ':' {
-		filePath = filePath[1:]
-	}
-	return filepath.FromSlash(filePath), nil
 }
 
 func (pm *PluginManager) extractPluginDownload(download *os.File, archivePath, pluginPath, pluginName string) error {

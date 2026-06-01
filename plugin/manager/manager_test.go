@@ -190,6 +190,36 @@ func TestInstallPluginWithHTTP(t *testing.T) {
 	}
 }
 
+func TestInstallPluginWithPlatformLeavesNoDirOnChecksumFailure(t *testing.T) {
+	pluginDir := t.TempDir()
+	dataDir := t.TempDir()
+	pluginName := "bad-install"
+	zipPath := writeTempPluginZip(t, pluginName)
+
+	registry := []map[string]interface{}{{
+		"name":         pluginName,
+		"version":      "1.0.0",
+		"description":  "Test plugin",
+		"author":       "Test Author",
+		"license":      "MIT",
+		"download_url": "file://" + filepath.ToSlash(zipPath),
+		"checksum":     strings.Repeat("0", 64),
+		"category":     "test",
+	}}
+	registryFile := writeRegistry(t, registry)
+
+	manager := NewPluginManager(pluginDir, dataDir, "file://"+registryFile)
+	if err := manager.RefreshStore(); err != nil {
+		t.Fatalf("Failed to refresh store: %v", err)
+	}
+
+	err := manager.InstallPluginWithPlatform(pluginName, "", "")
+	if err == nil || !strings.Contains(err.Error(), "checksum") {
+		t.Fatalf("expected checksum install error, got %v", err)
+	}
+	assertPluginDirAbsent(t, filepath.Join(pluginDir, pluginName))
+}
+
 func TestDownloadPluginRejectsHTTPChecksumMismatchBeforeExtract(t *testing.T) {
 	pluginDir := t.TempDir()
 	dataDir := t.TempDir()
@@ -565,6 +595,13 @@ func assertPluginBinaryExecutable(t *testing.T, binaryPath string) {
 	}
 	if info.Mode()&0111 == 0 {
 		t.Fatalf("expected plugin binary %s to be executable, mode=%v", binaryPath, info.Mode())
+	}
+}
+
+func assertPluginDirAbsent(t *testing.T, pluginPath string) {
+	t.Helper()
+	if _, err := os.Stat(pluginPath); !os.IsNotExist(err) {
+		t.Fatalf("expected plugin directory absent, stat err=%v", err)
 	}
 }
 
