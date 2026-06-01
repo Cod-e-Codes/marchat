@@ -10,6 +10,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"time"
@@ -248,6 +249,69 @@ func TestDownloadPluginAcceptsLocalFileURL(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(pluginPath, "plugin.json")); err != nil {
 		t.Fatalf("expected plugin manifest to be extracted: %v", err)
 	}
+	assertPluginBinaryExecutable(t, filepath.Join(pluginPath, pluginName))
+}
+
+func TestDownloadPluginSetsTarBinaryExecutable(t *testing.T) {
+	pluginDir := t.TempDir()
+	dataDir := t.TempDir()
+	pluginName := "tar-plugin"
+	tarPath := writeTempPluginTarGz(t, pluginName)
+
+	manager := NewPluginManager(pluginDir, dataDir, "https://example.com/registry.json")
+	pluginPath := filepath.Join(pluginDir, pluginName)
+	if err := manager.downloadPlugin(storePluginForTest(pluginName, "file://"+filepath.ToSlash(tarPath), ""), pluginPath); err != nil {
+		t.Fatalf("downloadPlugin failed for tar.gz plugin: %v", err)
+	}
+	assertPluginBinaryExecutable(t, filepath.Join(pluginPath, pluginName))
+}
+
+func TestDownloadPluginChmodsOnlyExactBinaryName(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("Unix execute bit check")
+	}
+
+	pluginDir := t.TempDir()
+	dataDir := t.TempDir()
+	pluginName := "my-plugin"
+	zipPath := writeTempZipWithEntries(t, map[string][]byte{
+		"not-" + pluginName: []byte("decoy"),
+		pluginName:          []byte("#!/bin/sh\necho test\n"),
+	})
+
+	manager := NewPluginManager(pluginDir, dataDir, "https://example.com/registry.json")
+	pluginPath := filepath.Join(pluginDir, pluginName)
+	if err := manager.downloadPlugin(storePluginForTest(pluginName, "file://"+filepath.ToSlash(zipPath), ""), pluginPath); err != nil {
+		t.Fatalf("downloadPlugin failed: %v", err)
+	}
+
+	decoyInfo, err := os.Stat(filepath.Join(pluginPath, "not-"+pluginName))
+	if err != nil {
+		t.Fatalf("expected decoy file: %v", err)
+	}
+	if decoyInfo.Mode()&0111 != 0 {
+		t.Fatal("expected decoy file to remain non-executable")
+	}
+	assertPluginBinaryExecutable(t, filepath.Join(pluginPath, pluginName))
+}
+
+func TestArchiveFilePathRejectsUnsafePaths(t *testing.T) {
+	root := t.TempDir()
+	unsafe := []string{
+		"../escape",
+		"nested/../../escape",
+		`..\escape`,
+		`C:\escape`,
+		"C:/escape",
+		"nested/C:/escape",
+		"//server/share/escape",
+		`\\server\share\escape`,
+	}
+	for _, name := range unsafe {
+		if _, err := archiveFilePath(root, name); err == nil {
+			t.Fatalf("expected unsafe path error for %q", name)
+		}
+	}
 }
 
 func TestDownloadPluginRejectsArchiveTraversal(t *testing.T) {
@@ -258,7 +322,12 @@ func TestDownloadPluginRejectsArchiveTraversal(t *testing.T) {
 		{name: "zip parent", downloadURL: writeTempZip(t, "../escape")},
 		{name: "zip nested parent", downloadURL: writeTempZip(t, "nested/../../escape")},
 		{name: "zip backslash parent", downloadURL: writeTempZip(t, `..\escape`)},
+		{name: "zip drive letter", downloadURL: writeTempZip(t, `C:\escape`)},
+		{name: "zip drive letter slash", downloadURL: writeTempZip(t, "C:/escape")},
+		{name: "zip nested drive letter", downloadURL: writeTempZip(t, "nested/C:/escape")},
+		{name: "zip unc", downloadURL: writeTempZip(t, `\\server\share\escape`)},
 		{name: "tar parent", downloadURL: writeTempTarGz(t, "../escape")},
+		{name: "tar drive letter", downloadURL: writeTempTarGz(t, "C:/escape")},
 	}
 
 	for _, tt := range tests {
@@ -421,6 +490,82 @@ func writeTempTarGz(t *testing.T, name string) string {
 		t.Fatalf("failed to write unsafe tar: %v", err)
 	}
 	return "file://" + filepath.ToSlash(tarPath)
+}
+
+func writeTempPluginTarGz(t *testing.T, pluginName string) string {
+	t.Helper()
+	var buf bytes.Buffer
+	gzWriter := gzip.NewWriter(&buf)
+	tarWriter := tar.NewWriter(gzWriter)
+
+	binaryData := []byte("#!/bin/sh\necho test\n")
+	if err := tarWriter.WriteHeader(&tar.Header{Name: pluginName, Mode: 0644, Size: int64(len(binaryData))}); err != nil {
+		t.Fatalf("failed to write tar binary header: %v", err)
+	}
+	if _, err := tarWriter.Write(binaryData); err != nil {
+		t.Fatalf("failed to write tar binary: %v", err)
+	}
+
+	manifest := sdk.PluginManifest{Name: pluginName, Version: "1.0.0", Description: "Test plugin", Author: "Test Author", License: "MIT"}
+	manifestData, err := json.Marshal(manifest)
+	if err != nil {
+		t.Fatalf("failed to marshal manifest: %v", err)
+	}
+	if err := tarWriter.WriteHeader(&tar.Header{Name: "plugin.json", Mode: 0644, Size: int64(len(manifestData))}); err != nil {
+		t.Fatalf("failed to write tar manifest header: %v", err)
+	}
+	if _, err := tarWriter.Write(manifestData); err != nil {
+		t.Fatalf("failed to write tar manifest: %v", err)
+	}
+
+	if err := tarWriter.Close(); err != nil {
+		t.Fatalf("failed to close tar writer: %v", err)
+	}
+	if err := gzWriter.Close(); err != nil {
+		t.Fatalf("failed to close gzip writer: %v", err)
+	}
+	tarPath := filepath.Join(t.TempDir(), pluginName+".tar.gz")
+	if err := os.WriteFile(tarPath, buf.Bytes(), 0644); err != nil {
+		t.Fatalf("failed to write plugin tar: %v", err)
+	}
+	return tarPath
+}
+
+func writeTempZipWithEntries(t *testing.T, entries map[string][]byte) string {
+	t.Helper()
+	var buf bytes.Buffer
+	zipWriter := zip.NewWriter(&buf)
+	for name, data := range entries {
+		writer, err := zipWriter.Create(name)
+		if err != nil {
+			t.Fatalf("failed to create ZIP entry %q: %v", name, err)
+		}
+		if _, err := writer.Write(data); err != nil {
+			t.Fatalf("failed to write ZIP entry %q: %v", name, err)
+		}
+	}
+	if err := zipWriter.Close(); err != nil {
+		t.Fatalf("failed to close ZIP writer: %v", err)
+	}
+	zipPath := filepath.Join(t.TempDir(), "entries.zip")
+	if err := os.WriteFile(zipPath, buf.Bytes(), 0644); err != nil {
+		t.Fatalf("failed to write zip: %v", err)
+	}
+	return zipPath
+}
+
+func assertPluginBinaryExecutable(t *testing.T, binaryPath string) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+	info, err := os.Stat(binaryPath)
+	if err != nil {
+		t.Fatalf("expected plugin binary at %s: %v", binaryPath, err)
+	}
+	if info.Mode()&0111 == 0 {
+		t.Fatalf("expected plugin binary %s to be executable, mode=%v", binaryPath, info.Mode())
+	}
 }
 
 func assertPluginNotExtracted(t *testing.T, pluginPath string) {

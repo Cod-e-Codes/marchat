@@ -536,9 +536,9 @@ func (pm *PluginManager) extractPluginDownload(download *os.File, archivePath, p
 
 	switch {
 	case strings.HasSuffix(archivePath, ".zip"):
-		err = pm.extractZip(download, stagingDir)
+		err = pm.extractZip(download, stagingDir, pluginName)
 	case strings.HasSuffix(archivePath, ".tar.gz"), strings.HasSuffix(archivePath, ".tgz"):
-		err = pm.extractTarGz(download, stagingDir)
+		err = pm.extractTarGz(download, stagingDir, pluginName)
 	default:
 		err = pm.downloadBinary(download, stagingDir, pluginName)
 	}
@@ -617,8 +617,12 @@ func archiveFilePath(root, name string) (string, error) {
 	return target, nil
 }
 
+func archiveEntryBaseName(name string) string {
+	return path.Base(strings.ReplaceAll(name, `\`, "/"))
+}
+
 // extractZip extracts a zip file.
-func (pm *PluginManager) extractZip(file *os.File, pluginPath string) error {
+func (pm *PluginManager) extractZip(file *os.File, destDir, pluginName string) error {
 	info, err := file.Stat()
 	if err != nil {
 		return fmt.Errorf("failed to stat zip file: %w", err)
@@ -629,7 +633,7 @@ func (pm *PluginManager) extractZip(file *os.File, pluginPath string) error {
 	}
 
 	for _, file := range zipReader.File {
-		filePath, err := archiveFilePath(pluginPath, file.Name)
+		filePath, err := archiveFilePath(destDir, file.Name)
 		if err != nil {
 			return err
 		}
@@ -645,7 +649,7 @@ func (pm *PluginManager) extractZip(file *os.File, pluginPath string) error {
 		if err := extractZipFile(file, filePath); err != nil {
 			return err
 		}
-		if strings.HasSuffix(file.Name, filepath.Base(pluginPath)) {
+		if archiveEntryBaseName(file.Name) == pluginName {
 			if err := os.Chmod(filePath, 0755); err != nil {
 				return fmt.Errorf("failed to make executable: %w", err)
 			}
@@ -674,7 +678,7 @@ func extractZipFile(file *zip.File, dst string) error {
 }
 
 // extractTarGz extracts a tar.gz file.
-func (pm *PluginManager) extractTarGz(reader io.Reader, pluginPath string) error {
+func (pm *PluginManager) extractTarGz(reader io.Reader, destDir, pluginName string) error {
 	gzReader, err := gzip.NewReader(reader)
 	if err != nil {
 		return fmt.Errorf("failed to create gzip reader: %w", err)
@@ -691,7 +695,7 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, pluginPath string) error
 			return fmt.Errorf("failed to read tar header: %w", err)
 		}
 
-		filePath, err := archiveFilePath(pluginPath, header.Name)
+		filePath, err := archiveFilePath(destDir, header.Name)
 		if err != nil {
 			return err
 		}
@@ -707,7 +711,7 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, pluginPath string) error
 			if err := extractTarFile(tarReader, filePath); err != nil {
 				return err
 			}
-			if strings.HasSuffix(header.Name, filepath.Base(pluginPath)) {
+			if archiveEntryBaseName(header.Name) == pluginName {
 				if err := os.Chmod(filePath, 0755); err != nil {
 					return fmt.Errorf("failed to make executable: %w", err)
 				}

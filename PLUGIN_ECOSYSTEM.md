@@ -73,7 +73,8 @@ The plugin ecosystem consists of several interconnected components:
 - SHA-256 checksum validation before extraction (HTTP and local `file://` downloads)
 - Download size cap (100 MB) for HTTP and local files
 - Archive type detection from the URL path (works when the URL has query parameters)
-- Zip-slip path checks on archive entries
+- Zip-slip path checks on archive entries (including drive-letter and UNC-style paths in archive names)
+- Execute bit applied to the archive entry whose basename matches the plugin name (exact match, not suffix)
 - Store integration
 - Command execution
 
