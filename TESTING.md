@@ -115,7 +115,7 @@ Per-file statement percentages for important paths are listed under [Test Covera
 
 ### Prerequisites
 
-- Go 1.25.10 or later
+- Go 1.25.11 or later
 - SQLite support (built into Go)
 - PowerShell (for Windows test script)
 
