@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v1.1.0-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.1.0)
+[![Version](https://img.shields.io/badge/version-v1.2.0-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.2.0)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -37,7 +37,7 @@ Both clients follow the same wire format documented in [PROTOCOL.md](PROTOCOL.md
 
 ## Release notes
 
-**Latest tagged release:** [v1.1.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.1.0) (2026-05-12). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
+**Latest tagged release:** [v1.2.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.2.0) (2026-06-06). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 **`main` branch:** may include changes not yet in that tag (for example items under **Unreleased** in [CHANGELOG.md](CHANGELOG.md)). Feature descriptions elsewhere in this README match the tree you build from source; compare your binary’s `-doctor` / `-version` output to the release page when in doubt.
 
@@ -153,12 +153,12 @@ Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQ
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.1.0/marchat-v1.1.0-linux-amd64.zip
-unzip marchat-v1.1.0-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.2.0/marchat-v1.2.0-linux-amd64.zip
+unzip marchat-v1.2.0-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.1.0/marchat-v1.1.0-darwin-amd64.zip
-unzip marchat-v1.1.0-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.2.0/marchat-v1.2.0-darwin-amd64.zip
+unzip marchat-v1.2.0-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -184,11 +184,11 @@ See [PACKAGING.md](PACKAGING.md) and `packaging/` for Homebrew, Scoop, winget, C
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v1.1.0
+docker pull codecodesxyz/marchat:v1.2.0
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v1.1.0
+  codecodesxyz/marchat:v1.2.0
 ```
 
 **Docker Compose (local development):**

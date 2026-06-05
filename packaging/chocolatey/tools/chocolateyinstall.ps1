@@ -1,9 +1,9 @@
 $ErrorActionPreference = 'Stop'
 $toolsDir = "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"
 
-$tag    = 'v1.1.0'
+$tag    = 'v1.2.0'
 $url    = "https://github.com/Cod-e-Codes/marchat/releases/download/$tag/marchat-$tag-windows-amd64.zip"
-$checksum = '061c085a4944eab2468aa235eed77a0f5bdacff6d8816f2ae3ae65472226ed6b'
+$checksum = '0000000000000000000000000000000000000000000000000000000000000000'
 
 $packageArgs = @{
   packageName   = $env:ChocolateyPackageName

@@ -4,13 +4,17 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 ## Unreleased
 
-On **`main`** only; not part of **[v1.1.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.1.0)** or its published binaries until you tag and publish. Compare [`v1.1.0...main`](https://github.com/Cod-e-Codes/marchat/compare/v1.1.0...main). Commits since the tag: **`git log v1.1.0..HEAD --oneline`**.
+On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
+
+## v1.2.0
+
+**Released 2026-06-06.** Since **[v1.1.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.1.0)**; compare [`v1.1.0...v1.2.0`](https://github.com/Cod-e-Codes/marchat/compare/v1.1.0...v1.2.0). Commits: **`git log v1.1.0..v1.2.0 --oneline`**.
 
 - **Server**: WebSocket **Origin** checks compare parsed hostnames (no substring matching); optional **`MARCHAT_ALLOWED_ORIGINS`** allowlist. **`getClientIP`** and web-admin login rate limiting honor **`X-Forwarded-For`** / **`X-Real-IP`** only when the immediate peer is in **`MARCHAT_TRUSTED_PROXIES`** (comma-separated IPs or CIDRs).
-- **Client**: Direct messages use the same E2E wire path as channel `text` when encryption is enabled (`encrypted` plus base64 nonce || ciphertext with the global key). Applies to `:dm <user> <msg>`, DM mode compose, and code snippets sent while a DM thread is open (`:code` / Alt+C).
-- **Dependencies**: **golang.org/x/crypto** v0.52.0 (SSH advisories cleared at module level; marchat uses ChaCha20-Poly1305 and PBKDF2 only); **modernc.org/sqlite** v1.50.1 (was v1.50.0). Transitive **filippo.io/edwards25519** v1.2.0 (MySQL driver).
-- **Toolchain**: Go **1.25.11** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for **GO-2026-5037**, **GO-2026-5038**, **GO-2026-5039** reported by **govulncheck** on **1.25.10**).
-- **Plugins**: Plugin store downloads validate SHA-256 checksums before extraction (HTTP and `file://`), reject oversize archives, parse `file://` paths correctly on Linux and Windows (registry and download URLs via `plugin/fileurl`), detect archive type from the URL path (including query strings), extract to a staging directory with zip-slip checks, roll back failed updates, set the execute bit on the plugin binary by exact name match after ZIP/TAR extract, and do not leave an empty plugin directory when install download fails.
+- **Client**: Direct messages use the same E2E wire path as channel `text` when encryption is enabled (`encrypted` plus base64 nonce || ciphertext with the global key). Applies to **`:dm <user> <msg>`**, DM mode compose, and code snippets sent while a DM thread is open (**`:code`** / Alt+C). **Fix:** code snippets in DM mode route through the DM send path, not channel `text`.
+- **Plugins**: Plugin store downloads validate SHA-256 checksums before extraction (HTTP and `file://`), reject oversize archives, parse `file://` paths correctly on Linux and Windows (registry and download URLs via **`plugin/fileurl`**), detect archive type from the URL path (including query strings), extract to a staging directory with zip-slip checks, roll back failed updates, set the execute bit on the plugin binary by exact name match after ZIP/TAR extract, and do not leave an empty plugin directory when install download fails.
+- **Toolchain / dependencies**: Go **1.25.11** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for **GO-2026-5037**, **GO-2026-5038**, **GO-2026-5039** reported by **govulncheck** on **1.25.10**); **golang.org/x/crypto** v0.52.0; **modernc.org/sqlite** v1.51.0 (was v1.50.0). Transitive **filippo.io/edwards25519** v1.2.0 (MySQL driver).
+- **Packaging**: Version strings and URLs for **v1.2.0** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.2.0** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**). Regenerate **packaging/aur/.SRCINFO** on Arch after final **PKGBUILD** checksums (**`makepkg --printsrcinfo`**).
 
 ## v1.1.0
 
