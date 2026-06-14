@@ -6,6 +6,8 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+- **Dependencies**: **github.com/jackc/pgx/v5** v5.10.0, **golang.org/x/crypto** v0.53.0, **golang.org/x/term** v0.44.0, **modernc.org/sqlite** v1.52.0 (SQLite 3.53.2).
+
 ## v1.2.0
 
 **Released 2026-06-06.** Since **[v1.1.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.1.0)**; compare [`v1.1.0...v1.2.0`](https://github.com/Cod-e-Codes/marchat/compare/v1.1.0...v1.2.0). Commits: **`git log v1.1.0..v1.2.0 --oneline`**.
