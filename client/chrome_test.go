@@ -8,6 +8,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestBuildStatusFooter(t *testing.T) {
@@ -154,8 +155,8 @@ func TestConfigureTextareaChrome(t *testing.T) {
 	if before == after {
 		t.Fatal("expected CursorLine styling to change")
 	}
-	if ta.Styles().Cursor.Blink {
-		t.Fatal("expected cursor blink disabled")
+	if !ta.Styles().Cursor.Blink {
+		t.Fatal("expected cursor blink enabled")
 	}
 }
 
@@ -180,14 +181,114 @@ func TestNewMainTeaViewShiftDisablesMouse(t *testing.T) {
 
 func TestChromeComposerPanelFullWidth(t *testing.T) {
 	styles := getThemeStyles("retro")
-	row := chromeComposerPanel(styles, 72, "type here")
+	row := chromeComposerPanel(styles, 72, 3, "type here", false)
 	if lipgloss.Width(row) < 72 {
 		t.Fatalf("expected full composer width, got %d", lipgloss.Width(row))
 	}
 }
 
+func TestChromeComposerPanelPlaceholderFill(t *testing.T) {
+	styles := getThemeStyles("modern")
+	ta := textarea.New()
+	ta.Placeholder = "Type your message..."
+	ta.Prompt = "┃ "
+	ta.SetWidth(composeInnerWidth(40))
+	ta.SetHeight(3)
+	ta.ShowLineNumbers = false
+	configureTextareaChrome(&ta, styles.Input)
+
+	panel := chromeComposerPanel(styles, 40, ta.Height(), ta.View(), true)
+	lines := strings.Split(strings.TrimSuffix(panel, "\n"), "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected 3 composer lines, got %d", len(lines))
+	}
+	inner := composeInnerWidth(40)
+	for i, line := range lines {
+		if w := lipgloss.Width(line); w < inner {
+			t.Fatalf("line %d width %d < inner %d", i, w, inner)
+		}
+	}
+}
+
 func TestComposeInputWidth(t *testing.T) {
-	if w := composeInputWidth(50); w != chromeFullWidth(50)-4 {
-		t.Fatalf("composeInputWidth = %d, want %d", w, chromeFullWidth(50)-4)
+	if w := composeInputWidth(50); w != chromeFullWidth(50)-2 {
+		t.Fatalf("composeInputWidth = %d, want %d", w, chromeFullWidth(50)-2)
+	}
+}
+
+func TestChromeComposerPanelFillsRowBackground(t *testing.T) {
+	styles := getThemeStyles("modern")
+	content := lipgloss.NewStyle().Foreground(lipgloss.Color("#FFFFFF")).Render("hi")
+	panel := chromeComposerPanel(styles, 40, 1, content, false)
+	if lipgloss.Width(panel) < 40 {
+		t.Fatalf("composer width = %d, want >= 40", lipgloss.Width(panel))
+	}
+	lines := strings.Split(panel, "\n")
+	if len(lines) == 0 {
+		t.Fatal("expected at least one line")
+	}
+	if lipgloss.Width(lines[0]) < composeInnerWidth(40) {
+		t.Fatalf("expected padded composer line width >= %d, got %d", composeInnerWidth(40), lipgloss.Width(lines[0]))
+	}
+}
+
+func TestPadComposerLinesPreservesMultilineCursor(t *testing.T) {
+	styles := getThemeStyles("modern")
+	ta := textarea.New()
+	ta.Prompt = "┃ "
+	ta.SetWidth(composeInnerWidth(40))
+	ta.SetHeight(3)
+	ta.ShowLineNumbers = false
+	configureTextareaChrome(&ta, styles.Input)
+	ta.SetValue("hello\n")
+	ta.Focus()
+
+	raw := ta.View()
+	withPlaceholder := padComposerLines(styles, composeInnerWidth(40), ta.Height(), raw, true)
+	active := padComposerLines(styles, composeInnerWidth(40), ta.Height(), raw, false)
+	if withPlaceholder == active {
+		t.Fatal("placeholder flattening must not run while composing multiline text")
+	}
+	activeLines := strings.Split(strings.TrimSuffix(active, "\n"), "\n")
+	if len(activeLines) < 2 {
+		t.Fatal("expected multiline composer output")
+	}
+	if !strings.Contains(ansi.Strip(activeLines[1]), "┃") {
+		t.Fatalf("expected cursor row content, got %q", ansi.Strip(activeLines[1]))
+	}
+}
+
+func TestComposerLineIsBareBuffer(t *testing.T) {
+	if !composerLineIsBareBuffer("┃ ") {
+		t.Fatal("expected bare buffer line")
+	}
+	if composerLineIsBareBuffer("┃ hello") {
+		t.Fatal("expected non-buffer line")
+	}
+}
+
+func TestChromeComposerPanelPlaceholderBufferRowsSolid(t *testing.T) {
+	styles := getThemeStyles("modern")
+	ta := textarea.New()
+	ta.Placeholder = "Type your message..."
+	ta.Prompt = "┃ "
+	ta.SetWidth(composeInnerWidth(40))
+	ta.SetHeight(3)
+	ta.ShowLineNumbers = false
+	configureTextareaChrome(&ta, styles.Input)
+
+	panel := chromeComposerPanel(styles, 40, ta.Height(), ta.View(), true)
+	lines := strings.Split(strings.TrimSuffix(panel, "\n"), "\n")
+	if len(lines) < 3 {
+		t.Fatalf("expected 3 lines, got %d", len(lines))
+	}
+	inner := composeInnerWidth(40)
+	for i := 1; i < 3; i++ {
+		if strings.TrimSpace(ansi.Strip(lines[i])) != "" {
+			t.Fatalf("line %d should be solid fill, plain=%q", i, ansi.Strip(lines[i]))
+		}
+		if lipgloss.Width(lines[i]) < inner {
+			t.Fatalf("line %d width %d < %d", i, lipgloss.Width(lines[i]), inner)
+		}
 	}
 }

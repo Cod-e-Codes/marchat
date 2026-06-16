@@ -2659,7 +2659,7 @@ func (m *model) View() tea.View {
 		inputContent = dmIndicator + inputContent
 	}
 	fullW := chromeFullWidth(m.viewport.Width())
-	inputPanel := chromeComposerPanel(m.styles, fullW, inputContent)
+	inputPanel := chromeComposerPanel(m.styles, fullW, m.textarea.Height(), inputContent, m.textarea.Value() == "")
 
 	// Compose layout
 	ui := lipgloss.JoinVertical(lipgloss.Left,

@@ -20,6 +20,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/lucasb-eyer/go-colorful"
 )
 
@@ -37,45 +38,100 @@ func chromeFullWidth(viewportW int) int {
 	return viewportW + userListWidth + 4
 }
 
-// composeInputWidth is the bubbles textarea width inside the full-width composer bar.
+// composeInputWidth is the bubbles textarea width inside the full-width composer bar
+// (matches horizontal padding in chromeComposerPanel).
 func composeInputWidth(viewportW int) int {
-	w := chromeFullWidth(viewportW) - 4
+	return composeInnerWidth(chromeFullWidth(viewportW))
+}
+
+func composeInnerWidth(fullW int) int {
+	w := fullW - 2
 	if w < 20 {
 		return 20
 	}
 	return w
 }
 
-// configureTextareaChrome syncs textarea foreground/prompt with theme Input.
-// Background fill comes from chromeComposerPanel only (avoids nested boxes).
+// lineStyleFromInput builds per-line textarea styles that carry the composer fill.
+func lineStyleFromInput(input lipgloss.Style) lipgloss.Style {
+	s := lipgloss.NewStyle()
+	if bg := input.GetBackground(); bg != nil {
+		s = s.Background(bg)
+	}
+	if fg := input.GetForeground(); fg != nil {
+		s = s.Foreground(fg)
+	}
+	return s
+}
+
+// configureTextareaChrome syncs textarea with theme Input. Composer chrome paints the
+// full row background; textarea line styles carry fill for trailing pad spaces.
 func configureTextareaChrome(ta *textarea.Model, input lipgloss.Style) {
 	s := textarea.DefaultDarkStyles()
-	noBG := lipgloss.NewStyle()
-	text := noBG
-	if fg := input.GetForeground(); fg != nil {
-		text = text.Foreground(fg)
-	}
-	faint := text.Copy().Faint(true)
+	line := lineStyleFromInput(input)
+	faint := line.Copy().Faint(true)
 	for _, state := range []*textarea.StyleState{&s.Focused, &s.Blurred} {
-		state.Base = noBG
-		state.Text = text
-		state.CursorLine = text
+		state.Base = lipgloss.NewStyle()
+		state.Text = line
+		state.CursorLine = line
 		state.Prompt = faint
 		state.Placeholder = faint
 		state.LineNumber = faint
 		state.CursorLineNumber = faint
-		state.EndOfBuffer = faint
+		state.EndOfBuffer = line
 	}
-	s.Cursor.Blink = false
+	s.Cursor.Blink = true
 	if fg := input.GetForeground(); fg != nil {
 		s.Cursor.Color = fg
 	}
 	ta.SetStyles(s)
+	ta.SetVirtualCursor(true)
+}
+
+// composerLineIsBareBuffer reports placeholder end-of-buffer rows (prompt only).
+func composerLineIsBareBuffer(line string) bool {
+	plain := strings.TrimSpace(ansi.Strip(line))
+	plain = strings.TrimPrefix(plain, "┃")
+	plain = strings.TrimSpace(plain)
+	return plain == "" || len([]rune(plain)) <= 1
+}
+
+// padComposerLines extends every row to innerW and paints the full row with the input fill.
+// Bubbles textarea placeholder buffer rows only style the prompt plus one end-of-buffer rune;
+// the viewport may pad with unstyled spaces that read as alt-screen black.
+func padComposerLines(styles themeStyles, innerW, minLines int, content string, placeholderMode bool) string {
+	lines := strings.Split(content, "\n")
+	if n := len(lines); n > 0 && lines[n-1] == "" {
+		lines = lines[:n-1]
+	}
+	fill := styles.Input
+	for len(lines) < minLines {
+		lines = append(lines, "")
+	}
+	if len(lines) > minLines {
+		lines = lines[:minLines]
+	}
+	for i := range lines {
+		// Only flatten empty buffer rows before typing; multiline cursor rows look bare too.
+		if placeholderMode && i > 0 && composerLineIsBareBuffer(lines[i]) {
+			lines[i] = fill.Width(innerW).Render("")
+			continue
+		}
+		placed := lipgloss.PlaceHorizontal(innerW, lipgloss.Left, lines[i],
+			lipgloss.WithWhitespaceStyle(fill))
+		lines[i] = fill.Width(innerW).Render(placed)
+	}
+	return strings.Join(lines, "\n")
 }
 
 // chromeComposerPanel renders the full-width message composer (header/footer alignment).
-func chromeComposerPanel(styles themeStyles, fullW int, inputContent string) string {
-	return styles.Input.Width(fullW).Padding(0, 1).Render(inputContent)
+func chromeComposerPanel(styles themeStyles, fullW, minLines int, inputContent string, placeholderMode bool) string {
+	innerW := composeInnerWidth(fullW)
+	if minLines < 1 {
+		minLines = 1
+	}
+	padded := padComposerLines(styles, innerW, minLines, inputContent, placeholderMode)
+	return styles.Input.Width(fullW).Padding(0, 1).Render(padded)
 }
 
 // chromeTypingLine renders a full-width typing indicator under the main grid.
