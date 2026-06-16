@@ -1421,20 +1421,21 @@ func TestAppendChatMessageE2ESearchHint(t *testing.T) {
 	}
 }
 
-func TestPruneClientSystemMessages(t *testing.T) {
+func TestPruneEphemeralSystemMessages(t *testing.T) {
 	msgs := []shared.Message{
 		{Sender: "alice", Content: "hi", MessageID: 1},
 		{Sender: "System", Content: "usage", MessageID: -1},
+		{Sender: "System", Content: "This command requires admin privileges", MessageID: 0},
 		{Sender: "bob", Content: "hey", MessageID: 2},
-		{Sender: "System", Content: "other", MessageID: 0},
+		{Sender: "System", Content: "Joined channel #general", MessageID: 0},
 	}
-	got := pruneClientSystemMessages(msgs)
+	got := pruneEphemeralSystemMessages(msgs)
 	if len(got) != 3 {
 		t.Fatalf("len: got %d want 3", len(got))
 	}
 	for _, msg := range got {
-		if msg.MessageID < 0 {
-			t.Fatalf("pruned client system line: %+v", msg)
+		if msg.Sender == "System" && !isTranscriptSystemMessage(msg) {
+			t.Fatalf("ephemeral system line remained: %+v", msg)
 		}
 	}
 }

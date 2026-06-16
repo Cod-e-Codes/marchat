@@ -29,6 +29,38 @@ func TestSystemLineSeverityClass(t *testing.T) {
 	}
 }
 
+func TestIsTranscriptSystemNotice(t *testing.T) {
+	tests := []struct {
+		content string
+		want    bool
+	}{
+		{"This command requires admin privileges", false},
+		{"Unknown command: :foo", false},
+		{"Usage: :kick <username>", false},
+		{"Search results for 'hi' (1 found):", true},
+		{searchNoResultsPrefix + " test", true},
+		{"Joined channel #dev", true},
+		{"Pinned messages (2):\n  #1", true},
+		{"Available themes:\n\n  • system", true},
+		{e2eSearchNoResultsHint, true},
+	}
+	for _, tt := range tests {
+		if got := isTranscriptSystemNotice(tt.content); got != tt.want {
+			t.Fatalf("%q: got %v want %v", tt.content, got, tt.want)
+		}
+	}
+}
+
+func TestSystemBannerTextAddsErrorPrefix(t *testing.T) {
+	got := systemBannerText("Edit failed: denied")
+	if !strings.HasPrefix(got, "[ERROR]") {
+		t.Fatalf("got %q", got)
+	}
+	if systemBannerText("Theme changed") != "Theme changed" {
+		t.Fatal("info line should pass through")
+	}
+}
+
 func TestRenderMessagesSystemUsesSemanticStyle(t *testing.T) {
 	now := time.Now()
 	msgs := []shared.Message{

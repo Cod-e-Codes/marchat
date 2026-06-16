@@ -350,10 +350,10 @@ func appendClientSystemMessage(messages []shared.Message, content string, seq *i
 	})
 }
 
-func pruneClientSystemMessages(messages []shared.Message) []shared.Message {
+func pruneEphemeralSystemMessages(messages []shared.Message) []shared.Message {
 	n := 0
 	for _, msg := range messages {
-		if msg.MessageID < 0 {
+		if msg.Sender == "System" && !isTranscriptSystemMessage(msg) {
 			continue
 		}
 		messages[n] = msg
@@ -371,6 +371,14 @@ func appendChatMessage(messages []shared.Message, msg shared.Message, useE2E boo
 }
 
 func (m *model) appendClientSystem(content string) {
+	content = strings.TrimSpace(content)
+	if content == "" {
+		return
+	}
+	if !isTranscriptSystemNotice(content) {
+		m.banner = systemBannerText(content)
+		return
+	}
 	if len(m.messages) >= maxMessages {
 		m.messages = m.messages[len(m.messages)-maxMessages+1:]
 	}
@@ -1083,8 +1091,19 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.messages) >= maxMessages {
 				m.messages = m.messages[len(m.messages)-maxMessages+1:]
 			}
+			if v.Sender == "System" && !isTranscriptSystemMessage(v) {
+				m.banner = systemBannerText(v.Content)
+				m.rebuildDMUnreadCounts()
+				wasAtBottom := m.viewport.AtBottom()
+				m.refreshTranscript()
+				if wasAtBottom {
+					m.viewport.GotoBottom()
+				}
+				m.sending = false
+				return m, m.listenWebSocket()
+			}
 			if v.MessageID > 0 {
-				m.messages = pruneClientSystemMessages(m.messages)
+				m.messages = pruneEphemeralSystemMessages(m.messages)
 			}
 			m.messages = appendChatMessage(m.messages, v, m.useE2E, &m.clientSystemSeq)
 			sortMessagesByTimestamp(m.messages)
@@ -2300,7 +2319,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			if text != "" {
-				m.messages = pruneClientSystemMessages(m.messages)
+				m.messages = pruneEphemeralSystemMessages(m.messages)
 				m.refreshTranscript()
 				m.sending = true
 				if m.conn != nil {

@@ -59,6 +59,73 @@ func messageLess(a, b shared.Message) bool {
 	return a.Content < b.Content
 }
 
+// systemBannerText formats ephemeral System feedback for the banner strip.
+func systemBannerText(content string) string {
+	t := strings.TrimSpace(content)
+	switch systemLineSeverityClass(t) {
+	case systemLineErr:
+		if !strings.HasPrefix(t, "[ERROR]") {
+			return "[ERROR] " + t
+		}
+	case systemLineWarn:
+		if !strings.HasPrefix(t, "[WARN]") {
+			return "[WARN] " + t
+		}
+	}
+	return t
+}
+
+// isTranscriptSystemNotice reports whether a System line should stay in the scrollable
+// transcript. Command errors, usage, and other ephemeral feedback belong in the banner.
+func isTranscriptSystemNotice(content string) bool {
+	c := strings.TrimSpace(content)
+	if c == "" {
+		return false
+	}
+	cl := strings.ToLower(c)
+	if c == e2eSearchNoResultsHint {
+		return true
+	}
+	if strings.Count(c, "\n") >= 1 {
+		return true
+	}
+	switch {
+	case strings.HasPrefix(cl, "search results for "),
+		strings.HasPrefix(cl, strings.ToLower(searchNoResultsPrefix)),
+		strings.HasPrefix(cl, "pinned messages"),
+		cl == "no pinned messages",
+		strings.HasPrefix(cl, "active channels:"),
+		strings.HasPrefix(cl, "joined channel #"),
+		strings.HasPrefix(cl, "left #"),
+		strings.HasPrefix(cl, "chat history cleared"),
+		strings.HasPrefix(cl, "you have been kicked"),
+		strings.HasPrefix(cl, "message ") && (strings.Contains(cl, " pinned by ") || strings.Contains(cl, " unpinned by ")),
+		strings.Contains(cl, "has been kicked"),
+		strings.Contains(cl, "permanently banned"),
+		strings.Contains(cl, "has been unbanned"),
+		strings.Contains(cl, "forcibly disconnected"),
+		strings.HasPrefix(cl, "available themes:"),
+		strings.HasPrefix(cl, "dm conversations:"):
+		return true
+	}
+	return false
+}
+
+// isTranscriptSystemMessage reports whether a System wire/local message belongs in
+// the transcript rather than the ephemeral banner.
+func isTranscriptSystemMessage(msg shared.Message) bool {
+	if msg.Sender != "System" {
+		return true
+	}
+	if msg.MessageID < 0 {
+		return false
+	}
+	if msg.MessageID > 0 {
+		return true
+	}
+	return isTranscriptSystemNotice(msg.Content)
+}
+
 type systemLineSeverity int
 
 const (

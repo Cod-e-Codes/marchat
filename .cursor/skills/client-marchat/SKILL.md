@@ -28,7 +28,8 @@ Bubble Tea + Lipgloss TUI. Entry: `client/main.go`; split across `render.go`, `c
 - **Word wrap**: `wrapStyledBlock` + `ansi.Wrap` at viewport width; preserves ANSI codes.
 - **URLs**: `prepareURLWrapping` (non-breaking hyphens in hosts), `markURLsForWrap` / `applyURLMarkers` so hyperlink color and underline survive line breaks without styling continuation indent.
 - **Sort order**: `sortMessagesByTimestamp` / `messageLess` - persisted chat by `message_id`, server System (`message_id == 0`) by `created_at`, client-local System (negative `message_id`) after persisted chat.
-- **Ephemeral client System lines**: `appendClientSystem` / `appendClientSystemMessage` assign negative ids; `pruneClientSystemMessages` on send or inbound persisted message. Do not append raw `Sender: "System"` with `time.Now()` for command feedback.
+- **Ephemeral System feedback**: `isTranscriptSystemNotice` / `isTranscriptSystemMessage` route command errors and one-line server replies (e.g. admin-only denial) to the **banner**; multi-line search, themes, and channel notices stay in the transcript. `pruneEphemeralSystemMessages` clears stale ephemeral lines on send or inbound persisted chat.
+- **Client-local System lines**: negative `message_id` via `appendClientSystemMessage` for transcript notices only; short client usage/errors go to banner through `appendClientSystem`.
 
 ## Testing
 
