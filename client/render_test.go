@@ -145,6 +145,77 @@ func TestWrapStyledBlockLongURLBreaksAtSlashes(t *testing.T) {
 	}
 }
 
+func underlineOnLeadingWhitespace(s string) bool {
+	underline := false
+	seenNonSpace := false
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			end := strings.IndexByte(s[i:], 'm')
+			if end < 0 {
+				break
+			}
+			seq := s[i : i+end+1]
+			i += end + 1
+			if strings.Contains(seq, ";4m") || strings.HasSuffix(seq, "[4m") {
+				underline = true
+			}
+			if strings.Contains(seq, ";24m") || strings.HasSuffix(seq, "[24m") || strings.HasSuffix(seq, "[0m") || strings.Contains(seq, ";0m") {
+				underline = false
+			}
+			continue
+		}
+		r := rune(s[i])
+		if r == '\n' || r == '\r' {
+			i++
+			continue
+		}
+		if !seenNonSpace {
+			if r == ' ' || r == '\t' {
+				if underline {
+					return true
+				}
+			} else {
+				seenNonSpace = true
+			}
+		}
+		i++
+	}
+	return false
+}
+
+func TestWrapStyledBlockURLUnderlineNotOnContinuationIndent(t *testing.T) {
+	styles := getThemeStyles("patriot")
+	url := "https://github.com/Cod-e-Codes/marchat/commit/1fc41486340cefc14838f467c4bd09da68ee6947"
+	msgs := []shared.Message{
+		{
+			Sender:    "Cody",
+			Content:   url,
+			CreatedAt: time.Now(),
+			Type:      shared.TextMessage,
+			MessageID: 70,
+		},
+	}
+	const width = 62
+	out := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, width, true, true)
+	plainLines := strings.Split(strings.TrimRight(ansi.Strip(out), "\n"), "\n")
+	rawLines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	for i, plain := range plainLines {
+		if !strings.Contains(plain, "1fc414") {
+			continue
+		}
+		if strings.HasPrefix(strings.TrimLeft(plain, " "), "http") {
+			continue
+		}
+		if i >= len(rawLines) {
+			t.Fatal("raw/plain line count mismatch")
+		}
+		if underlineOnLeadingWhitespace(rawLines[i]) {
+			t.Fatalf("underline bleeds into continuation indent: %q", rawLines[i])
+		}
+	}
+}
+
 func TestWrapStyledBlockShortMessageUnchanged(t *testing.T) {
 	styles := getThemeStyles("patriot")
 	msgs := []shared.Message{

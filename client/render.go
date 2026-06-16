@@ -95,12 +95,13 @@ func prepareURLWrapping(s string) string {
 
 // wrapStyledBlock word-wraps ANSI-styled chat body text to width, preserving escape codes.
 // prefix is printed once on the first line; continuation lines align under the body column.
-func wrapStyledBlock(prefix, content, suffix string, width int) string {
+// Hyperlink styling is applied per wrapped line so underline does not bleed across breaks.
+func wrapStyledBlock(prefix, content, suffix string, width int, styles themeStyles) string {
 	if content == "" {
 		return prefix + suffix
 	}
 	if width <= 0 {
-		return prefix + content + suffix
+		return prefix + renderHyperlinks(content, styles) + suffix
 	}
 
 	prefixCells := ansi.StringWidth(prefix)
@@ -117,6 +118,7 @@ func wrapStyledBlock(prefix, content, suffix string, width int) string {
 	for _, paragraph := range strings.Split(content, "\n") {
 		wrapped := ansi.Wrap(paragraph, lineWidth, wrapBreakpoints)
 		for _, wl := range strings.Split(wrapped, "\n") {
+			wl = renderHyperlinks(wl, styles)
 			if !first {
 				out.WriteString("\n")
 			}
@@ -183,7 +185,6 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 			content = renderEmojis(content)
 			content = renderCodeBlocks(content)
 			content = prepareURLWrapping(content)
-			content = renderHyperlinks(content, styles)
 			if mentionRegex != nil {
 				content = mentionRegex.ReplaceAllStringFunc(content, func(match string) string {
 					mentionName := strings.TrimPrefix(match, "@")
@@ -215,15 +216,15 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 		switch msg.Sender {
 		case "System":
 			styled := systemLineStyle(styles, content).Render(content)
-			b.WriteString(wrapStyledBlock(headPrefix, styled, metaSuffix, width))
+			b.WriteString(wrapStyledBlock(headPrefix, styled, metaSuffix, width, styles))
 			b.WriteString("\n")
 		case username:
 			head := headPrefix + styles.Me.Render(msg.Sender) + ": "
-			b.WriteString(wrapStyledBlock(head, content, metaSuffix, width))
+			b.WriteString(wrapStyledBlock(head, content, metaSuffix, width, styles))
 			b.WriteString("\n")
 		default:
 			head := headPrefix + styles.Other.Render(msg.Sender) + ": "
-			b.WriteString(wrapStyledBlock(head, content, metaSuffix, width))
+			b.WriteString(wrapStyledBlock(head, content, metaSuffix, width, styles))
 			b.WriteString("\n")
 		}
 
