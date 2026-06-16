@@ -403,7 +403,7 @@ func GetRecentMessagesWithLimit(db *sql.DB, limit int) []shared.Message {
 		recentMessagesCacheMutex.RUnlock()
 	}
 
-	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, ''), COALESCE(channel, 'general') FROM messages ORDER BY created_at DESC LIMIT ?`, limit)
+	rows, err := dbQuery(db, fmt.Sprintf(`SELECT %s FROM messages ORDER BY created_at DESC LIMIT ?`, messageHistoryRowSelectColumns(db)), limit)
 	if err != nil {
 		log.Println("Query error:", err)
 		return nil
@@ -428,7 +428,7 @@ func queryVisibleMessagesForUser(db *sql.DB, lowerUsername string, limit int) []
 	if limit <= 0 {
 		limit = HandshakeReplayLimit
 	}
-	rows, err := dbQuery(db, visibleMessagesForUserSQL(), lowerUsername, lowerUsername, limit)
+	rows, err := dbQuery(db, visibleMessagesForUserSQL(db), lowerUsername, lowerUsername, limit)
 	if err != nil {
 		log.Printf("Query error in queryVisibleMessagesForUser for %s: %v", lowerUsername, err)
 		return nil

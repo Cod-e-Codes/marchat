@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"strings"
 	"testing"
 )
 
@@ -31,5 +32,28 @@ func TestRebindQueryPostgres(t *testing.T) {
 	got := rebindQuery(db, "SELECT * FROM t WHERE a = ? AND b = ?")
 	if got != "SELECT * FROM t WHERE a = $1 AND b = $2" {
 		t.Fatalf("unexpected rebind output: %s", got)
+	}
+}
+
+func TestMessageHistoryRowSelectColumnsPostgres(t *testing.T) {
+	db := &sql.DB{}
+	setDBDialect(db, DialectPostgres)
+	got := messageHistoryRowSelectColumns(db)
+	if !strings.Contains(got, "COALESCE(edited, FALSE)") {
+		t.Fatalf("postgres edited coalesce: %s", got)
+	}
+	if strings.Contains(got, "COALESCE(edited, 0)") {
+		t.Fatalf("postgres must not use integer coalesce for booleans: %s", got)
+	}
+}
+
+func TestEnsureMySQLParseTime(t *testing.T) {
+	got := ensureMySQLParseTime("user:pass@tcp(localhost:3306)/marchat")
+	if !strings.Contains(got, "parseTime=true") {
+		t.Fatalf("expected parseTime=true, got %q", got)
+	}
+	got2 := ensureMySQLParseTime("user:pass@tcp(localhost:3306)/marchat?parseTime=false")
+	if got2 != "user:pass@tcp(localhost:3306)/marchat?parseTime=false" {
+		t.Fatalf("should not duplicate parseTime: %q", got2)
 	}
 }

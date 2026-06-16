@@ -88,14 +88,29 @@ func touchUserLastSeenSQL(db *sql.DB) string {
 	}
 }
 
+// messageHistoryRowSelectColumns is the shared SELECT list for message history rows.
+// Postgres BOOLEAN columns cannot use COALESCE(..., 0); use FALSE instead.
+func messageHistoryRowSelectColumns(db *sql.DB) string {
+	editedExpr := "COALESCE(edited, 0)"
+	deletedExpr := "COALESCE(deleted, 0)"
+	if getDBDialect(db) == DialectPostgres {
+		editedExpr = "COALESCE(edited, FALSE)"
+		deletedExpr = "COALESCE(deleted, FALSE)"
+	}
+	return fmt.Sprintf(
+		"sender, content, created_at, is_encrypted, message_id, %s, %s, COALESCE(recipient, ''), COALESCE(channel, 'general')",
+		editedExpr, deletedExpr,
+	)
+}
+
 // visibleMessagesForUserSQL returns up to limit rows visible to lowerUsername:
 // channel/public rows (empty recipient) plus DMs where the user is sender or recipient.
-func visibleMessagesForUserSQL() string {
-	return `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, ''), COALESCE(channel, 'general')
+func visibleMessagesForUserSQL(db *sql.DB) string {
+	return fmt.Sprintf(`SELECT %s
 FROM messages
-WHERE (COALESCE(TRIM(recipient), '') = '' OR LOWER(TRIM(sender)) = ? OR LOWER(TRIM(recipient)) = ?)
+WHERE (recipient IS NULL OR TRIM(recipient) = '' OR LOWER(TRIM(sender)) = ? OR LOWER(TRIM(recipient)) = ?)
 ORDER BY created_at DESC
-LIMIT ?`
+LIMIT ?`, messageHistoryRowSelectColumns(db))
 }
 
 func upsertUserChannelSQL(db *sql.DB) string {

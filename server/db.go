@@ -25,8 +25,22 @@ func detectDriver(conn string) (string, DBDialect, string) {
 	}
 }
 
+func ensureMySQLParseTime(dsn string) string {
+	if strings.Contains(strings.ToLower(dsn), "parsetime=") {
+		return dsn
+	}
+	sep := "?"
+	if strings.Contains(dsn, "?") {
+		sep = "&"
+	}
+	return dsn + sep + "parseTime=true"
+}
+
 func InitDB(conn string) (*sql.DB, error) {
 	driver, dialect, dsn := detectDriver(conn)
+	if dialect == DialectMySQL {
+		dsn = ensureMySQLParseTime(dsn)
+	}
 
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
