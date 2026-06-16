@@ -9,9 +9,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/alecthomas/chroma/quick"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 	"github.com/mattn/go-runewidth"
 )
@@ -206,18 +206,54 @@ func markURLsForWrap(s string) string {
 	})
 }
 
+// urlMarkerState tracks URL span boundaries and full hrefs across wrapped lines.
+type urlMarkerState struct {
+	open       bool
+	currentURL string
+	urlIndex   int
+	urlQueue   []string
+}
+
+// parseMarkedURLs returns URLs between sentinel pairs in document order.
+func parseMarkedURLs(s string) []string {
+	var urls []string
+	pos := 0
+	for pos < len(s) {
+		r, sz := utf8.DecodeRuneInString(s[pos:])
+		if r != urlStartMarker {
+			pos += sz
+			continue
+		}
+		pos += sz
+		var buf strings.Builder
+		for pos < len(s) {
+			r, sz = utf8.DecodeRuneInString(s[pos:])
+			if r == urlEndMarker {
+				urls = append(urls, buf.String())
+				pos += sz
+				break
+			}
+			buf.WriteRune(r)
+			pos += sz
+		}
+	}
+	return urls
+}
+
 // applyURLMarkers renders hyperlink style for marked URL spans on one wrapped line.
-// open tracks an URL span that continues from the previous wrapped line.
-func applyURLMarkers(line string, styles themeStyles, open *bool) string {
+// state tracks an URL span that continues from the previous wrapped line.
+func applyURLMarkers(line string, styles themeStyles, state *urlMarkerState) string {
 	var out strings.Builder
 	var segment strings.Builder
-	link := *open
+	link := state.open
 
 	writeSegment := func() {
 		if segment.Len() == 0 {
 			return
 		}
-		if link {
+		if link && state.currentURL != "" {
+			out.WriteString(styles.Hyperlink.Hyperlink(state.currentURL).Render(segment.String()))
+		} else if link {
 			out.WriteString(styles.Hyperlink.Render(segment.String()))
 		} else {
 			out.WriteString(segment.String())
@@ -243,16 +279,21 @@ func applyURLMarkers(line string, styles themeStyles, open *bool) string {
 		case urlStartMarker:
 			writeSegment()
 			link = true
+			if state.urlIndex < len(state.urlQueue) {
+				state.currentURL = state.urlQueue[state.urlIndex]
+			}
 		case urlEndMarker:
 			writeSegment()
 			link = false
+			state.urlIndex++
+			state.currentURL = ""
 		default:
 			segment.WriteRune(r)
 		}
 		pos += sz
 	}
 	writeSegment()
-	*open = link
+	state.open = link
 	return out.String()
 }
 
@@ -265,8 +306,8 @@ func wrapStyledBlock(prefix, content, suffix string, width int, styles themeStyl
 		return prefix + suffix
 	}
 	if width <= 0 {
-		open := false
-		return prefix + applyURLMarkers(content, styles, &open) + suffix
+		state := urlMarkerState{urlQueue: parseMarkedURLs(content)}
+		return prefix + applyURLMarkers(content, styles, &state) + suffix
 	}
 
 	prefixCells := ansi.StringWidth(prefix)
@@ -281,10 +322,10 @@ func wrapStyledBlock(prefix, content, suffix string, width int, styles themeStyl
 	var out strings.Builder
 	first := true
 	for _, paragraph := range strings.Split(content, "\n") {
-		urlOpen := false
+		state := urlMarkerState{urlQueue: parseMarkedURLs(paragraph)}
 		wrapped := ansi.Wrap(paragraph, lineWidth, wrapBreakpoints)
 		for _, wl := range strings.Split(wrapped, "\n") {
-			wl = applyURLMarkers(wl, styles, &urlOpen)
+			wl = applyURLMarkers(wl, styles, &state)
 			if !first {
 				out.WriteString("\n")
 			}

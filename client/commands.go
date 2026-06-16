@@ -3,9 +3,9 @@ package main
 import (
 	"fmt"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/Cod-e-Codes/marchat/client/config"
 	"github.com/Cod-e-Codes/marchat/shared"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 func (m *model) generateHelpContent() string {

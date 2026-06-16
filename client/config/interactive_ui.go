@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 var (
@@ -32,6 +32,24 @@ var (
 	focusedButton = focusedStyle.Render("[ Connect ]")
 	blurredButton = fmt.Sprintf("[ %s ]", blurredStyle.Render("Connect"))
 )
+
+func configInputStyles() textinput.Styles {
+	s := textinput.DefaultDarkStyles()
+	s.Focused.Prompt = focusedStyle
+	s.Focused.Text = focusedStyle
+	s.Blurred.Prompt = noStyle
+	s.Blurred.Text = noStyle
+	s.Cursor.Color = lipgloss.Color("#FF6B9D")
+	return s
+}
+
+func initConfigInput(t *textinput.Model, width int, focus bool) {
+	t.SetStyles(configInputStyles())
+	t.SetWidth(width)
+	if focus {
+		t.Focus()
+	}
+}
 
 type configField int
 
@@ -70,51 +88,47 @@ func NewConfigUI() ConfigUIModel {
 	var t textinput.Model
 	for i := range m.inputs {
 		t = textinput.New()
-		t.Cursor.Style = cursorStyle
 
 		switch configField(i) {
 		case serverURLField:
 			t.Placeholder = "wss://example.com/ws"
 			t.Prompt = "Server URL: "
 			t.CharLimit = 256
-			t.Width = 50
-			t.Focus()
-			t.PromptStyle = focusedStyle
-			t.TextStyle = focusedStyle
+			initConfigInput(&t, 50, true)
 		case usernameField:
 			t.Placeholder = "Enter your username"
 			t.Prompt = "Username: "
 			t.CharLimit = 32
-			t.Width = 30
+			initConfigInput(&t, 30, false)
 		case adminField:
 			t.Placeholder = "y/n"
 			t.Prompt = "Admin user? "
 			t.CharLimit = 1
-			t.Width = 5
+			initConfigInput(&t, 5, false)
 		case adminKeyField:
 			t.Placeholder = "Enter admin key"
 			t.Prompt = "Admin Key: "
 			t.CharLimit = 64
-			t.Width = 40
+			initConfigInput(&t, 40, false)
 			t.EchoMode = textinput.EchoPassword
 			t.EchoCharacter = '•'
 		case e2eField:
 			t.Placeholder = "y/n"
 			t.Prompt = "Enable E2E encryption? "
 			t.CharLimit = 1
-			t.Width = 5
+			initConfigInput(&t, 5, false)
 		case keystorePassField:
 			t.Placeholder = "Enter keystore passphrase"
 			t.Prompt = "Keystore passphrase: "
 			t.CharLimit = 128
-			t.Width = 40
+			initConfigInput(&t, 40, false)
 			t.EchoMode = textinput.EchoPassword
 			t.EchoCharacter = '•'
 		case themeField:
 			t.Placeholder = "system"
 			t.Prompt = "Theme: "
 			t.CharLimit = 20
-			t.Width = 20
+			initConfigInput(&t, 20, false)
 		}
 
 		m.inputs[i] = t
@@ -129,7 +143,7 @@ func (m ConfigUIModel) Init() tea.Cmd {
 
 func (m ConfigUIModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			m.cancelled = true
@@ -233,12 +247,8 @@ func (m *ConfigUIModel) updateFocus() {
 	for i := 0; i < len(m.inputs); i++ {
 		if i == m.focusIndex {
 			m.inputs[i].Focus()
-			m.inputs[i].PromptStyle = focusedStyle
-			m.inputs[i].TextStyle = focusedStyle
 		} else {
 			m.inputs[i].Blur()
-			m.inputs[i].PromptStyle = noStyle
-			m.inputs[i].TextStyle = noStyle
 		}
 	}
 }
@@ -303,7 +313,7 @@ func (m *ConfigUIModel) validateAndBuildConfig() error {
 	return nil
 }
 
-func (m ConfigUIModel) View() string {
+func (m ConfigUIModel) View() tea.View {
 	var b strings.Builder
 
 	// Title
@@ -368,7 +378,7 @@ func (m ConfigUIModel) View() string {
 	// Help
 	b.WriteString(helpStyle.Render("Tab/Shift+Tab: Navigate • Enter: Select/Submit • Esc: Cancel"))
 
-	return b.String()
+	return tea.NewView(b.String())
 }
 
 // GetConfig returns the built configuration
@@ -434,12 +444,9 @@ func NewProfileSelectionModel(profiles []ConnectionProfile, showNewOption bool) 
 func NewEnhancedProfileSelectionModel(profiles []ConnectionProfile, showNewOption bool, icl *InteractiveConfigLoader) ProfileSelectionModel {
 	// Initialize rename input
 	ti := textinput.New()
-	ti.Cursor.Style = cursorStyle
 	ti.CharLimit = 50
-	ti.Width = 40
 	ti.Prompt = "New name: "
-	ti.PromptStyle = focusedStyle
-	ti.TextStyle = focusedStyle
+	initConfigInput(&ti, 40, false)
 
 	return ProfileSelectionModel{
 		profiles:      profiles,
@@ -468,7 +475,7 @@ func (m ProfileSelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Handle main selection
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Clear message on any key press if it's been shown
 		if m.message != "" && m.messageType != "error" {
 			m.message = ""
@@ -534,7 +541,7 @@ func (m ProfileSelectionModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m ProfileSelectionModel) handleViewOperation(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "esc", "q", "i", "v":
 			m.operation = ProfileOpNone
@@ -545,7 +552,7 @@ func (m ProfileSelectionModel) handleViewOperation(msg tea.Msg) (tea.Model, tea.
 
 func (m ProfileSelectionModel) handleRenameOperation(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "esc":
 			m.operation = ProfileOpNone
@@ -601,7 +608,7 @@ func (m ProfileSelectionModel) handleRenameOperation(msg tea.Msg) (tea.Model, te
 
 func (m ProfileSelectionModel) handleDeleteOperation(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "esc", "n", "N":
 			m.operation = ProfileOpNone
@@ -670,15 +677,15 @@ func (m ProfileSelectionModel) formatProfileLine(i int, profile ConnectionProfil
 	return body + tags.String()
 }
 
-func (m ProfileSelectionModel) View() string {
+func (m ProfileSelectionModel) View() tea.View {
 	// Show operation-specific views
 	switch m.operation {
 	case ProfileOpView:
-		return m.viewDetails()
+		return tea.NewView(m.viewDetails())
 	case ProfileOpRename:
-		return m.viewRename()
+		return tea.NewView(m.viewRename())
 	case ProfileOpDelete:
-		return m.viewDelete()
+		return tea.NewView(m.viewDelete())
 	}
 
 	// Main profile selection view
@@ -727,7 +734,7 @@ func (m ProfileSelectionModel) View() string {
 	b.WriteString("\n")
 	b.WriteString(helpStyle.Render("↑/↓: Navigate • Enter: Select • i: View • r: Rename • d: Delete • Esc: Cancel"))
 
-	return b.String()
+	return tea.NewView(b.String())
 }
 
 func (m ProfileSelectionModel) viewDetails() string {
@@ -972,13 +979,9 @@ func NewSensitiveDataPrompt(isAdmin, useE2E bool) SensitiveDataModel {
 		t.Placeholder = "Enter admin key"
 		t.Prompt = "Admin Key: "
 		t.CharLimit = 64
-		t.Width = 40
 		t.EchoMode = textinput.EchoPassword
 		t.EchoCharacter = '•'
-		t.Focus()
-		t.PromptStyle = focusedStyle
-		t.TextStyle = focusedStyle
-		t.Cursor.Style = cursorStyle
+		initConfigInput(&t, 40, true)
 		m.inputs[idx] = t
 		idx++
 	}
@@ -988,15 +991,9 @@ func NewSensitiveDataPrompt(isAdmin, useE2E bool) SensitiveDataModel {
 		t.Placeholder = "Enter keystore passphrase"
 		t.Prompt = "Keystore passphrase: "
 		t.CharLimit = 128
-		t.Width = 40
 		t.EchoMode = textinput.EchoPassword
 		t.EchoCharacter = '•'
-		t.Cursor.Style = cursorStyle
-		if !isAdmin {
-			t.Focus()
-			t.PromptStyle = focusedStyle
-			t.TextStyle = focusedStyle
-		}
+		initConfigInput(&t, 40, !isAdmin)
 		m.inputs[idx] = t
 	}
 
@@ -1011,7 +1008,7 @@ func (m SensitiveDataModel) Init() tea.Cmd {
 
 func (m SensitiveDataModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "esc":
 			m.cancelled = true
@@ -1083,12 +1080,8 @@ func (m *SensitiveDataModel) updateFocus() {
 	for i := 0; i < len(m.inputs); i++ {
 		if i == m.focusIndex {
 			m.inputs[i].Focus()
-			m.inputs[i].PromptStyle = focusedStyle
-			m.inputs[i].TextStyle = focusedStyle
 		} else {
 			m.inputs[i].Blur()
-			m.inputs[i].PromptStyle = blurredStyle
-			m.inputs[i].TextStyle = blurredStyle
 		}
 	}
 }
@@ -1103,7 +1096,7 @@ func (m *SensitiveDataModel) updateInputs(msg tea.Msg) tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
-func (m SensitiveDataModel) View() string {
+func (m SensitiveDataModel) View() tea.View {
 	var b strings.Builder
 
 	b.WriteString(titleStyle.Render("Authentication Required"))
@@ -1128,7 +1121,7 @@ func (m SensitiveDataModel) View() string {
 		b.WriteString(helpStyle.Render("Enter: Submit • Esc: Cancel"))
 	}
 
-	return b.String()
+	return tea.NewView(b.String())
 }
 
 func (m SensitiveDataModel) IsFinished() bool {

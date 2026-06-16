@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Test NewConfigUI initialization
@@ -50,7 +50,7 @@ func TestConfigUIModelNavigation(t *testing.T) {
 	model := NewConfigUI()
 
 	// Test tab navigation
-	tabMsg := tea.KeyMsg{Type: tea.KeyTab}
+	tabMsg := tea.KeyPressMsg{Code: tea.KeyTab}
 	updatedModel, _ := model.Update(tabMsg)
 	csModel := updatedModel.(ConfigUIModel)
 
@@ -59,7 +59,7 @@ func TestConfigUIModelNavigation(t *testing.T) {
 	}
 
 	// Test shift+tab navigation (backwards)
-	shiftTabMsg := tea.KeyMsg{Type: tea.KeyShiftTab}
+	shiftTabMsg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	updatedModel, _ = csModel.Update(shiftTabMsg)
 	csModel = updatedModel.(ConfigUIModel)
 
@@ -68,7 +68,7 @@ func TestConfigUIModelNavigation(t *testing.T) {
 	}
 
 	// Test down arrow navigation
-	downMsg := tea.KeyMsg{Type: tea.KeyDown}
+	downMsg := tea.KeyPressMsg{Code: tea.KeyDown}
 	updatedModel, _ = csModel.Update(downMsg)
 	csModel = updatedModel.(ConfigUIModel)
 
@@ -77,7 +77,7 @@ func TestConfigUIModelNavigation(t *testing.T) {
 	}
 
 	// Test up arrow navigation
-	upMsg := tea.KeyMsg{Type: tea.KeyUp}
+	upMsg := tea.KeyPressMsg{Code: tea.KeyUp}
 	updatedModel, _ = csModel.Update(upMsg)
 	csModel = updatedModel.(ConfigUIModel)
 
@@ -212,7 +212,7 @@ func TestConfigUIModelCancellation(t *testing.T) {
 	model := NewConfigUI()
 
 	// Test ESC key cancellation
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	escMsg := tea.KeyPressMsg{Code: tea.KeyEsc}
 	updatedModel, _ := model.Update(escMsg)
 	csModel := updatedModel.(ConfigUIModel)
 
@@ -222,7 +222,7 @@ func TestConfigUIModelCancellation(t *testing.T) {
 
 	// Test Ctrl+C cancellation
 	model = NewConfigUI()
-	ctrlCMsg := tea.KeyMsg{Type: tea.KeyCtrlC}
+	ctrlCMsg := tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	updatedModel, _ = model.Update(ctrlCMsg)
 	csModel = updatedModel.(ConfigUIModel)
 
@@ -299,7 +299,7 @@ func TestProfileSelectionModelNavigation(t *testing.T) {
 	model := NewProfileSelectionModel(profiles, false)
 
 	// Test down navigation
-	downMsg := tea.KeyMsg{Type: tea.KeyDown}
+	downMsg := tea.KeyPressMsg{Code: tea.KeyDown}
 	updatedModel, _ := model.Update(downMsg)
 	psModel := updatedModel.(ProfileSelectionModel)
 
@@ -308,7 +308,7 @@ func TestProfileSelectionModelNavigation(t *testing.T) {
 	}
 
 	// Test up navigation
-	upMsg := tea.KeyMsg{Type: tea.KeyUp}
+	upMsg := tea.KeyPressMsg{Code: tea.KeyUp}
 	updatedModel, _ = psModel.Update(upMsg)
 	psModel = updatedModel.(ProfileSelectionModel)
 
@@ -317,7 +317,7 @@ func TestProfileSelectionModelNavigation(t *testing.T) {
 	}
 
 	// Test 'j' key navigation
-	jMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}
+	jMsg := tea.KeyPressMsg{Code: 'j', Text: "j"}
 	updatedModel, _ = psModel.Update(jMsg)
 	psModel = updatedModel.(ProfileSelectionModel)
 
@@ -326,7 +326,7 @@ func TestProfileSelectionModelNavigation(t *testing.T) {
 	}
 
 	// Test 'k' key navigation
-	kMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}
+	kMsg := tea.KeyPressMsg{Code: 'k', Text: "k"}
 	updatedModel, _ = psModel.Update(kMsg)
 	psModel = updatedModel.(ProfileSelectionModel)
 
@@ -345,7 +345,7 @@ func TestProfileSelectionModelSelection(t *testing.T) {
 	model := NewProfileSelectionModel(profiles, false)
 
 	// Test profile selection
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	psModel := updatedModel.(ProfileSelectionModel)
 
@@ -386,7 +386,7 @@ func TestProfileSelectionModelOperations(t *testing.T) {
 	model := NewProfileSelectionModel(profiles, false)
 
 	// Test view operation
-	viewMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'v'}}
+	viewMsg := tea.KeyPressMsg{Code: 'v', Text: "v"}
 	updatedModel, _ := model.Update(viewMsg)
 	psModel := updatedModel.(ProfileSelectionModel)
 
@@ -396,7 +396,7 @@ func TestProfileSelectionModelOperations(t *testing.T) {
 
 	// Test rename operation
 	model = NewEnhancedProfileSelectionModel(profiles, false, nil)
-	renameMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}}
+	renameMsg := tea.KeyPressMsg{Code: 'r', Text: "r"}
 	updatedModel, _ = model.Update(renameMsg)
 	psModel = updatedModel.(ProfileSelectionModel)
 
@@ -406,7 +406,7 @@ func TestProfileSelectionModelOperations(t *testing.T) {
 
 	// Test delete operation
 	model = NewProfileSelectionModel(profiles, false)
-	deleteMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}}
+	deleteMsg := tea.KeyPressMsg{Code: 'd', Text: "d"}
 	updatedModel, _ = model.Update(deleteMsg)
 	psModel = updatedModel.(ProfileSelectionModel)
 
@@ -423,7 +423,7 @@ func TestProfileSelectionModelDeleteProtection(t *testing.T) {
 	}
 
 	model := NewProfileSelectionModel(profiles, false)
-	deleteMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}}
+	deleteMsg := tea.KeyPressMsg{Code: 'd', Text: "d"}
 	updatedModel, _ := model.Update(deleteMsg)
 	psModel := updatedModel.(ProfileSelectionModel)
 
@@ -449,7 +449,7 @@ func TestProfileSelectionModelCancellation(t *testing.T) {
 	model := NewProfileSelectionModel(profiles, false)
 
 	// Test ESC key cancellation
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	escMsg := tea.KeyPressMsg{Code: tea.KeyEsc}
 	updatedModel, _ := model.Update(escMsg)
 	psModel := updatedModel.(ProfileSelectionModel)
 
@@ -459,7 +459,7 @@ func TestProfileSelectionModelCancellation(t *testing.T) {
 
 	// Test Ctrl+C cancellation
 	model = NewProfileSelectionModel(profiles, false)
-	ctrlCMsg := tea.KeyMsg{Type: tea.KeyCtrlC}
+	ctrlCMsg := tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	updatedModel, _ = model.Update(ctrlCMsg)
 	psModel = updatedModel.(ProfileSelectionModel)
 
@@ -522,7 +522,7 @@ func TestSensitiveDataModelValidation(t *testing.T) {
 	model := NewSensitiveDataPrompt(true, false)
 	model.inputs[0].SetValue("") // Empty admin key
 
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	sdModel := updatedModel.(SensitiveDataModel)
 
@@ -556,7 +556,7 @@ func TestSensitiveDataModelSuccessfulCompletion(t *testing.T) {
 	model := NewSensitiveDataPrompt(true, false)
 	model.inputs[0].SetValue("adminkey123")
 
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	sdModel := updatedModel.(SensitiveDataModel)
 
@@ -588,7 +588,7 @@ func TestSensitiveDataModelSuccessfulCompletion(t *testing.T) {
 
 	// Simulate typing admin key
 	for _, char := range "adminkey123" {
-		charMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}}
+		charMsg := tea.KeyPressMsg{Code: char, Text: string(char)}
 		updatedModel, _ = model.Update(charMsg)
 		model = updatedModel.(SensitiveDataModel)
 	}
@@ -599,7 +599,7 @@ func TestSensitiveDataModelSuccessfulCompletion(t *testing.T) {
 
 	// Simulate typing keystore passphrase
 	for _, char := range "keystorepass123" {
-		charMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{char}}
+		charMsg := tea.KeyPressMsg{Code: char, Text: string(char)}
 		updatedModel, _ = model.Update(charMsg)
 		model = updatedModel.(SensitiveDataModel)
 	}
@@ -626,7 +626,7 @@ func TestSensitiveDataModelNavigation(t *testing.T) {
 	model := NewSensitiveDataPrompt(true, true)
 
 	// Test tab navigation
-	tabMsg := tea.KeyMsg{Type: tea.KeyTab}
+	tabMsg := tea.KeyPressMsg{Code: tea.KeyTab}
 	updatedModel, _ := model.Update(tabMsg)
 	sdModel := updatedModel.(SensitiveDataModel)
 
@@ -635,7 +635,7 @@ func TestSensitiveDataModelNavigation(t *testing.T) {
 	}
 
 	// Test shift+tab navigation
-	shiftTabMsg := tea.KeyMsg{Type: tea.KeyShiftTab}
+	shiftTabMsg := tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
 	updatedModel, _ = sdModel.Update(shiftTabMsg)
 	sdModel = updatedModel.(SensitiveDataModel)
 
@@ -649,7 +649,7 @@ func TestSensitiveDataModelCancellation(t *testing.T) {
 	model := NewSensitiveDataPrompt(true, false)
 
 	// Test ESC key cancellation
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	escMsg := tea.KeyPressMsg{Code: tea.KeyEsc}
 	updatedModel, _ := model.Update(escMsg)
 	sdModel := updatedModel.(SensitiveDataModel)
 
@@ -659,7 +659,7 @@ func TestSensitiveDataModelCancellation(t *testing.T) {
 
 	// Test Ctrl+C cancellation
 	model = NewSensitiveDataPrompt(true, false)
-	ctrlCMsg := tea.KeyMsg{Type: tea.KeyCtrlC}
+	ctrlCMsg := tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	updatedModel, _ = model.Update(ctrlCMsg)
 	sdModel = updatedModel.(SensitiveDataModel)
 
@@ -671,7 +671,7 @@ func TestSensitiveDataModelCancellation(t *testing.T) {
 // Test View methods
 func TestConfigUIModelView(t *testing.T) {
 	model := NewConfigUI()
-	view := model.View()
+	view := model.View().Content
 
 	// Check for title
 	if !contains(view, "marchat Configuration") {
@@ -692,7 +692,7 @@ func TestProfileSelectionModelView(t *testing.T) {
 	}
 
 	model := NewProfileSelectionModel(profiles, true)
-	view := model.View()
+	view := model.View().Content
 
 	// Check for title
 	if !contains(view, "Select a connection profile") {
@@ -735,7 +735,7 @@ func TestProfileSelectionModelViewDetails(t *testing.T) {
 
 	model := NewProfileSelectionModel(profiles, false)
 	model.operation = ProfileOpView
-	view := model.View()
+	view := model.View().Content
 
 	// Check for profile details
 	if !contains(view, "Profile Details") {
@@ -763,7 +763,7 @@ func TestProfileSelectionModelViewRename(t *testing.T) {
 
 	model := NewEnhancedProfileSelectionModel(profiles, false, nil)
 	model.operation = ProfileOpRename
-	view := model.View()
+	view := model.View().Content
 
 	// Check for rename interface
 	if !contains(view, "Rename Profile") {
@@ -788,7 +788,7 @@ func TestProfileSelectionModelViewDelete(t *testing.T) {
 	model := NewProfileSelectionModel(profiles, false)
 	model.operation = ProfileOpDelete
 	model.deleteConfirm = "TestProfile"
-	view := model.View()
+	view := model.View().Content
 
 	// Check for delete interface
 	if !contains(view, "Delete Profile") {
@@ -811,7 +811,7 @@ func TestProfileSelectionModelViewDelete(t *testing.T) {
 // Test SensitiveDataModel View
 func TestSensitiveDataModelView(t *testing.T) {
 	model := NewSensitiveDataPrompt(true, true)
-	view := model.View()
+	view := model.View().Content
 
 	// Check for title
 	if !contains(view, "Authentication Required") {

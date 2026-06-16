@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
 )
 
 // Test fileItem methods
@@ -176,7 +176,7 @@ func TestFilePickerModelEscInSelectState(t *testing.T) {
 	model := newFilePickerModel(styles, 80, 24, func(string) {}, onCancel)
 
 	// Send ESC key
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	escMsg := tea.KeyPressMsg{Code: tea.KeyEsc}
 	updatedModel, _ := model.Update(escMsg)
 	_ = updatedModel.(filePickerModel)
 
@@ -187,7 +187,7 @@ func TestFilePickerModelEscInSelectState(t *testing.T) {
 	// Test Ctrl+C
 	onCancelCalled = false
 	model = newFilePickerModel(styles, 80, 24, func(string) {}, onCancel)
-	ctrlCMsg := tea.KeyMsg{Type: tea.KeyCtrlC}
+	ctrlCMsg := tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
 	updatedModel, _ = model.Update(ctrlCMsg)
 	_ = updatedModel.(filePickerModel)
 
@@ -207,7 +207,7 @@ func TestFilePickerModelEscInConfirmState(t *testing.T) {
 	model.selectedFile = "/path/to/file.txt"
 
 	// Send ESC key
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	escMsg := tea.KeyPressMsg{Code: tea.KeyEsc}
 	updatedModel, _ := model.Update(escMsg)
 	_ = updatedModel.(filePickerModel)
 
@@ -233,7 +233,7 @@ func TestFilePickerModelEnterInConfirmState(t *testing.T) {
 	model.selectedFile = "/path/to/file.txt"
 
 	// Send Enter key
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	_ = updatedModel.(filePickerModel)
 
@@ -259,7 +259,7 @@ func TestFilePickerModelRInConfirmState(t *testing.T) {
 	model.fileSize = 1024
 
 	// Send 'r' key
-	rMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'r'}}
+	rMsg := tea.KeyPressMsg{Code: 'r', Text: "r"}
 	updatedModel, _ := model.Update(rMsg)
 	fpModel := updatedModel.(filePickerModel)
 
@@ -281,7 +281,7 @@ func TestFilePickerModelViewSelectState(t *testing.T) {
 	styles := getMockThemeStyles()
 	model := newFilePickerModel(styles, 80, 24, func(string) {}, func() {})
 
-	view := model.View()
+	view := model.View().Content
 
 	// Check for title
 	if !contains(view, "Select File to Send") {
@@ -300,7 +300,7 @@ func TestFilePickerModelViewWithError(t *testing.T) {
 	model := newFilePickerModel(styles, 80, 24, func(string) {}, func() {})
 	model.err = fmt.Errorf("test error")
 
-	view := model.View()
+	view := model.View().Content
 
 	// Check for error message
 	if !contains(view, "[ERROR] test error") {
@@ -316,7 +316,7 @@ func TestFilePickerModelViewConfirmState(t *testing.T) {
 	model.selectedFile = "/path/to/test.txt"
 	model.fileSize = 1024
 
-	view := model.View()
+	view := model.View().Content
 
 	// Check for confirm title
 	if !contains(view, "Confirm File Send") {
@@ -348,7 +348,7 @@ func TestFilePickerModelViewUnknownState(t *testing.T) {
 	model := newFilePickerModel(styles, 80, 24, func(string) {}, func() {})
 	model.state = 999 // Unknown state
 
-	view := model.View()
+	view := model.View().Content
 
 	if view != "Unknown state" {
 		t.Errorf("Expected 'Unknown state', got '%s'", view)
@@ -503,7 +503,7 @@ func TestFilePickerModelEnterOnDirectory(t *testing.T) {
 	}
 
 	// Send Enter key
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	fpModel := updatedModel.(filePickerModel)
 
@@ -575,7 +575,7 @@ func TestFilePickerModelEnterOnFile(t *testing.T) {
 	}
 
 	// Send Enter key
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	fpModel := updatedModel.(filePickerModel)
 
@@ -610,7 +610,7 @@ func TestFilePickerModelEnterOnNonExistentFile(t *testing.T) {
 	model.list.Select(0)
 
 	// Send Enter key
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	fpModel := updatedModel.(filePickerModel)
 
@@ -679,7 +679,7 @@ func TestFilePickerModelFileSizeLimit(t *testing.T) {
 	}
 
 	// Send Enter key
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	fpModel := updatedModel.(filePickerModel)
 
@@ -759,7 +759,7 @@ func TestFilePickerModelFileSizeLimitMB(t *testing.T) {
 	}
 
 	// Send Enter key
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 	fpModel := updatedModel.(filePickerModel)
 

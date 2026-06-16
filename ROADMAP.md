@@ -51,7 +51,7 @@ This file tracks implementation status. Completed items use `- [x]`; future idea
 - [x] Increase test coverage for client and server packages.
 
 ### Phase 7: Future Improvements
-- **Client URL click-to-open (open):** Wrapped long URLs in the transcript are styled as hyperlinks but left-click may open a truncated URL (for example `https://github.com/Cod` instead of a full GitHub commit link). Headless unit tests cover wrap styling and partial click logic; they do not reproduce real terminal mouse + lipgloss box chrome. Likely fix: emit OSC 8 hyperlinks with the **full** URL on each wrapped segment when the terminal supports OSC 8 (Charm Lip Gloss `Style.Hyperlink` in v2 / `github.com/charmbracelet/lipgloss` issue #220), and keep mouse-coordinate open only as fallback on capable terminals or via `openURL` when OSC 8 is disabled. **Workaround:** copy the URL from the message. Tracked in [#103](https://github.com/Cod-e-Codes/marchat/issues/103).
+- [x] Client wrapped URL click-to-open via OSC 8 hyperlinks (Lip Gloss v2; [#103](https://github.com/Cod-e-Codes/marchat/issues/103))
 - Persist channel room lifecycle and metadata across server restarts (not only per-user last channel state).
 - Consider using `sqlx` or a lightweight ORM to reduce SQL dialect handling.
 - Explore migrations tooling for schema changes.

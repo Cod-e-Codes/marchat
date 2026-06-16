@@ -11,13 +11,13 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/plugin/fileurl"
 	"github.com/Cod-e-Codes/marchat/plugin/sdk"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/spinner"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 // StorePlugin represents a plugin in the store
@@ -345,7 +345,9 @@ func NewStoreUI(store *Store) *StoreUI {
 
 	search := textinput.New()
 	search.Placeholder = "Search plugins..."
-	search.PromptStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	styles := textinput.DefaultDarkStyles()
+	styles.Focused.Prompt = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	search.SetStyles(styles)
 
 	s := spinner.New()
 	s.Spinner = spinner.Dot
@@ -404,7 +406,17 @@ func (s *StoreUI) Init() tea.Cmd {
 // Update handles UI updates
 func (s *StoreUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.MouseWheelMsg:
+		if s.state == "browsing" && !s.search.Focused() {
+			switch msg.Button {
+			case tea.MouseWheelDown:
+				s.list.CursorDown()
+			case tea.MouseWheelUp:
+				s.list.CursorUp()
+			}
+		}
+		return s, nil
+	case tea.KeyPressMsg:
 		switch s.state {
 		case "browsing":
 			switch msg.String() {
@@ -434,7 +446,7 @@ func (s *StoreUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		s.list.SetSize(msg.Width, msg.Height-2)
-		s.search.Width = msg.Width - 4
+		s.search.SetWidth(msg.Width - 4)
 	case refreshMsg:
 		s.state = "browsing"
 		s.updateList()
@@ -464,24 +476,26 @@ func (s *StoreUI) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the store UI
-func (s *StoreUI) View() string {
+func (s *StoreUI) View() tea.View {
+	var content string
 	switch s.state {
 	case "loading":
-		return lipgloss.JoinVertical(
+		content = lipgloss.JoinVertical(
 			lipgloss.Left,
 			"Refreshing plugin store...",
 			s.spinner.View(),
 		)
 	case "installing":
 		if s.selected == nil {
-			return "Installing plugin..."
+			content = "Installing plugin..."
+		} else {
+			content = lipgloss.JoinVertical(
+				lipgloss.Left,
+				fmt.Sprintf("Installing %s...", s.selected.Name),
+				s.spinner.View(),
+				"Press q to cancel",
+			)
 		}
-		return lipgloss.JoinVertical(
-			lipgloss.Left,
-			fmt.Sprintf("Installing %s...", s.selected.Name),
-			s.spinner.View(),
-			"Press q to cancel",
-		)
 	default:
 		var view strings.Builder
 		view.WriteString(s.search.View())
@@ -493,8 +507,11 @@ func (s *StoreUI) View() string {
 			view.WriteString(lipgloss.NewStyle().Foreground(lipgloss.Color("red")).Render("Error: " + s.err.Error()))
 		}
 
-		return view.String()
+		content = view.String()
 	}
+	v := tea.NewView(content)
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
 
 // refreshMsg is sent when store refresh completes

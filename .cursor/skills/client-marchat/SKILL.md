@@ -10,10 +10,11 @@ paths:
 
 # Client (marchat)
 
-Bubble Tea + Lipgloss TUI. Entry: `client/main.go`; split across `render.go`, `commands.go`, `hotkeys.go`, `websocket.go`, `cli_output.go`, `notification_manager.go`, etc.
+Bubble Tea + Lipgloss TUI on **Charm v2** (`charm.land/bubbletea/v2`, `bubbles/v2`, `lipgloss/v2`). Entry: `client/main.go`; split across `render.go`, `commands.go`, `hotkeys.go`, `websocket.go`, `scroll_input.go`, `cli_output.go`, `notification_manager.go`, etc.
 
 ## Patterns
 
+- **Charm v2**: `View() tea.View` sets `AltScreen` and `MouseModeCellMotion` on the main client; `KeyPressMsg` replaces `KeyMsg`; bubbles use `SetWidth` / `SetHeight` / `SetStyles`.
 - **Reconnect**: exponential backoff (capped at 30s); delay resets only after successful connect (`wsConnected`), not each `Init()` retry; no reconnect on fatal username/handshake errors (`websocket.go`, `main.go`).
 - **Commands**: `:q` quits; `Esc` closes menus; help in `commands.go` (shortcuts vs text commands). Transient command results belong in the **banner** when short; longer lists (e.g. `:themes`) may use transcript System lines.
 - **E2E**: same wire path for channel text and DMs when encryption on; files via keystore `EncryptRaw` / `DecryptRaw`. Do not log plaintext on send/decrypt paths.
@@ -26,7 +27,8 @@ Bubble Tea + Lipgloss TUI. Entry: `client/main.go`; split across `render.go`, `c
 ## Transcript rendering (`render.go`)
 
 - **Word wrap**: `wrapStyledBlock` + `ansi.Wrap` at viewport width; preserves ANSI codes.
-- **URLs**: `prepareURLWrapping` (non-breaking hyphens in hosts), `markURLsForWrap` / `applyURLMarkers` so hyperlink color and underline survive line breaks without styling continuation indent. **Click-to-open is not reliable for wrapped long URLs** in real terminals (manual mouse mapping + regex; headless tests do not cover lipgloss box chrome or emulator behavior). Workaround: copy URL from message. Tracked in [#103](https://github.com/Cod-e-Codes/marchat/issues/103). Planned fix: OSC 8 hyperlinks with full URL per segment when supported (`ROADMAP.md`).
+- **URLs**: `prepareURLWrapping` (non-breaking hyphens in hosts), `markURLsForWrap` / `applyURLMarkers` so hyperlink color, underline, and OSC 8 sequences survive line breaks with the **full** href on every wrapped fragment. Mouse click-to-open (`findURLAtClickPosition`) remains as fallback when OSC 8 is unavailable. Copy from message still works everywhere.
+- **Scroll input**: `activeScrollViewport` routes keyboard and `MouseWheelMsg` to help, DB menu, chat, or user list viewports; list modals (file picker, code-snippet language) handle wheel via `CursorUp`/`CursorDown`. Help and DB menu overlays (`overlayCapturesKeyboard`) swallow non-scroll keys so chat typing indicators, URL clicks, and read-receipt flush do not fire while browsing overlay content; `maybeFlushReadReceipt` only runs when the chat transcript viewport is active and at bottom.
 - **Sort order**: `sortMessagesByTimestamp` / `messageLess` - persisted chat by `message_id`, server System (`message_id == 0`) by `created_at`, client-local System (negative `message_id`) after persisted chat.
 - **Ephemeral System feedback**: `isTranscriptSystemNotice` / `isTranscriptSystemMessage` route command errors and one-line server replies (e.g. admin-only denial) to the **banner**; multi-line search, themes, and channel notices stay in the transcript. Negative `message_id` transcript notices are classified by **content** (`isTranscriptSystemNotice`), not ID sign alone. `pruneEphemeralSystemMessages` clears stale ephemeral lines on send or inbound persisted chat.
 - **Client-local System lines**: negative `message_id` via `appendClientSystemMessage` for transcript notices only (with active `channel` set); short client usage/errors go to banner through `appendClientSystem`.
@@ -34,9 +36,10 @@ Bubble Tea + Lipgloss TUI. Entry: `client/main.go`; split across `render.go`, `c
 ## Testing
 
 - Inject `tea.Msg` in tests; no real terminal.
-- `client/testmain_test.go`: `lipgloss.SetColorProfile(termenv.ANSI256)` so headless render/hyperlink tests emit real SGR sequences.
-- `client/render_test.go`: URL wrap, hyperlink markers, system line severity, wrap width; URL click helpers (`buildTranscriptLineURLs`, `findURLAtTranscriptClick`) are headless only and do **not** validate real-terminal wrapped URL opens.
+- `client/testmain_test.go`: `lipgloss.Writer.Profile = colorprofile.ANSI256` so headless render/hyperlink tests emit real SGR and OSC 8 sequences.
+- `client/render_test.go`: URL wrap, OSC 8 hyperlink markers (`\x1b]8;;`), underline on wrapped segments, system line severity, wrap width; URL click helpers (`buildTranscriptLineURLs`, `findURLAtTranscriptClick`) are headless fallback-path coverage.
 - `client/main_test.go`: DM/channel filters, unread, client system prune/sort, reconnect backoff, URL click hit/miss (single-line, headless), E2E search hint.
+- `client/scroll_input_test.go`: scroll target selection, help viewport wheel handling, overlay input capture, read-receipt scoping, viewport dimension helpers
 - `client/websocket_e2e_test.go`, `keystore_test.go`, `config_test.go`.
 - See `testing-marchat` skill.
 
