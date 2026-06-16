@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -375,6 +376,52 @@ func TestFindURLAtTranscriptClickWrappedCommitURL(t *testing.T) {
 	}
 	if !clicked {
 		t.Fatal("no click position resolved the wrapped commit URL")
+	}
+}
+
+func TestFindURLAtClickPositionThroughViewport(t *testing.T) {
+	url := "https://github.com/Cod-e-Codes/marchat/commit/85bf012bde8a88b9730e9a4ff3015551556835a9"
+	styles := getThemeStyles("patriot")
+	msgs := []shared.Message{
+		{
+			Sender:    "Cody",
+			Content:   url,
+			CreatedAt: time.Now(),
+			Type:      shared.TextMessage,
+			MessageID: 84,
+		},
+	}
+	const chatWidth = 62
+	content := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, chatWidth, true, true)
+	vp := viewport.New(chatWidth, 20)
+	vp.Width = chatWidth
+	vp.Height = 20
+	vp.SetContent(content)
+
+	m := &model{viewport: vp}
+	x0, y0 := m.chatPanelOrigin()
+	viewLines := strings.Split(strings.TrimRight(vp.View(), "\n"), "\n")
+
+	clicked := false
+	for relY, line := range viewLines {
+		plain := plainTranscriptLine(line)
+		if !strings.Contains(plain, "github.com") && !strings.Contains(plain, "85bf012") {
+			continue
+		}
+		lineWidth := ansi.StringWidth(plain)
+		for relX := 0; relX <= lineWidth; relX++ {
+			got := m.findURLAtClickPosition(x0+relX, y0+relY)
+			if got == "" {
+				continue
+			}
+			if got != url {
+				t.Fatalf("viewport click relY=%d relX=%d: got %q want full URL", relY, relX, got)
+			}
+			clicked = true
+		}
+	}
+	if !clicked {
+		t.Fatal("viewport path did not resolve wrapped commit URL")
 	}
 }
 

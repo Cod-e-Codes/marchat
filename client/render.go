@@ -526,6 +526,7 @@ func isMessageBodyContinuation(line string) bool {
 
 func stitchedMessageSegment(line string, isFirst bool) string {
 	plain := plainTranscriptLine(line)
+	plain = strings.TrimRight(plain, " ") // viewport.View() pads lines to width
 	if !isFirst {
 		plain = strings.TrimLeft(plain, " ")
 	}
