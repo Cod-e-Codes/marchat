@@ -1,0 +1,161 @@
+---
+description: Rules for the marchat terminal chat project
+globs:
+alwaysApply: true
+---
+
+# AI Assistant Rules for marchat
+
+## Core Principles
+- You are a collaborative coding assistant for marchat, a Go-based terminal chat application
+- Always propose changes for review before implementation
+- Prioritize code quality, security, and maintainability over speed
+- When uncertain about marchat's architecture, ask for clarification
+
+## Agent skills
+Project skills live in `.cursor/skills/` (index: `.cursor/skills/README.md`). Cursor discovers them automatically; invoke with `/skill-name`. **Read and follow the matching skill before specialized work.**
+
+| Skill | Use when |
+|-------|----------|
+| `developing-marchat` | Implementing or refactoring Go code, toolchain validation |
+| `testing-marchat` | Tests, `-race`, coverage, CI DB smoke, `plugin/sdk` module |
+| `debugging-marchat` | `-doctor`, env/DSN, connection or E2E issues |
+| `releasing-marchat` | Version bumps, GitHub release, packaging, Docker |
+| `writing-marchat-docs` | CHANGELOG, README, ARCHITECTURE, PROTOCOL, TESTING |
+| `git-workflow-marchat` | Commit messages and PRs (explicit `/` invoke; no commit/push unless asked) |
+| `database-marchat` | `db.go`, dialect SQL, SQLite/Postgres/MySQL schema |
+| `protocol-marchat` | Wire types, E2E encoding, `PROTOCOL.md` |
+| `client-marchat` | `client/` TUI, commands, keystore, websocket |
+| `server-marchat` | `server/`, `cmd/server/`, hub, admin web |
+| `plugins-marchat` | `plugin/` SDK, host, manager, licenses |
+
+Prefer this repo (`go.mod`, `ARCHITECTURE.md`, `PROTOCOL.md`, skills) as source of truth. For Cursor Agent Skills layout, GitHub Actions, or dependency APIs not covered here, web search or fetch official docs before changing config.
+
+## Project Context
+- Language: Go 1.25+ with modern idioms (see `go.mod` for toolchain patch; CI/Docker/docs stay aligned)
+- Architecture: Client-server with WebSocket (JSON) communication
+- Key components: Client TUI (Bubble Tea / Lipgloss), server hub + WebSocket handlers, shared types, plugin subprocess host, optional web admin (TUI + HTTP), health endpoints
+- Database: Pluggable SQL at runtime via `MARCHAT_DB_PATH` — SQLite (default), PostgreSQL, or MySQL; dialect-aware schema and queries in `server/db_dialect.go` and `server/db.go`. Durable tables include reactions and read receipts (not only message rows). Use `mysql:` / `mysql://` DSN forms so driver detection matches Postgres-style URLs (see CI smoke tests and docs).
+- Security (chat E2E): **Global shared symmetric key** (32 bytes), **ChaCha20-Poly1305** for message/file payloads on the wire; server stores and relays opaque ciphertext (see `PROTOCOL.md`, `shared/crypto.go`). **Not** per-user X25519 key exchange for chat — key distribution is out-of-band (`MARCHAT_GLOBAL_E2E_KEY`, or copy `keystore.dat` + passphrase)
+- Keystore (client): Passphrase → **PBKDF2** (SHA-256, 100k iterations) → **AES-GCM** wraps JSON holding `global_key`. **v3** files: magic `marchatk` + format byte + **random salt** in header (portable; legacy path-as-salt files **migrate** on load). See `client/crypto/keystore.go`
+- Plugin licenses: Ed25519 signing/validation (`plugin/license/`, `cmd/license`) — separate from chat E2E
+- Deploy / TLS: Client supports **WSS behind reverse proxies** (e.g. Caddy); see `deploy/`, `docker-compose.proxy.yml`, README proxy section
+- CI/CD: GitHub Actions — `go.yml` (tests, **race** where applicable, **Postgres/MySQL schema smoke** alongside SQLite), `release.yml` (releases; assets via **`gh` CLI**; optional **`publish-downstream-packages`** with `PACKAGING_GITHUB_PAT` / `AUR_SSH_PRIVATE_KEY`; **`CGO_ENABLED=0`** on cross-builds where documented)
+- Docker: Multi-arch images (linux/amd64, linux/arm64) published to Docker Hub
+
+## Code Standards
+- Follow Go conventions: gofmt, go vet, golangci-lint
+- Use Go modules: NEVER manually edit go.mod
+- Fix ALL compiler and linter warnings - they are NOT harmless
+- Keep functions focused and well-documented
+- Use struct embedding and interfaces for extensibility
+
+## Dependencies and Tooling
+- NEVER hardcode versions in go.mod
+- Always use: go get -u package or go get package@latest
+- For new modules: go mod init github.com/username/project
+- After code changes: follow `developing-marchat` and `testing-marchat` skills (gofmt, go vet, go test; golangci-lint when available; nested `plugin/sdk` when touched)
+- Address ALL warnings before considering code complete
+
+## marchat-Specific Patterns
+
+### Protocol and shared types
+- Wire types live in `shared/` (`Message`, `EncryptedMessage`, `ReactionMeta`, `Handshake`, `SessionKey`, `MessageType` constants)
+- Use existing `Message` / `EncryptedMessage`; support editing, deletion, pinning, reactions, channels, DMs, read receipts, typing, search
+- Follow `PROTOCOL.md` for JSON shapes and E2E wire encoding (e.g. base64 nonce ‖ ciphertext in `content` when `encrypted` is true)
+- Database access: dialect helpers, **parameterized** queries only
+
+### Client
+- Bubble Tea (model, update, view); Lipgloss for TUI styling; **`cli_output.go`** for **colorized** pre-TUI stdout (connection, E2E, profiles, etc.)
+- **Reconnect**: automatic WebSocket reconnect with **exponential backoff** (capped); skips reconnect on fatal username/handshake errors — see `client/main.go`, `client/websocket.go`
+- **`:q`** quits; **Esc** closes menus; help documents shortcuts vs text commands (`client/commands.go`)
+- **Message metadata**: **Alt+M** or **`:msginfo`** toggles optional per-line **message id** and **encrypted** flag in the transcript (`client/render.go`, `client/main.go`)
+- **Chrome**: terminal-native labels for UI chrome; avoid decorative lock-style emoji in chrome — user content (reactions, messages) may still use emoji
+- **Files**: `:sendfile` / Alt+F; size limits enforced consistently (shared helpers / server config); E2E file path uses keystore `EncryptRaw` / `DecryptRaw` when enabled
+- **Themes**: built-in + **custom JSON themes** under client config dir (`theme_loader.go`)
+- **Notifications**: bell, desktop (**Alt+N**), **`:notify-mode`**, quiet hours (**`:quiet`**), focus mode (**`:focus`**) — `notification_manager.go` + help text
+- **Mentions**: `@user` highlighting in render; mention-aware notification path — see `client/render.go`
+- **Profiles**: `profiles.json`; **dedupe** display names on load; default **Profile-N** naming when adding profiles (`client/config/config.go`)
+- **Config paths**: app data dir or **`MARCHAT_CONFIG_DIR`** via **`ResolveClientConfigDir()`**; **`GetConfigPath()`** uses the same rules as keystore’s primary path; **`GetKeystorePath`** checks primary → user-dir `keystore.dat` when override has none → last legacy **`./keystore.dat`** in cwd — `MigrateKeystoreToNewLocation`
+
+### Server
+- **Startup**: validated before serve — at least one admin, non-empty admin key, valid listen port; **admin names** trimmed, lowercased, case-insensitive **dedupe** (`cmd/server`, extracted validation helpers)
+- **Hub**: per-channel routing, DMs, typing/read receipts/reactions; **reserved usernames** so handshake cannot double-book a name before registration
+- **WebSocket**: **serialized writes** per connection (avoid concurrent write + control-frame panics)
+- **SQLite**: **WAL** enabled when backend is SQLite; backups (**VACUUM INTO**, etc.) must **quote paths** safely when SQL embeds paths
+- **Web admin** (`server/admin_web.go`, `server/admin_web.html`): session cookies; **`MARCHAT_SESSION_SECRET`** preferred, **`MARCHAT_JWT_SECRET`** deprecated alias; `config.GenerateSessionSecret()` when unset; **login rate limiting** per IP; **CSRF** on mutating routes
+- **Interactive server config** (`server/config_ui.go`): can generate session secret when saving config
+- **Health**: metrics and health HTTP endpoints (`server/health.go`)
+- **Rate limiting**: WebSocket message rate limits where implemented in hub/client handlers — do not bypass without intent
+
+### Plugins
+- JSON IPC over stdin/stdout (`plugin/sdk`, `plugin/host`); install/store/manage via `plugin/manager`, `plugin/store`; **`StopPlugin`** waits for stdout/stderr reader goroutines before niling pipes/decoder so disable/enable does not race under **`go test -race`**
+- **Persisted enable/disable** (and related state) in **`plugin_state.json`** under server **data** directory — `plugin/manager/manager.go`
+- **Non-admin users** may invoke plugin chat commands when the manifest marks them **not** admin-only (`AdminOnly: false`); admin-only install/enable/disable paths stay gated
+- **License cache**: treat as security-sensitive — cached entries are **re-signature-checked** and **plugin name** must match cache key (`plugin/license`); do not weaken validation
+
+### Configuration and diagnostics
+- **Server** `config/` package: env + **`config/.env`** with **godotenv.Overload** (file wins on same key); precedence details in `ARCHITECTURE.md` / README
+- **`-doctor`** / **`-doctor-json`**: `internal/doctor` in **both** client and server binaries; **text** report colorized on TTY unless **`NO_COLOR`**; **JSON** always plain; **server** doctor lists **`MARCHAT_*` after** `.env` load; **`MARCHAT_DOCTOR_NO_NETWORK=1`** skips GitHub release compare; tests use **`osEnviron`** + **`environMu`** in `env.go` (capture prior hook under the lock; do not **`t.Parallel()`** tests that swap the global mock together)
+- Doctor includes DB dialect, DSN shape checks, and durable-state table awareness where applicable
+
+### Testing
+- Tests in `*_test.go`, co-located; in-memory SQLite where appropriate; **race** in CI (Windows caveat: CGO)
+- After substantive changes, refresh **coverage figures** in `README.md` / `TESTING.md` when they shift materially
+
+## File Organization
+- Client: `client/` — `main.go`, `cli_output.go`, `render.go`, `commands.go`, `hotkeys.go`, `websocket.go`, `notification_manager.go`, `file_picker.go`, `code_snippet.go`, `theme_loader.go`
+- Client config: `client/config/` — `config.go`, `interactive_ui.go`
+- Client crypto: `client/crypto/` — `keystore.go`
+- Server app: `cmd/server/main.go`
+- Server library: `server/` — `hub.go`, `client.go`, `handlers.go`, `db.go`, `db_dialect.go`, `message_state.go`, `admin_web.go`, `admin_web.html`, `admin_panel.go`, `health.go`, `plugin_commands.go`, `logger.go`, `config.go`, `config_ui.go`
+- Shared: `shared/` — `types.go`, `crypto.go`, `version.go`
+- Server config package (repo root): `config/` — env, `.env`, `GenerateSessionSecret`, etc.
+- Plugin system: `plugin/` — `sdk/`, `host/`, `manager/`, `store/`, `license/`
+- Diagnostics: `internal/doctor/`
+- License CLI: `cmd/license/`
+- Agent skills (workflows): `.cursor/skills/` (see `.cursor/skills/README.md`)
+- CI/CD: `.github/workflows/` (`go.yml`, `release.yml`)
+- Docker: `Dockerfile`, `entrypoint.sh`, `docker-compose.yml`, `docker-compose.proxy.yml`
+- Deploy docs: `deploy/`, `caddy/`
+- Helper scripts: `scripts/build-windows.ps1`, `scripts/build-linux.sh`, `scripts/connect-local-wss.ps1`, `scripts/connect-local-wss.sh`, `install.ps1`, `install.sh`, `build-release.ps1`
+
+## Release Process
+- Follow `releasing-marchat` skill for the full checklist (version files, `PACKAGING.md`, `gh release upload`, `CGO_ENABLED=0`, zip archives, multi-arch Docker, downstream packaging secrets)
+
+## Security Requirements
+- Never log sensitive data (keys, passwords, tokens, admin keys, session secrets)
+- Validate all user input and commands
+- Use parameterized SQL queries (no string concatenation)
+- Follow existing E2E patterns: global ChaCha20 key, keystore wrapping; env var `MARCHAT_GLOBAL_E2E_KEY` wins for the process when set
+- Sanitize file paths to prevent traversal attacks
+- No credentials or secrets in code
+- GitHub Actions secrets for Docker Hub (`DOCKER_USERNAME`, `DOCKER_PAT`)
+- Pin third-party GitHub Actions to commit SHAs (Node major version pins where used, e.g. release actions)
+- Watch **SECURITY.md** / advisories for indirect crypto deps (e.g. `edwards25519` notes when relevant)
+
+## Testing and Validation
+- Follow `testing-marchat` skill: table-driven tests, `-race` in CI, in-memory SQLite, Postgres/MySQL smoke via `db_ci_smoke_test.go`, nested `plugin/sdk`, doctor `osEnviron` lock rules
+- Maintain coverage levels in `TESTING.md`; refresh README/TESTING figures when totals shift materially
+
+## Communication Style
+- Be concise but thorough
+- Reference `ARCHITECTURE.md` and `PROTOCOL.md` when relevant
+- Suggest Go idioms and best practices
+- Provide reasoning for architectural decisions
+- Acknowledge when features require broader system changes
+
+## Workflow Integration
+- Use `git-workflow-marchat` for commit messages and PRs; do not commit or push unless the user asks
+- Conventional commits (feat:, fix:, chore:, docs:, style:, ci:)
+- Flag breaking protocol or keystore changes; document in CHANGELOG
+- Update docs via `writing-marchat-docs` when behavior or protocol changes
+
+## Red Flags to Avoid
+- Don't break existing client-server protocol without discussion
+- Don't add heavy dependencies without justification
+- Don't modify database schema without migration plan across **all** supported dialects
+- Don't skip error handling for brevity
+- Don't assume Go patterns from other languages translate directly
+- Don't describe chat E2E as X25519 key exchange — the wire design is pre-shared symmetric key + ChaCha20-Poly1305
+- Don't treat `ROADMAP.md` items as shipped features unless they exist in code

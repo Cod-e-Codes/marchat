@@ -9,7 +9,16 @@
 
 # Cursor
 .cursorrules
-.cursor/
+# Local IDE state under .cursor/ stays untracked; commit shared rules and skills (cursor.com/docs/skills).
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
+!.cursor/skills/
+!.cursor/skills/**
+# Optional alternate project skills root (Agent Skills standard)
+.agents/*
+!.agents/skills/
+!.agents/skills/**
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out
