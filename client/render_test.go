@@ -284,6 +284,12 @@ func TestApplyURLMarkersAcrossWrappedLines(t *testing.T) {
 		if !hasHyperlinkANSI(segment) {
 			t.Fatalf("expected hyperlink underline on URL segment %q", line)
 		}
+		if strings.Contains(segment, "Cod\u2011e") || strings.Contains(segment, "Cod%E2%80%91") {
+			t.Fatalf("OSC 8 href must use ASCII hyphens, not non-breaking hyphens: %q", segment)
+		}
+		if !strings.Contains(segment, "\x1b]8;;https://github.com/Cod-e-Codes/") {
+			t.Fatalf("expected ASCII hyphen in OSC 8 href, got %q", segment)
+		}
 	}
 }
 

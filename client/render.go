@@ -229,7 +229,7 @@ func parseMarkedURLs(s string) []string {
 		for pos < len(s) {
 			r, sz = utf8.DecodeRuneInString(s[pos:])
 			if r == urlEndMarker {
-				urls = append(urls, buf.String())
+				urls = append(urls, normalizeURLHyphens(buf.String()))
 				pos += sz
 				break
 			}
@@ -252,7 +252,8 @@ func applyURLMarkers(line string, styles themeStyles, state *urlMarkerState) str
 			return
 		}
 		if link && state.currentURL != "" {
-			out.WriteString(styles.Hyperlink.Hyperlink(state.currentURL).Render(segment.String()))
+			href := normalizeURLHyphens(state.currentURL)
+			out.WriteString(styles.Hyperlink.Hyperlink(href).Render(segment.String()))
 		} else if link {
 			out.WriteString(styles.Hyperlink.Render(segment.String()))
 		} else {
