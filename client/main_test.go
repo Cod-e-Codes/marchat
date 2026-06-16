@@ -1404,16 +1404,53 @@ func TestAppendChatMessageE2ESearchHint(t *testing.T) {
 		Content: searchNoResultsPrefix + " test",
 		Type:    shared.TextMessage,
 	}
-	got := appendChatMessage(nil, noResults, true)
+	var seq int64
+	got := appendChatMessage(nil, noResults, true, &seq)
 	if len(got) != 2 {
 		t.Fatalf("len: got %d want 2", len(got))
 	}
 	if got[1].Content != e2eSearchNoResultsHint {
 		t.Fatalf("hint: got %q", got[1].Content)
 	}
-	plain := appendChatMessage(nil, noResults, false)
+	if got[1].MessageID >= 0 {
+		t.Fatalf("hint should use negative client system id, got %d", got[1].MessageID)
+	}
+	plain := appendChatMessage(nil, noResults, false, &seq)
 	if len(plain) != 1 {
 		t.Fatalf("plain len: got %d want 1", len(plain))
+	}
+}
+
+func TestPruneClientSystemMessages(t *testing.T) {
+	msgs := []shared.Message{
+		{Sender: "alice", Content: "hi", MessageID: 1},
+		{Sender: "System", Content: "usage", MessageID: -1},
+		{Sender: "bob", Content: "hey", MessageID: 2},
+		{Sender: "System", Content: "other", MessageID: 0},
+	}
+	got := pruneClientSystemMessages(msgs)
+	if len(got) != 3 {
+		t.Fatalf("len: got %d want 3", len(got))
+	}
+	for _, msg := range got {
+		if msg.MessageID < 0 {
+			t.Fatalf("pruned client system line: %+v", msg)
+		}
+	}
+}
+
+func TestSortMessagesPersistedBeforeClientSystem(t *testing.T) {
+	now := time.Now()
+	msgs := []shared.Message{
+		{Sender: "System", Content: "usage", CreatedAt: now.Add(time.Second), MessageID: -1},
+		{Sender: "alice", Content: "hello", CreatedAt: now, MessageID: 42},
+	}
+	sortMessagesByTimestamp(msgs)
+	if msgs[0].MessageID != 42 {
+		t.Fatalf("persisted chat should sort before client system line, got %+v", msgs)
+	}
+	if msgs[1].MessageID != -1 {
+		t.Fatalf("client system line should trail persisted chat, got %+v", msgs)
 	}
 }
 

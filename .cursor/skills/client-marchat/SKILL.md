@@ -15,7 +15,7 @@ Bubble Tea + Lipgloss TUI. Entry: `client/main.go`; split across `render.go`, `c
 ## Patterns
 
 - **Reconnect**: exponential backoff (capped); no reconnect on fatal username/handshake errors (`websocket.go`, `main.go`).
-- **Commands**: `:q` quits; `Esc` closes menus; help in `commands.go` (shortcuts vs text commands).
+- **Commands**: `:q` quits; `Esc` closes menus; help in `commands.go` (shortcuts vs text commands). Transient command results belong in the **banner** when short; longer lists (e.g. `:themes`) may use transcript System lines.
 - **E2E**: same wire path for channel text and DMs when encryption on; files via keystore `EncryptRaw` / `DecryptRaw`.
 - **Config**: `MARCHAT_CONFIG_DIR` / `ResolveClientConfigDir()`; keystore path resolution and migration in `client/config/config.go`.
 - **Chrome**: terminal-native labels; no decorative lock emoji in UI chrome (user content may include emoji).
@@ -23,15 +23,25 @@ Bubble Tea + Lipgloss TUI. Entry: `client/main.go`; split across `render.go`, `c
 - **Notifications**: bell, desktop (Alt+N), `:notify-mode`, `:quiet`, `:focus` (`notification_manager.go`).
 - **Pre-TUI output**: colorized stdout via `cli_output.go` unless `NO_COLOR`.
 
+## Transcript rendering (`render.go`)
+
+- **Word wrap**: `wrapStyledBlock` + `ansi.Wrap` at viewport width; preserves ANSI codes.
+- **URLs**: `prepareURLWrapping` (non-breaking hyphens in hosts), `markURLsForWrap` / `applyURLMarkers` so hyperlink color and underline survive line breaks without styling continuation indent.
+- **Sort order**: `sortMessagesByTimestamp` / `messageLess` - persisted chat by `message_id`, server System (`message_id == 0`) by `created_at`, client-local System (negative `message_id`) after persisted chat.
+- **Ephemeral client System lines**: `appendClientSystem` / `appendClientSystemMessage` assign negative ids; `pruneClientSystemMessages` on send or inbound persisted message. Do not append raw `Sender: "System"` with `time.Now()` for command feedback.
+
 ## Testing
 
 - Inject `tea.Msg` in tests; no real terminal.
-- `client/main_test.go`, `websocket_e2e_test.go`, `keystore_test.go`, `config_test.go`.
+- `client/testmain_test.go`: `lipgloss.SetColorProfile(termenv.ANSI256)` so headless render/hyperlink tests emit real SGR sequences.
+- `client/render_test.go`: URL wrap, hyperlink markers, system line severity, wrap width.
+- `client/main_test.go`: DM/channel filters, unread, client system prune/sort, E2E search hint.
+- `client/websocket_e2e_test.go`, `keystore_test.go`, `config_test.go`.
 - See `testing-marchat` skill.
 
 ## Protocol
 
-Outbound/inbound shapes must match `PROTOCOL.md` (`protocol-marchat` skill).
+Outbound/inbound shapes must match `PROTOCOL.md` (`protocol-marchat` skill). Negative `message_id` is client-only; never send on the wire.
 
 ## Doctor
 

@@ -42,6 +42,18 @@ func TestRenderMessagesSystemUsesSemanticStyle(t *testing.T) {
 	}
 }
 
+func TestMessageLessPersistedBeforeClientSystem(t *testing.T) {
+	now := time.Now()
+	a := shared.Message{Sender: "System", Content: "usage", CreatedAt: now.Add(time.Second), MessageID: -1}
+	b := shared.Message{Sender: "alice", Content: "hello", CreatedAt: now, MessageID: 42}
+	if messageLess(a, b) {
+		t.Fatal("client system line must not sort before persisted chat")
+	}
+	if !messageLess(b, a) {
+		t.Fatal("persisted chat must sort before client system line")
+	}
+}
+
 func TestResolveReactionEmojiThumbsAliases(t *testing.T) {
 	if got := resolveReactionEmoji("thumbsup"); got != "👍" {
 		t.Fatalf("thumbsup: got %q want thumbs up", got)

@@ -15,18 +15,48 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// sortMessagesByTimestamp ensures messages are displayed in chronological order
-// This provides client-side protection against server ordering issues
+// sortMessagesByTimestamp ensures messages are displayed in chronological order.
+// Persisted chat (message_id > 0) sorts by id; server System lines (id == 0) use
+// created_at; client-local System feedback (negative id) stays after persisted chat
+// so clock skew cannot pin it above new messages.
 func sortMessagesByTimestamp(messages []shared.Message) {
 	sort.Slice(messages, func(i, j int) bool {
-		if !messages[i].CreatedAt.Equal(messages[j].CreatedAt) {
-			return messages[i].CreatedAt.Before(messages[j].CreatedAt)
-		}
-		if messages[i].Sender != messages[j].Sender {
-			return messages[i].Sender < messages[j].Sender
-		}
-		return messages[i].Content < messages[j].Content
+		return messageLess(messages[i], messages[j])
 	})
+}
+
+func messageLess(a, b shared.Message) bool {
+	aClient := a.MessageID < 0
+	bClient := b.MessageID < 0
+	if aClient != bClient {
+		return !aClient
+	}
+	if aClient && bClient {
+		if a.MessageID != b.MessageID {
+			return a.MessageID < b.MessageID
+		}
+		return a.Content < b.Content
+	}
+
+	if a.MessageID > 0 && b.MessageID > 0 {
+		if a.MessageID != b.MessageID {
+			return a.MessageID < b.MessageID
+		}
+	}
+
+	if !a.CreatedAt.Equal(b.CreatedAt) {
+		return a.CreatedAt.Before(b.CreatedAt)
+	}
+	if a.MessageID > 0 && b.MessageID == 0 {
+		return true
+	}
+	if a.MessageID == 0 && b.MessageID > 0 {
+		return false
+	}
+	if a.Sender != b.Sender {
+		return a.Sender < b.Sender
+	}
+	return a.Content < b.Content
 }
 
 type systemLineSeverity int

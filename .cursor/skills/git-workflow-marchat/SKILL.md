@@ -3,8 +3,8 @@ name: git-workflow-marchat
 description: >-
   Drafts conventional commit messages and pull request bodies for marchat
   without committing or pushing unless explicitly requested. Use when the user
-  asks for a commit message, PR description, or git workflow help.
-disable-model-invocation: true
+  asks for a commit message, PR description, or git workflow help; also read at
+  the end of every substantive implementation task.
 ---
 
 # Git workflow for marchat
@@ -12,7 +12,8 @@ disable-model-invocation: true
 ## Default behavior
 
 - **Do not** run `git commit` or `git push` unless the user explicitly asks.
-- When changes are complete, **provide** a suggested commit message (and PR body if relevant).
+- **Always** provide a suggested commit message when implementation work is complete, even if the user did not ask to commit.
+- Scope the message to **all** uncommitted changes (`git status`, `git diff`), including prior uncommitted work from earlier turns in the same session.
 - Never amend, force-push, or skip hooks unless the user explicitly requests and conditions are met.
 
 ## Commit message format

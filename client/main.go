@@ -155,6 +155,8 @@ type model struct {
 
 	sending bool // NEW: sending message feedback
 
+	clientSystemSeq int64 // negative message_id sequence for ephemeral client System lines
+
 	conn    *websocket.Conn // persistent WebSocket connection
 	msgChan chan tea.Msg    // channel for incoming messages from WS goroutine
 	ctx     context.Context
@@ -333,17 +335,46 @@ func messageIncrementsUnread(m *model, v shared.Message) bool {
 	}
 }
 
-func appendChatMessage(messages []shared.Message, msg shared.Message, useE2E bool) []shared.Message {
+func nextClientSystemMessageID(seq *int64) int64 {
+	*seq--
+	return *seq
+}
+
+func appendClientSystemMessage(messages []shared.Message, content string, seq *int64) []shared.Message {
+	return append(messages, shared.Message{
+		Sender:    "System",
+		Content:   content,
+		CreatedAt: time.Now(),
+		Type:      shared.TextMessage,
+		MessageID: nextClientSystemMessageID(seq),
+	})
+}
+
+func pruneClientSystemMessages(messages []shared.Message) []shared.Message {
+	n := 0
+	for _, msg := range messages {
+		if msg.MessageID < 0 {
+			continue
+		}
+		messages[n] = msg
+		n++
+	}
+	return messages[:n]
+}
+
+func appendChatMessage(messages []shared.Message, msg shared.Message, useE2E bool, seq *int64) []shared.Message {
 	messages = append(messages, msg)
 	if useE2E && msg.Sender == "System" && strings.HasPrefix(msg.Content, searchNoResultsPrefix) {
-		messages = append(messages, shared.Message{
-			Sender:    "System",
-			Content:   e2eSearchNoResultsHint,
-			CreatedAt: time.Now(),
-			Type:      shared.TextMessage,
-		})
+		messages = appendClientSystemMessage(messages, e2eSearchNoResultsHint, seq)
 	}
 	return messages
+}
+
+func (m *model) appendClientSystem(content string) {
+	if len(m.messages) >= maxMessages {
+		m.messages = m.messages[len(m.messages)-maxMessages+1:]
+	}
+	m.messages = appendClientSystemMessage(m.messages, content, &m.clientSystemSeq)
 }
 
 func reactionWireMessage(sender string, targetID int64, emojiInput string, remove bool) shared.Message {
@@ -359,9 +390,7 @@ func reactionWireMessage(sender string, targetID int64, emojiInput string, remov
 }
 
 func (m *model) appendReactionUsage(usage string) {
-	m.messages = append(m.messages, shared.Message{
-		Sender: "System", Content: usage, CreatedAt: time.Now(), Type: shared.TextMessage,
-	})
+	m.appendClientSystem(usage)
 	m.refreshTranscript()
 	m.viewport.GotoBottom()
 }
@@ -1054,7 +1083,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.messages) >= maxMessages {
 				m.messages = m.messages[len(m.messages)-maxMessages+1:]
 			}
-			m.messages = appendChatMessage(m.messages, v, m.useE2E)
+			if v.MessageID > 0 {
+				m.messages = pruneClientSystemMessages(m.messages)
+			}
+			m.messages = appendChatMessage(m.messages, v, m.useE2E, &m.clientSystemSeq)
 			sortMessagesByTimestamp(m.messages)
 
 			if v.Type == shared.FileMessageType && v.File != nil {
@@ -1695,16 +1727,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				themeList.WriteString("\nUse :theme <name> to switch or Ctrl+T to cycle")
 
 				// Add as a system message
-				systemMsg := shared.Message{
-					Sender:    "System",
-					Content:   themeList.String(),
-					CreatedAt: time.Now(),
-					Type:      shared.TextMessage,
-				}
-				if len(m.messages) >= maxMessages {
-					m.messages = m.messages[len(m.messages)-maxMessages+1:]
-				}
-				m.messages = append(m.messages, systemMsg)
+				m.appendClientSystem(themeList.String())
 				m.refreshTranscript()
 				m.viewport.GotoBottom()
 
@@ -2000,21 +2023,21 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(text, ":edit ") {
 				parts := strings.Fields(text)
 				if len(parts) < 3 {
-					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :edit <message_id> <new content>", CreatedAt: time.Now(), Type: shared.TextMessage})
+					m.appendClientSystem("Usage: :edit <message_id> <new content>")
 				} else {
 					id, err := strconv.ParseInt(parts[1], 10, 64)
 					if err != nil {
-						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
+						m.appendClientSystem("Invalid message ID")
 					} else {
 						newContent := strings.Join(parts[2:], " ")
 						editMsg := shared.Message{Type: shared.EditMessageType, MessageID: id, Sender: m.cfg.Username}
 						okToSend := true
 						if m.useE2E && m.keystore != nil && m.keystore.GetSessionKey("global") != nil {
 							if err := verifyKeystoreUnlocked(m.keystore); err != nil {
-								m.messages = append(m.messages, shared.Message{Sender: "System", Content: "[ERROR] Keystore not unlocked: " + err.Error(), CreatedAt: time.Now(), Type: shared.TextMessage})
+								m.appendClientSystem("[ERROR] Keystore not unlocked: " + err.Error())
 								okToSend = false
 							} else if wire, encErr := encryptGlobalTextWireContent(m.keystore, m.cfg.Username, newContent); encErr != nil {
-								m.messages = append(m.messages, shared.Message{Sender: "System", Content: "[ERROR] Failed to encrypt edit: " + encErr.Error(), CreatedAt: time.Now(), Type: shared.TextMessage})
+								m.appendClientSystem("[ERROR] Failed to encrypt edit: " + encErr.Error())
 								okToSend = false
 							} else {
 								editMsg.Content = wire
@@ -2036,11 +2059,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(text, ":delete ") {
 				parts := strings.Fields(text)
 				if len(parts) < 2 {
-					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :delete <message_id>", CreatedAt: time.Now(), Type: shared.TextMessage})
+					m.appendClientSystem("Usage: :delete <message_id>")
 				} else {
 					id, err := strconv.ParseInt(parts[1], 10, 64)
 					if err != nil {
-						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
+						m.appendClientSystem("Invalid message ID")
 					} else {
 						delMsg := shared.Message{Type: shared.DeleteMessage, MessageID: id, Sender: m.cfg.Username}
 						if m.conn != nil {
@@ -2085,12 +2108,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if text == ":dms" {
 				threads := m.sidebarDMThreads()
 				if len(threads) == 0 {
-					m.messages = append(m.messages, shared.Message{
-						Sender:    "System",
-						Content:   "No DM conversations yet.",
-						CreatedAt: time.Now(),
-						Type:      shared.TextMessage,
-					})
+					m.appendClientSystem("No DM conversations yet.")
 				} else {
 					lines := make([]string, 0, len(threads))
 					for _, thread := range threads {
@@ -2100,12 +2118,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							lines = append(lines, thread.User)
 						}
 					}
-					m.messages = append(m.messages, shared.Message{
-						Sender:    "System",
-						Content:   "DM conversations: " + strings.Join(lines, ", "),
-						CreatedAt: time.Now(),
-						Type:      shared.TextMessage,
-					})
+					m.appendClientSystem("DM conversations: " + strings.Join(lines, ", "))
 				}
 				m.textarea.SetValue("")
 				m.refreshTranscript()
@@ -2173,7 +2186,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						_ = m.conn.WriteJSON(searchMsg)
 					}
 				} else {
-					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :search <query>", CreatedAt: time.Now(), Type: shared.TextMessage})
+					m.appendClientSystem("Usage: :search <query>")
 					m.refreshTranscript()
 					m.viewport.GotoBottom()
 				}
@@ -2207,13 +2220,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if strings.HasPrefix(text, ":pin ") {
 				parts := strings.Fields(text)
 				if len(parts) < 2 {
-					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :pin <message_id>", CreatedAt: time.Now(), Type: shared.TextMessage})
+					m.appendClientSystem("Usage: :pin <message_id>")
 					m.refreshTranscript()
 					m.viewport.GotoBottom()
 				} else {
 					id, err := strconv.ParseInt(parts[1], 10, 64)
 					if err != nil {
-						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
+						m.appendClientSystem("Invalid message ID")
 						m.refreshTranscript()
 						m.viewport.GotoBottom()
 					} else {
@@ -2279,20 +2292,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					sb.WriteString(fmt.Sprintf("[%s] %s: %s\n", ts, msg.Sender, msg.Content))
 				}
 				if err := os.WriteFile(filename, []byte(sb.String()), 0644); err != nil {
-					m.messages = append(m.messages, shared.Message{
-						Sender: "System", Content: "Export failed: " + err.Error(),
-						CreatedAt: time.Now(), Type: shared.TextMessage,
-					})
+					m.appendClientSystem("Export failed: " + err.Error())
 				} else {
-					m.messages = append(m.messages, shared.Message{
-						Sender: "System", Content: "History exported to " + filename,
-						CreatedAt: time.Now(), Type: shared.TextMessage,
-					})
+					m.appendClientSystem("History exported to " + filename)
 				}
 				m.textarea.SetValue("")
 				return m, nil
 			}
 			if text != "" {
+				m.messages = pruneClientSystemMessages(m.messages)
+				m.refreshTranscript()
 				m.sending = true
 				if m.conn != nil {
 					// Check if this is a server-side command (admin/plugin) that should bypass encryption
