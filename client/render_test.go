@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestSystemLineSeverityClass(t *testing.T) {
@@ -96,6 +97,52 @@ func stripANSIForTest(s string) string {
 		b.WriteRune(r)
 	}
 	return b.String()
+}
+
+func TestPrepareURLWrappingUsesNonBreakingHyphen(t *testing.T) {
+	in := "see https://github.com/Cod-e-Codes/marchat"
+	out := prepareURLWrapping(in)
+	if strings.Contains(out, "Cod-e-Codes") {
+		t.Fatalf("expected non-breaking hyphens in URL, got %q", out)
+	}
+	if !strings.Contains(out, "Cod\u2011e\u2011Codes") {
+		t.Fatalf("expected NB hyphen in URL segment, got %q", out)
+	}
+}
+
+func TestWrapStyledBlockLongURLBreaksAtSlashes(t *testing.T) {
+	styles := getThemeStyles("patriot")
+	url := "https://github.com/Cod-e-Codes/marchat/commit/351139afcb2f548eb02ff0fd3f107b1c63910a60"
+	msgs := []shared.Message{
+		{
+			Sender:    "Cody",
+			Content:   "updated: " + url,
+			CreatedAt: time.Now(),
+			Type:      shared.TextMessage,
+			MessageID: 67,
+		},
+	}
+	const width = 59
+	out := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, width, true, true)
+	if strings.Contains(out, "Cod-e-\n") || strings.Contains(out, "Cod-e-\r") {
+		t.Fatalf("URL should not break at domain hyphen:\n%s", out)
+	}
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
+		if strings.TrimSpace(line) == "" || strings.Contains(line, "June") {
+			continue
+		}
+		if !strings.Contains(line, "http") && !strings.Contains(line, "updated:") && !strings.Contains(line, "Cody:") {
+			continue
+		}
+		if ansi.StringWidth(stripANSIForTest(line)) > width+1 {
+			t.Fatalf("line exceeds width %d (%d cells): %q", width, ansi.StringWidth(stripANSIForTest(line)), line)
+		}
+	}
+	if !strings.Contains(out, "/marchat/") && !strings.Contains(out, "/commit/") {
+		if !strings.Contains(out, "github.com/Cod") {
+			t.Fatalf("expected URL path segments in wrapped output, got:\n%s", out)
+		}
+	}
 }
 
 func TestWrapStyledBlockShortMessageUnchanged(t *testing.T) {

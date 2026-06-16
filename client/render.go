@@ -72,6 +72,27 @@ func systemLineStyle(styles themeStyles, content string) lipgloss.Style {
 	}
 }
 
+const (
+	// urlNBHyphen is a non-breaking hyphen so ansi.Wrap does not split URLs at
+	// domain/path hyphens (e.g. Cod-e-Codes). Restored for click-to-open matching.
+	urlNBHyphen = '\u2011'
+)
+
+// wrapBreakpoints are characters where line wrapping may occur. Slashes and
+// query delimiters let long URLs break at path boundaries instead of mid-token.
+const wrapBreakpoints = " /?#&="
+
+// prepareURLWrapping adjusts URL text so terminal wrapping prefers path segments
+// over hyphens inside host/path components.
+func prepareURLWrapping(s string) string {
+	if urlRegex == nil {
+		return s
+	}
+	return urlRegex.ReplaceAllStringFunc(s, func(url string) string {
+		return strings.ReplaceAll(url, "-", string(urlNBHyphen))
+	})
+}
+
 // wrapStyledBlock word-wraps ANSI-styled chat body text to width, preserving escape codes.
 // prefix is printed once on the first line; continuation lines align under the body column.
 func wrapStyledBlock(prefix, content, suffix string, width int) string {
@@ -94,7 +115,7 @@ func wrapStyledBlock(prefix, content, suffix string, width int) string {
 	var out strings.Builder
 	first := true
 	for _, paragraph := range strings.Split(content, "\n") {
-		wrapped := ansi.Wordwrap(paragraph, lineWidth, " ")
+		wrapped := ansi.Wrap(paragraph, lineWidth, wrapBreakpoints)
 		for _, wl := range strings.Split(wrapped, "\n") {
 			if !first {
 				out.WriteString("\n")
@@ -161,6 +182,7 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 		} else {
 			content = renderEmojis(content)
 			content = renderCodeBlocks(content)
+			content = prepareURLWrapping(content)
 			content = renderHyperlinks(content, styles)
 			if mentionRegex != nil {
 				content = mentionRegex.ReplaceAllStringFunc(content, func(match string) string {

@@ -515,6 +515,7 @@ func (m *model) findURLAtClickPosition(clickX, clickY int) string {
 	}
 
 	line := ansiEscRegex.ReplaceAllString(lines[adjustedY], "")
+	line = strings.ReplaceAll(line, "\u2011", "-")
 
 	adjustedX := clickX - userListWidth - 1
 	if adjustedX < 0 || adjustedX >= len(line) {
