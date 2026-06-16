@@ -842,7 +842,7 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `client` | 29.4% | Low |
 | `cmd/server` | 13.7% | Low |
 
-**Overall: 44.0%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 44.4%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

@@ -27,6 +27,10 @@ Update docs when behavior, protocol, env vars, or coverage changes. Do not edit 
 - Call out breaking protocol or keystore changes explicitly.
 - Dependency bumps: name and version.
 
+## Behavior changes (required)
+
+When user-visible or protocol behavior changes, update **CHANGELOG** and **normative docs** together (`ARCHITECTURE.md`, `PROTOCOL.md`, `TESTING.md`, `README.md` when env/coverage/install facts shift). Update **domain skills** under `.cursor/skills/` when agent workflows or shipped behavior they describe changes. Do **not** leave CHANGELOG-only updates when other docs or skills would become stale.
+
 ## README.md
 
 - Install paths, env vars, doctor, DB backends, proxy/WSS, coverage summary pointer to `TESTING.md`.
@@ -53,4 +57,5 @@ Use `ROADMAP.md` for planned work. Do not document roadmap items as released unl
 - [ ] Facts match current code (grep or read implementation)
 - [ ] Version strings consistent across touched files
 - [ ] Coverage numbers refreshed if tests changed materially
+- [ ] Normative docs and domain skills updated when behavior changes (not CHANGELOG-only)
 - [ ] No em dash introduced in new prose

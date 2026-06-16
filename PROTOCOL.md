@@ -128,11 +128,11 @@ These values of `type` extend the core chat protocol:
 | `edit` | Replace the text of an existing message. Requires `message_id` and new body in `content`. Set `encrypted` to `true` when `content` is E2E ciphertext (same base64 **nonce ‖ ciphertext** layout as `text`); the server persists that flag to `is_encrypted` so history and reconnects stay consistent. Only the original sender may edit; admins cannot edit someone else's message (unlike `delete`, where an admin may remove any message). Enforced by matching WebSocket `sender` to the stored row. |
 | `delete` | Soft-delete a message. Requires `message_id`. Authors may delete their own messages; admins may delete any message. |
 | `typing` | Typing indicator; `content` is not required. The server sets `sender`. Optional `recipient` scopes typing to a DM partner only (same delivery as `dm`: sender and recipient). Empty `recipient` keeps channel/global behavior (see [Channels](#channels) when `channel` is set). The reference client sets `recipient` while composing in DM mode; it only applies DM-scoped typing when that DM thread is open, and it does not show channel/global typing while a DM thread is open (so channel typing is not mistaken for the active DM). |
-| `reaction` | Add or remove a reaction. Requires the `reaction` object (`emoji`, `target_id`, optional `is_removal`). The reference client sends removals via `:unreact <id> <emoji>` (or the same emoji aliases as `:react`, including `thumbsup` / `thumbsdown` for `+1` / `-1`). |
+| `reaction` | Add or remove a reaction. Requires the `reaction` object (`emoji`, `target_id`, optional `is_removal`). The reference client includes the active `channel` on the wire. The server stamps `channel` from membership and delivers to clients in that channel. Removals via `:unreact <id> <emoji>` (or the same emoji aliases as `:react`, including `thumbsup` / `thumbsdown` for `+1` / `-1`). |
 | `dm` | Direct message. Requires `recipient` (target username). Delivered only to sender and recipient. Persisted by the server and included in reconnect history only for those two participants. When E2E is enabled, the reference client sets `encrypted` to `true` and uses the same base64 **nonce ‖ ciphertext** layout in `content` as `text` messages (global shared key). |
 | `search` | Full-text search. `content` is the search query; the server replies with a private `text` message from `System` listing up to 20 matches (not broadcast). Matching uses SQL `LIKE` on the stored `content` column. When E2E is enabled, persisted chat bodies are ciphertext, so search does not match decrypted plaintext clients display in the transcript. The reference client appends a short `System` note when a search returns no results in an E2E session. |
 | `pin` | Toggle pinned state for `message_id`. **Admin only**; non-admins receive an error `text` from `System`. On success, a `System` `text` notice is broadcast. |
-| `read_receipt` | Read receipt. Clients may send `read_receipt` with `message_id` set to the latest persisted chat line they have read while the transcript viewport is scrolled to the tail (the reference client debounces bursts). The server sets `sender` from the connection, persists when `message_id` is positive (`read_receipts` table), and broadcasts the message. Receivers may ignore or surface receipts in UI; the reference TUI does not print them in the transcript. |
+| `read_receipt` | Read receipt. Clients may send `read_receipt` with `message_id` set to the latest persisted chat line they have read while the transcript viewport is scrolled to the tail (the reference client debounces bursts and includes the active `channel`). The server sets `sender` from the connection, stamps `channel` from membership, persists when `message_id` is positive (`read_receipts` table), and broadcasts to clients in that channel. Receivers may ignore or surface receipts in UI; the reference TUI does not print them in the transcript. |
 | `join_channel` | Join a channel. Requires `channel` (name). If the client was in another channel, they leave it first. The server sends a confirmation `text` from `System`. |
 | `leave_channel` | Leave the current channel and return to `#general`. No `content` required. If already in `general`, no-op. The server sends a confirmation `text` from `System`. |
 
@@ -188,7 +188,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
 ## Channels
 
 - Every connection is placed in the `general` channel after a successful handshake.
-- Channel names are carried on messages via the optional `channel` field. When it is set on a non-system message, the server routes that message only to clients currently joined to that channel.
+- Channel names are carried on messages via the optional `channel` field. For outbound traffic from authenticated clients (text, files, edits, typing, reactions, read receipts, and similar), the server **stamps** `channel` from the sender's current hub membership and **ignores** client-supplied channel values, so clients cannot inject messages into rooms they have not joined. When `channel` is set on a non-system message, the server routes that message only to clients currently joined to that channel.
 - Clients switch channels by sending `type`: `join_channel` with `channel` set to the target name. Sending `join_channel` while already in another channel leaves the previous channel first.
 - Clients return to `general` with `type`: `leave_channel` (no fields required beyond the message envelope). If the client is already in `general`, the server performs no channel change.
 
@@ -265,15 +265,14 @@ The protocol is intentionally JSON-based. **Plugins** extend the server through 
 ```
 
 3. Server responds with history and user list
-4. Client sends message (optional `channel`; if omitted, the server uses the client’s current channel, default `general`):
+4. Client sends message (`channel` on the wire is optional; the server stamps routing from the sender's joined channel, default `general`):
 
 ```json
 {
   "sender": "carol",
   "content": "hey there",
   "created_at": "2025-07-24T15:09:00Z",
-  "type": "text",
-  "channel": "general"
+  "type": "text"
 }
 ```
 

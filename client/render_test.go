@@ -358,3 +358,18 @@ func TestWrapStyledBlockShortMessageUnchanged(t *testing.T) {
 		t.Fatalf("short message should be a single chat line, got %d: %q", msgLines, out)
 	}
 }
+
+func TestIsTranscriptSystemMessageNegativeClientNotice(t *testing.T) {
+	msg := shared.Message{
+		Sender:    "System",
+		Content:   "Available themes: dark",
+		MessageID: -1,
+	}
+	if !isTranscriptSystemMessage(msg) {
+		t.Fatal("negative-id transcript notice should stay in transcript")
+	}
+	ephemeral := shared.Message{Sender: "System", Content: "Usage: :kick", MessageID: -2}
+	if isTranscriptSystemMessage(ephemeral) {
+		t.Fatal("negative-id usage line should be ephemeral")
+	}
+}

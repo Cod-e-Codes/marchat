@@ -45,6 +45,10 @@ Locally, CI smoke tests skip without env vars. See `testing-marchat` skill.
 3. Run `go test ./server/...`.
 4. Document env or migration notes in `ARCHITECTURE.md` / `CHANGELOG.md` if user-visible.
 
+## Backup
+
+In-process `:backup` supports **SQLite only**. Postgres and MySQL require native backup tools; `BackupDatabase` returns an error when dialect is not SQLite.
+
 ## References
 
 - `ARCHITECTURE.md` database section

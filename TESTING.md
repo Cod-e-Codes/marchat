@@ -12,7 +12,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: Narrative release summaries live in **[CHANGELOG.md](CHANGELOG.md)** (and on GitHub Releases). This is a foundational test suite with good coverage for smaller utility packages and growing coverage for client and server components. **Overall statement coverage is 44.0%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage`, `coverage`, or per-package `ph` / `sv`) so the argument is not misparsed. The nested **`plugin/sdk`** module (separate `go.mod`) is not included in that merged number; its package statement coverage is **58.8%** when measured with `cd plugin/sdk && go test -coverprofile=sdkcover ./... && go tool cover -func=sdkcover`.
+**Note**: Narrative release summaries live in **[CHANGELOG.md](CHANGELOG.md)** (and on GitHub Releases). This is a foundational test suite with good coverage for smaller utility packages and growing coverage for client and server components. **Overall statement coverage is 44.4%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage`, `coverage`, or per-package `ph` / `sv`) so the argument is not misparsed. The nested **`plugin/sdk`** module (separate `go.mod`) is not included in that merged number; its package statement coverage is **58.8%** when measured with `cd plugin/sdk && go test -coverprofile=sdkcover ./... && go tool cover -func=sdkcover`.
 
 **Doctor env tests:** Production code reads process env via **`collectMarchatEnviron`** and the swappable **`osEnviron`** variable (see `internal/doctor/env.go`), guarded by **`environMu`**. Tests that replace **`osEnviron`** must capture the previous function while holding **`environMu`** and must not use **`t.Parallel()`** alongside other tests that also swap it, or **`go test -race`** can observe races and overlapping mocks. **`buildEnvLines`** tests are therefore sequential in the package.
 
@@ -37,8 +37,8 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `client/code_snippet_test.go` | Client code snippet functionality | Text editing, selection, clipboard, syntax highlighting |
 | `client/file_picker_test.go` | Client file picker functionality | File browsing, selection, size validation, directory navigation |
 | `client/testmain_test.go` | Client test harness | Forces Lipgloss ANSI256 profile for headless hyperlink/render assertions |
-| `client/render_test.go` | Message transcript rendering | URL wrap breakpoints, URL span markers, hyperlink style on wrapped segments, continuation indent not underlined, system line severity |
-| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling, encryption functions, flag validation, `wsConnected` transcript reset on reconnect, `TestMessageIncrementsUnread`, client System prune/sort (`TestPruneClientSystemMessages`, `TestSortMessagesPersistedBeforeClientSystem`) |
+| `client/render_test.go` | Message transcript rendering | URL wrap breakpoints, URL span markers, hyperlink style on wrapped segments, continuation indent not underlined, system line severity, negative-ID transcript notice classification |
+| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling (click miss vs hit), encryption functions, flag validation, `wsConnected` transcript reset on reconnect, reconnect backoff doubling, `TestMessageIncrementsUnread`, client System prune/sort (`TestPruneEphemeralSystemMessages`, `TestPruneKeepsTranscriptSystemNotices`, `TestSortMessagesPersistedBeforeClientSystem`), reaction wire channel |
 | `client/websocket_sanitize_test.go` | WebSocket URL / TLS hints | Sanitization helpers for display and connection hints |
 | `client/websocket_e2e_test.go` | E2E DM and channel wire helpers | Encrypted outbound message shape, DM send wire format, decrypt roundtrip |
 | `client/exthook/exthook_test.go` | Client hook helpers | Executable validation, hook JSON shaping, path rules |
@@ -58,7 +58,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables, visible handshake replay query, search and pin SQL (env-gated) |
 | `server/message_state_test.go` | Durable reactions | Reaction persistence and replay helpers |
 | `server/config_test.go` | Server configuration | Server configuration logic and validation |
-| `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations, unknown admin command system reply (`TestHandleCommandUnknownAdminSendsSystemReply`) |
+| `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations, unknown admin command system reply (`TestHandleCommandUnknownAdminSendsSystemReply`), channel stamping (`TestStampClientChannelOverwritesSpoofedChannel`), non-admin unknown vs admin-only command replies |
 | `server/health_test.go` | Server health monitoring | Health checks, system metrics, HTTP endpoints, concurrent access |
 | `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, extended fields (channel, encrypted, message_id, recipient, edited), JSON serialization, omitempty validation, backwards-compat unknown-field handling |
 | `plugin/sdk/stdio_test.go` | Plugin SDK stdio | `HandlePluginRequest` / `RunIO` (init, message, command, shutdown), EOF handling |
@@ -263,17 +263,17 @@ Nested **`plugin/sdk`**: `cd plugin/sdk && go test -coverprofile=sdkcover ./... 
 - **Config Package**: Configuration loading, validation, environment variables (73.2%)
 
 ### Medium Coverage (40-70%)
-- **Plugin Host Package**: Load/start/stop lifecycle, JSON IPC with a minimal test plugin, `ExecuteCommand`, bounded async chat fan-out to plugins, **stop** waits for IPC reader goroutines before clearing instance state (64.6%)
+- **Plugin Host Package**: Load/start/stop lifecycle, JSON IPC with a minimal test plugin, `ExecuteCommand`, bounded async chat fan-out to plugins, serialized stdin writes (`stdinMu`), **stop** waits for IPC reader goroutines before clearing instance state (66.0%)
 - **Client Config Package**: Configuration management, path utilities, keystore migration, interactive UI (58.0%)
 - **Doctor Package**: Server/client diagnostics, env checks, update metadata, DB probes (66.5%)
 - **Plugin Store**: Registry management, platform resolution, filtering, caching (47.0%)
 - **Command License**: CLI functions for license management (42.2%)
 
 ### Low Coverage (<40%)
-- **Server Package**: WebSocket handling, origin/IP request context (`request_context.go`), admin panel, database operations, message edit/delete/pin/search, channels, DMs (39.8%)
+- **Server Package**: WebSocket handling, origin/IP request context (`request_context.go`), admin panel, database operations, message edit/delete/pin/search, channels, DMs (43.5%)
 - **Plugin Manager**: Installation, store download paths, checksum and archive guards, enable/disable with persisted state (66.1%)
 - **Client Hooks (`client/exthook`)**: Hook path validation and hook-safe message JSON (24.1%)
-- **Client Package**: Message rendering, user lists, encryption functions (including E2E DM wire helpers), flag validation, TUI entrypoints (28.1%)
+- **Client Package**: Message rendering, user lists, encryption functions (including E2E DM wire helpers), flag validation, TUI entrypoints (31.3%)
 - **Server Main (`cmd/server`)**: Full `main` startup, HTTP/TLS serving, admin panel wiring (13.7% for `cmd/server`); helpers such as `normalizeAndValidateAdmins` and `validateStartupConfig` plus `-doctor` / `-doctor-json` subprocess smoke tests cover parts of `main`
 
 ### Detailed File Coverage
@@ -294,7 +294,7 @@ Statement percentages below use the same `mergedcoverage` profile as `go tool co
 | `config/config.go` | 73.2% | config | Configuration management |
 | `client/notification_manager.go` | 67.5% | client | Desktop / notification integration |
 | `client/config/interactive_ui.go` | 66.9% | client/config | Interactive configuration UI |
-| `plugin/host/host.go` | 64.6% | plugin/host | Plugin subprocess lifecycle and IPC |
+| `plugin/host/host.go` | 66.0% | plugin/host | Plugin subprocess lifecycle, serialized stdin IPC |
 | `server/logger.go` | 61.4% | server | Logging functionality |
 | `server/message_state.go` | 59.2% | server | Reactions, read receipts, channel prefs |
 | `server/db_dialect.go` | 74.1% | server | SQL dialect helpers |

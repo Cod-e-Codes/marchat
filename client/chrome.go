@@ -155,6 +155,7 @@ func (m *model) flushReadReceipt() tea.Cmd {
 		Type:      shared.ReadReceiptType,
 		Sender:    m.cfg.Username,
 		MessageID: maxID,
+		Channel:   normalizeChannel(m.currentChannel),
 	}
 	if err := m.conn.WriteJSON(out); err != nil {
 		m.banner = "[ERROR] Failed to send read receipt: " + err.Error()

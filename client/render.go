@@ -118,7 +118,7 @@ func isTranscriptSystemMessage(msg shared.Message) bool {
 		return true
 	}
 	if msg.MessageID < 0 {
-		return false
+		return isTranscriptSystemNotice(msg.Content)
 	}
 	if msg.MessageID > 0 {
 		return true

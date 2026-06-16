@@ -1376,7 +1376,7 @@ func TestReactionMetaSerialization(t *testing.T) {
 }
 
 func TestReactionWireMessageRemoval(t *testing.T) {
-	msg := reactionWireMessage("alice", 20, "thumbsup", true)
+	msg := reactionWireMessage("alice", "general", 20, "thumbsup", true)
 	if msg.Type != shared.ReactionMessage {
 		t.Fatalf("type: got %v", msg.Type)
 	}
@@ -1388,6 +1388,9 @@ func TestReactionWireMessageRemoval(t *testing.T) {
 	}
 	if msg.Reaction.TargetID != 20 {
 		t.Fatalf("target: got %d want 20", msg.Reaction.TargetID)
+	}
+	if msg.Channel != "general" {
+		t.Fatalf("channel: got %q want general", msg.Channel)
 	}
 	data, err := json.Marshal(msg)
 	if err != nil {
@@ -1405,7 +1408,7 @@ func TestAppendChatMessageE2ESearchHint(t *testing.T) {
 		Type:    shared.TextMessage,
 	}
 	var seq int64
-	got := appendChatMessage(nil, noResults, true, &seq)
+	got := appendChatMessage(nil, noResults, true, "general", &seq)
 	if len(got) != 2 {
 		t.Fatalf("len: got %d want 2", len(got))
 	}
@@ -1415,7 +1418,7 @@ func TestAppendChatMessageE2ESearchHint(t *testing.T) {
 	if got[1].MessageID >= 0 {
 		t.Fatalf("hint should use negative client system id, got %d", got[1].MessageID)
 	}
-	plain := appendChatMessage(nil, noResults, false, &seq)
+	plain := appendChatMessage(nil, noResults, false, "general", &seq)
 	if len(plain) != 1 {
 		t.Fatalf("plain len: got %d want 1", len(plain))
 	}
@@ -1437,6 +1440,34 @@ func TestPruneEphemeralSystemMessages(t *testing.T) {
 		if msg.Sender == "System" && !isTranscriptSystemMessage(msg) {
 			t.Fatalf("ephemeral system line remained: %+v", msg)
 		}
+	}
+}
+
+func TestPruneKeepsTranscriptSystemNotices(t *testing.T) {
+	var seq int64
+	msgs := appendClientSystemMessage(nil, "Available themes: dark, light", "dev", &seq)
+	got := pruneEphemeralSystemMessages(msgs)
+	if len(got) != 1 {
+		t.Fatalf("len: got %d want 1", len(got))
+	}
+}
+
+func TestAppendClientSystemMessageSetsChannel(t *testing.T) {
+	var seq int64
+	msgs := appendClientSystemMessage(nil, "Joined channel #dev", "ops", &seq)
+	if msgs[0].Channel != "ops" {
+		t.Fatalf("channel: got %q want ops", msgs[0].Channel)
+	}
+}
+
+func TestReconnectBackoffDoubles(t *testing.T) {
+	m := &model{reconnectDelay: time.Second}
+	delay := m.reconnectDelay
+	if delay < reconnectMaxDelay {
+		m.reconnectDelay *= 2
+	}
+	if delay != time.Second || m.reconnectDelay != 2*time.Second {
+		t.Fatalf("delay=%v reconnectDelay=%v", delay, m.reconnectDelay)
 	}
 }
 
@@ -1523,5 +1554,17 @@ func TestDebugWebSocketWriteDetailed(t *testing.T) {
 				t.Error("Content should not be empty")
 			}
 		}
+	}
+}
+
+func TestFindURLAtClickPositionMissReturnsEmpty(t *testing.T) {
+	m := &model{viewport: viewport.New(80, 3)}
+	m.viewport.SetContent("see https://a.com and https://b.com")
+	x0, y0 := m.chatPanelOrigin()
+	if got := m.findURLAtClickPosition(x0+2, y0); got != "" {
+		t.Fatalf("click on plain text should not open URL, got %q", got)
+	}
+	if got := m.findURLAtClickPosition(x0+4, y0); got != "https://a.com" {
+		t.Fatalf("click on URL: got %q want https://a.com", got)
 	}
 }

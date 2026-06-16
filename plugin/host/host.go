@@ -74,6 +74,8 @@ type PluginInstance struct {
 	// ipcWG waits for stdout/stderr reader goroutines so a follow-up StartPlugin cannot race
 	// on instance.decoder (or pipes) while a prior handlePluginOutput is still starting.
 	ipcWG sync.WaitGroup
+	// stdinMu serializes newline-delimited JSON writes to Stdin (fan-out writer vs RPC).
+	stdinMu sync.Mutex
 }
 
 // NewPluginHost creates a new plugin host
@@ -459,6 +461,16 @@ func (h *PluginHost) enqueuePluginChatMessage(instance *PluginInstance, name str
 	}
 }
 
+func (instance *PluginInstance) writeStdin(data []byte) error {
+	instance.stdinMu.Lock()
+	defer instance.stdinMu.Unlock()
+	if instance.Stdin == nil {
+		return fmt.Errorf("plugin stdin is not available")
+	}
+	_, err := instance.Stdin.Write(data)
+	return err
+}
+
 func (h *PluginHost) runPluginOutboundWriter(ch <-chan sdk.Message, instance *PluginInstance) {
 	for msg := range ch {
 		req := sdk.PluginRequest{
@@ -471,14 +483,7 @@ func (h *PluginHost) runPluginOutboundWriter(ch <-chan sdk.Message, instance *Pl
 			continue
 		}
 		line := append(data, '\n')
-
-		instance.mu.Lock()
-		stdin := instance.Stdin
-		instance.mu.Unlock()
-		if stdin == nil {
-			continue
-		}
-		if _, err := stdin.Write(line); err != nil {
+		if err := instance.writeStdin(line); err != nil {
 			log.Printf("Failed to send message to plugin %s: %v", instance.Name, err)
 		}
 	}
@@ -594,27 +599,13 @@ func (h *PluginHost) initializePlugin(instance *PluginInstance) error {
 
 // sendRequest sends a request to a plugin
 func (h *PluginHost) sendRequest(instance *PluginInstance, req sdk.PluginRequest) error {
-	if instance.Stdin == nil {
-		return fmt.Errorf("plugin stdin is not available")
-	}
-
 	data, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	// Sending request to plugin
-
-	// Send request with newline delimiter
 	data = append(data, '\n')
-	_, err = instance.Stdin.Write(data)
-	if err != nil {
-		// Failed to write to plugin stdin
-		return err
-	}
-
-	// Successfully sent request to plugin
-	return nil
+	return instance.writeStdin(data)
 }
 
 // handlePluginOutput handles stdout from a plugin

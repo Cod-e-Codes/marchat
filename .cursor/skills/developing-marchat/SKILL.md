@@ -40,6 +40,8 @@ gofmt -w .
 go vet ./...
 go test ./...
 go test -race ./...
+go test -coverprofile=mergedcoverage ./...
+go tool cover -func=mergedcoverage
 ```
 
 If `golangci-lint` is installed:
@@ -62,7 +64,7 @@ Windows: CI runs `-race` on Linux; local `-race` on Windows may require CGO for 
 - [ ] `go test ./...` and `go test -race ./...` run and reported (not assumed)
 - [ ] `cd plugin/sdk && go test ./...` run (nested module; skip only for docs-only or unrelated isolated edits)
 - [ ] Tests added or updated for behavior changes (`testing-marchat` skill)
-- [ ] Docs/changelog/coverage updated if user-visible or totals shifted (`writing-marchat-docs`)
+- [ ] Docs/changelog/coverage updated if user-visible or totals shifted (`writing-marchat-docs`); update ARCHITECTURE/PROTOCOL/skills when behavior changes, not CHANGELOG alone
 - [ ] Domain skill and `.cursor/skills/` updated when shipped behavior or agent workflow changes
 - [ ] No protocol or keystore breaking change without explicit discussion and changelog note
 - [ ] **Commit message drafted** via `git-workflow-marchat` for **all** uncommitted files in the working tree

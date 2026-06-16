@@ -340,12 +340,13 @@ func nextClientSystemMessageID(seq *int64) int64 {
 	return *seq
 }
 
-func appendClientSystemMessage(messages []shared.Message, content string, seq *int64) []shared.Message {
+func appendClientSystemMessage(messages []shared.Message, content, channel string, seq *int64) []shared.Message {
 	return append(messages, shared.Message{
 		Sender:    "System",
 		Content:   content,
 		CreatedAt: time.Now(),
 		Type:      shared.TextMessage,
+		Channel:   normalizeChannel(channel),
 		MessageID: nextClientSystemMessageID(seq),
 	})
 }
@@ -362,10 +363,10 @@ func pruneEphemeralSystemMessages(messages []shared.Message) []shared.Message {
 	return messages[:n]
 }
 
-func appendChatMessage(messages []shared.Message, msg shared.Message, useE2E bool, seq *int64) []shared.Message {
+func appendChatMessage(messages []shared.Message, msg shared.Message, useE2E bool, channel string, seq *int64) []shared.Message {
 	messages = append(messages, msg)
 	if useE2E && msg.Sender == "System" && strings.HasPrefix(msg.Content, searchNoResultsPrefix) {
-		messages = appendClientSystemMessage(messages, e2eSearchNoResultsHint, seq)
+		messages = appendClientSystemMessage(messages, e2eSearchNoResultsHint, channel, seq)
 	}
 	return messages
 }
@@ -382,13 +383,14 @@ func (m *model) appendClientSystem(content string) {
 	if len(m.messages) >= maxMessages {
 		m.messages = m.messages[len(m.messages)-maxMessages+1:]
 	}
-	m.messages = appendClientSystemMessage(m.messages, content, &m.clientSystemSeq)
+	m.messages = appendClientSystemMessage(m.messages, content, m.currentChannel, &m.clientSystemSeq)
 }
 
-func reactionWireMessage(sender string, targetID int64, emojiInput string, remove bool) shared.Message {
+func reactionWireMessage(sender, channel string, targetID int64, emojiInput string, remove bool) shared.Message {
 	return shared.Message{
-		Type:   shared.ReactionMessage,
-		Sender: sender,
+		Type:    shared.ReactionMessage,
+		Sender:  sender,
+		Channel: normalizeChannel(channel),
 		Reaction: &shared.ReactionMeta{
 			Emoji:     resolveReactionEmoji(emojiInput),
 			TargetID:  targetID,
@@ -432,7 +434,7 @@ func (m *model) handleReactionCommand(text string, remove bool, fixedEmoji strin
 		emojiInput = parts[2]
 	}
 	if m.conn != nil {
-		_ = m.conn.WriteJSON(reactionWireMessage(m.cfg.Username, id, emojiInput, remove))
+		_ = m.conn.WriteJSON(reactionWireMessage(m.cfg.Username, m.currentChannel, id, emojiInput, remove))
 	}
 	return true
 }
@@ -875,7 +877,6 @@ type fileSendMsg struct {
 
 func (m *model) Init() tea.Cmd {
 	m.msgChan = make(chan tea.Msg, 10) // buffered to avoid blocking
-	m.reconnectDelay = time.Second     // reset on each Init
 	return func() tea.Msg {
 		err := m.connectWebSocket(m.cfg.ServerURL)
 		if err != nil {
@@ -1105,7 +1106,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if v.MessageID > 0 {
 				m.messages = pruneEphemeralSystemMessages(m.messages)
 			}
-			m.messages = appendChatMessage(m.messages, v, m.useE2E, &m.clientSystemSeq)
+			m.messages = appendChatMessage(m.messages, v, m.useE2E, m.currentChannel, &m.clientSystemSeq)
 			sortMessagesByTimestamp(m.messages)
 
 			if v.Type == shared.FileMessageType && v.File != nil {
@@ -2376,8 +2377,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.banner = ""
 						m.sending = false
 					} else if m.useE2E {
-						log.Printf("DEBUG: Attempting to send global encrypted message: '%s'", text)
-
 						// Validate keystore is unlocked
 						if err := verifyKeystoreUnlocked(m.keystore); err != nil {
 							m.banner = fmt.Sprintf("[ERROR] Keystore not unlocked: %v", err)
@@ -2406,7 +2405,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							return m, nil
 						}
 
-						log.Printf("DEBUG: Global encrypted message sent successfully")
 						m.banner = ""
 						m.sending = false
 					} else {
@@ -2524,16 +2522,12 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch v.Action {
 		case tea.MouseActionPress:
 			if v.Button == tea.MouseButtonLeft {
-				// Check if click is within the viewport area
-				if v.X >= 0 && v.X < m.viewport.Width && v.Y >= 0 && v.Y < m.viewport.Height {
-					// Try to find a URL at the click position
-					clickedURL := m.findURLAtClickPosition(v.X, v.Y)
-					if clickedURL != "" {
-						if err := openURL(clickedURL); err != nil {
-							m.banner = "[ERROR] Failed to open URL: " + err.Error()
-						} else {
-							m.banner = "[OK] Opening URL: " + clickedURL
-						}
+				clickedURL := m.findURLAtClickPosition(v.X, v.Y)
+				if clickedURL != "" {
+					if err := openURL(clickedURL); err != nil {
+						m.banner = "[ERROR] Failed to open URL: " + err.Error()
+					} else {
+						m.banner = "[OK] Opening URL: " + clickedURL
 					}
 				}
 			}
@@ -3238,6 +3232,7 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 		dmHidden:            make(map[string]bool),
 		dmStatePath:         filepath.Join(getClientConfigDir(), "dm_state.json"),
 		reactions:           make(map[int64]map[string]map[string]bool),
+		reconnectDelay:      time.Second,
 	}
 	m.loadDMUIState()
 	m.rebuildDMUnreadCounts()

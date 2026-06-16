@@ -23,6 +23,7 @@ JSON IPC over stdin/stdout. Packages: `plugin/sdk`, `plugin/host`, `plugin/manag
 
 - `StartPlugin` / `StopPlugin`; `StopPlugin` waits for stdout/stderr reader goroutines before niling pipes (race-safe disable/enable).
 - Bounded plugin chat fan-out queue (`plugin/host/outbound_test.go`).
+- Serialized stdin writes via `stdinMu` so fan-out and `ExecuteCommand` cannot interleave JSON lines.
 
 ## Manager
 

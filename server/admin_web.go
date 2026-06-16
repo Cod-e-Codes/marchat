@@ -662,7 +662,7 @@ func (w *WebAdminServer) handleSystemAction(rw http.ResponseWriter, r *http.Requ
 			success = true
 		}
 	case "backup_db":
-		filename, err := BackupDatabase(w.cfg.DBPath)
+		filename, err := BackupDatabase(w.db, w.cfg.DBPath)
 		if err != nil {
 			message = "Failed to backup database: " + err.Error()
 			success = false

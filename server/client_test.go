@@ -545,3 +545,49 @@ func TestHandleCommandUnknownAdminSendsSystemReply(t *testing.T) {
 		t.Fatal("timeout waiting for reply on send channel")
 	}
 }
+
+func TestStampClientChannelOverwritesSpoofedChannel(t *testing.T) {
+	client, hub, _, cleanup := setupTestClient(t)
+	defer cleanup()
+
+	hub.joinChannel(client, "general")
+	msg := shared.Message{Channel: "secret", Content: "hi"}
+	client.stampClientChannel(&msg)
+	if msg.Channel != "general" {
+		t.Fatalf("channel: got %q want general", msg.Channel)
+	}
+}
+
+func TestHandleCommandNonAdminUnknown(t *testing.T) {
+	client, _, _, cleanup := setupTestClient(t)
+	defer cleanup()
+	client.pluginCommandHandler = NewPluginCommandHandler(client.hub.pluginManager)
+	client.handleCommand(":notaplugincmd")
+	select {
+	case raw := <-client.send:
+		sm := raw.(shared.Message)
+		if !strings.Contains(sm.Content, "Unknown command") {
+			t.Fatalf("content: %q", sm.Content)
+		}
+		if strings.Contains(sm.Content, "admin privileges") {
+			t.Fatalf("should not claim admin-only: %q", sm.Content)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout")
+	}
+}
+
+func TestHandleCommandNonAdminBuiltinDenied(t *testing.T) {
+	client, _, _, cleanup := setupTestClient(t)
+	defer cleanup()
+	client.handleCommand(":cleardb")
+	select {
+	case raw := <-client.send:
+		sm := raw.(shared.Message)
+		if sm.Content != "This command requires admin privileges" {
+			t.Fatalf("content: %q", sm.Content)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout")
+	}
+}

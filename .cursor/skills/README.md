@@ -21,18 +21,18 @@ For Cursor, dependencies, or platform behavior not defined in this repo, verify 
 
 1. `developing-marchat` - scope, implement, validate
 2. Domain skill - `client-marchat`, `server-marchat`, `plugins-marchat`, `database-marchat`, or `protocol-marchat`
-3. `testing-marchat` - `go test -race ./...`, nested `plugin/sdk`, coverage; refresh `TESTING.md` when totals shift
-4. `writing-marchat-docs` - `CHANGELOG.md` and related docs when behavior changes
+3. `testing-marchat` - `go test -race ./...`, nested `plugin/sdk`, `go test -coverprofile=mergedcoverage`; refresh `TESTING.md` / `README.md` when totals shift
+4. `writing-marchat-docs` - `CHANGELOG.md` **and** normative docs/skills when behavior changes (not CHANGELOG-only)
 5. `git-workflow-marchat` - **always** draft a commit message for the full working tree (no commit/push unless asked)
 
 ## Skill maintenance
 
-Update domain skills when shipped behavior changes. Recent client transcript work (already on `main` or in flight):
+Update domain skills when shipped behavior changes. Recent fixes on `main` (or in flight):
 
-- ANSI-aware word wrap and URL path breakpoints (`wrapStyledBlock`, `prepareURLWrapping`)
-- Hyperlink style preserved across wrapped URL segments (`markURLsForWrap`, `applyURLMarkers`)
-- Headless render tests via `client/testmain_test.go` (Lipgloss ANSI256)
-- Client-local ephemeral System lines (negative `message_id`, prune on send)
+- Reconnect backoff advances on failure (not reset each `Init()`); channel stamping on server outbound messages
+- Client transcript notices: negative `message_id` classified by content; scoped to active channel
+- URL click uses `chatPanelOrigin()`; plugin `stdinMu` serializes IPC writes
+- `:backup` SQLite-only; Postgres/MySQL migrations use `BOOLEAN DEFAULT FALSE`
 
 ## Skill index
 

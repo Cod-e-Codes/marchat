@@ -77,7 +77,9 @@ The client is a standalone terminal user interface built with the Bubble Tea fra
 - Footer shows `DM:<user>` when a DM thread is active; code snippets submitted in DM mode use the same DM (and E2E) send path as typed compose, not channel `text`
 - While a DM thread is open, the typing footer ignores channel or global typing (empty `recipient` on `typing` messages) so someone typing in the channel is not shown as typing inside the DM view; only DM-scoped typing for the open peer is shown. In channel view, typing is filtered to the active channel.
 - DM unread and hidden-thread UI state is local client state in `dm_state.json` under the client config directory; opening a DM thread marks it read, and a hidden thread reappears on the next inbound DM from that user
-- Automatic WebSocket reconnect with exponential backoff (capped); on each successful connect (`wsConnected`), the reference client clears the in-memory transcript and related UI state before processing server history replay, so a server restart or network drop does not duplicate messages that were already on screen
+- Automatic WebSocket reconnect with exponential backoff (capped at 30s; delay resets only after a successful connect, not on each retry attempt); on each successful connect (`wsConnected`), the reference client clears the in-memory transcript and related UI state before processing server history replay, so a server restart or network drop does not duplicate messages that were already on screen
+- URL click-to-open uses terminal coordinates with sidebar and banner offsets; only the URL under the cursor opens (no fallback to the first URL on the line)
+- E2E send/decrypt paths do not log plaintext message content
 - Multi-line input via Alt+Enter / Ctrl+J
 - **Diagnostics**: `-doctor` and `-doctor-json` for environment, paths, and config checks (`internal/doctor`)
 
@@ -88,7 +90,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 #### Core Structures
 
 - **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered. All sends to `client.send` use non-blocking `select/default` to prevent deadlocks when a client's write buffer is full; stalled clients are dropped or the message is logged and skipped. **Text** messages fan out to plugins in a **separate goroutine** so plugin IPC never blocks the hub’s broadcast loop.
-- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer. `handleCommand` sends a `System` `text` reply to admins when a `:` command is not handled by plugins or built-ins (unknown token), so clients always get a wire response for that case.
+- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer. Outbound client messages are channel-stamped from hub membership (`stampClientChannel`) so spoofed `channel` values cannot cross rooms. `handleCommand` sends `Unknown command` to non-admins for unrecognized `:` tokens; built-in admin-only commands still return an admin-privilege notice. Admins get `Unknown command` for unrecognized built-ins.
 - **`AdminPanel`**: Terminal-based administrative interface for server management
 - **`WebAdminServer`**: Web-based administrative interface with session authentication
 - **`HealthChecker`**: System health monitoring with metrics collection
@@ -100,11 +102,10 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - Channel management: clients join/leave channels, messages routed per-channel
 - Direct message routing between specific users
 - Message editing, deletion, pinning, and search
-- Typing indicator and read receipt broadcasting
-- Reaction broadcasting
+- Typing indicator, reaction, and read receipt broadcasting (channel-scoped when `channel` is set after stamping)
 - User management including ban, kick, and allow operations (ban/kick state is committed under `banMutex`, then the lock is released before the actual disconnect to avoid holding the mutex across a channel send)
 - Plugin command execution and management
-- Database backup and maintenance operations (SQLite `VACUUM INTO` uses proper string quoting so backup paths containing `'` remain safe)
+- Database backup via `:backup` and admin panels: **SQLite only** (`VACUUM INTO` with quoted paths). Postgres and MySQL deployments receive a clear error directing operators to native backup tools for `MARCHAT_DB_PATH`.
 - System metrics collection and health monitoring
 - Web-based admin panel with CSRF protection
 - Health check endpoints for monitoring systems
@@ -189,6 +190,7 @@ Plugins communicate with the host through JSON messages over stdin/stdout:
 - **Request Format**: `{"type": "message|command|init|shutdown", "command": "name", "data": {}}`
 - **Response Format**: `{"type": "message|log", "success": true, "data": {}, "error": "message"}`
 - **Message Types**: Initialization, message processing, command execution, graceful shutdown
+- **Stdin writes**: Chat fan-out and command RPC share one pipe; the host serializes newline-delimited JSON writes (`stdinMu`) so concurrent fan-out and `ExecuteCommand` cannot interleave bytes
 
 ### Configuration System
 

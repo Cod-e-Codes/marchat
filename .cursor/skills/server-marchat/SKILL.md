@@ -22,6 +22,7 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 ## Hub and WebSocket
 
 - Per-channel routing, DMs, typing, read receipts, reactions.
+- Outbound client messages are channel-stamped from hub membership (`stampClientChannel`); client-supplied `channel` values are ignored for routing.
 - Reserved usernames during handshake (no double-book before registration).
 - Serialized writes per connection (`client.go`).
 - Read-pump rate limits: constants shared with `loadverify_ratelimit_test.go`.
@@ -38,6 +39,10 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 - Origin checks on parsed hostnames; optional `MARCHAT_ALLOWED_ORIGINS`.
 - Never log session secrets or admin keys.
 - E2E payloads opaque at rest and in logs.
+
+## Backup
+
+- `:backup` and admin backup actions: SQLite only (`BackupDatabase` checks dialect). Postgres/MySQL return a clear error; use native tools for those backends.
 
 ## Config
 

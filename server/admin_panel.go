@@ -1572,7 +1572,7 @@ func (ap *AdminPanel) clearDatabase() tea.Cmd {
 
 func (ap *AdminPanel) backupDatabase() tea.Cmd {
 	return func() tea.Msg {
-		filename, err := BackupDatabase(ap.config.DBPath)
+		filename, err := BackupDatabase(ap.db, ap.config.DBPath)
 		if err != nil {
 			return backupDBMsg{success: false, error: err.Error()}
 		}

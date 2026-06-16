@@ -128,14 +128,18 @@ func CreateSchema(db *sql.DB) {
 	}
 
 	// Migrations: add columns if they don't exist
+	boolMigrationDefault := "BOOLEAN DEFAULT 0"
+	if dialect == DialectPostgres || dialect == DialectMySQL {
+		boolMigrationDefault = "BOOLEAN DEFAULT FALSE"
+	}
 	migrations := []struct {
 		column string
 		ddl    string
 	}{
 		{"message_id", `ALTER TABLE messages ADD COLUMN message_id INTEGER DEFAULT 0`},
-		{"edited", `ALTER TABLE messages ADD COLUMN edited BOOLEAN DEFAULT 0`},
-		{"deleted", `ALTER TABLE messages ADD COLUMN deleted BOOLEAN DEFAULT 0`},
-		{"pinned", `ALTER TABLE messages ADD COLUMN pinned BOOLEAN DEFAULT 0`},
+		{"edited", fmt.Sprintf("ALTER TABLE messages ADD COLUMN edited %s", boolMigrationDefault)},
+		{"deleted", fmt.Sprintf("ALTER TABLE messages ADD COLUMN deleted %s", boolMigrationDefault)},
+		{"pinned", fmt.Sprintf("ALTER TABLE messages ADD COLUMN pinned %s", boolMigrationDefault)},
 		{"channel", fmt.Sprintf("ALTER TABLE messages ADD COLUMN channel %s NOT NULL DEFAULT 'general'", channelColumnType)},
 	}
 
@@ -703,8 +707,15 @@ func GetPinnedMessages(db *sql.DB) []shared.Message {
 	return messages
 }
 
-// BackupDatabase creates a backup of the current database
-func BackupDatabase(dbPath string) (string, error) {
+// BackupDatabase creates a backup of the current database. In-process backup is
+// supported for SQLite only; other dialects require native backup tools.
+func BackupDatabase(db *sql.DB, dbPath string) (string, error) {
+	if db == nil {
+		return "", fmt.Errorf("database connection required for backup")
+	}
+	if getDBDialect(db) != DialectSQLite {
+		return "", fmt.Errorf("automatic backup via :backup is supported for SQLite only; for %s use native backup tools with MARCHAT_DB_PATH", getDBDialect(db))
+	}
 	// Generate backup filename with timestamp
 	timestamp := time.Now().Format("2006-01-02_15-04-05")
 	backupFilename := fmt.Sprintf("marchat_backup_%s.db", timestamp)

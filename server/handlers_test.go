@@ -585,11 +585,7 @@ func TestBackupDatabase(t *testing.T) {
 		t.Fatalf("InsertMessage failed: %v", err)
 	}
 
-	// Close the database before backup
-	db.Close()
-
-	// Test backup
-	backupFilename, err := BackupDatabase(tempDB)
+	backupFilename, err := BackupDatabase(db, tempDB)
 	if err != nil {
 		t.Fatalf("BackupDatabase failed: %v", err)
 	}
@@ -605,6 +601,23 @@ func TestBackupDatabase(t *testing.T) {
 
 	if !strings.HasSuffix(backupFilename, ".db") {
 		t.Errorf("Expected backup filename to end with '.db', got '%s'", backupFilename)
+	}
+}
+
+func TestBackupDatabaseRejectsNonSQLite(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer db.Close()
+	setDBDialect(db, DialectPostgres)
+
+	_, err = BackupDatabase(db, "postgres://example")
+	if err == nil {
+		t.Fatal("expected error for non-sqlite dialect")
+	}
+	if !strings.Contains(err.Error(), "SQLite only") {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

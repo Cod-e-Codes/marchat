@@ -108,6 +108,7 @@ func (c *Client) readPump() {
 				continue
 			}
 			msg.CreatedAt = time.Now()
+			c.stampClientChannel(&msg)
 			c.hub.broadcast <- msg
 			continue
 		}
@@ -124,6 +125,7 @@ func (c *Client) readPump() {
 				msg.Sender = c.username
 				msg.CreatedAt = time.Now()
 				msg.Edited = true
+				c.stampClientChannel(&msg)
 				c.hub.broadcast <- msg
 			}
 			continue
@@ -140,6 +142,7 @@ func (c *Client) readPump() {
 			} else {
 				msg.Sender = c.username
 				msg.CreatedAt = time.Now()
+				c.stampClientChannel(&msg)
 				c.hub.broadcast <- msg
 			}
 			continue
@@ -150,6 +153,7 @@ func (c *Client) readPump() {
 			if strings.TrimSpace(msg.Recipient) != "" {
 				c.hub.broadcastDM(msg)
 			} else {
+				c.stampClientChannel(&msg)
 				c.hub.broadcast <- msg
 			}
 			continue
@@ -158,6 +162,7 @@ func (c *Client) readPump() {
 		if msg.Type == shared.ReactionMessage && msg.Reaction != nil {
 			msg.Sender = c.username
 			msg.CreatedAt = time.Now()
+			c.stampClientChannel(&msg)
 			PersistReaction(c.db, msg)
 			c.hub.broadcast <- msg
 			continue
@@ -252,6 +257,7 @@ func (c *Client) readPump() {
 			if msg.MessageID > 0 {
 				PersistReadReceipt(c.db, c.username, msg.MessageID)
 			}
+			c.stampClientChannel(&msg)
 			c.hub.broadcast <- msg
 			continue
 		}
@@ -322,9 +328,7 @@ func (c *Client) readPump() {
 			continue
 		}
 		msg.CreatedAt = time.Now()
-		if msg.Channel == "" {
-			msg.Channel = c.hub.getClientChannel(c)
-		}
+		c.stampClientChannel(&msg)
 		if msg.Type == "" || msg.Type == shared.TextMessage {
 			if msgID, err := InsertMessage(c.db, msg); err != nil {
 				log.Printf("Failed to persist message from %s: %v", c.username, err)
@@ -415,6 +419,24 @@ func parseCommandWithQuotes(command string) []string {
 	return parts
 }
 
+// stampClientChannel sets outbound routing channel from hub membership, ignoring
+// client-supplied channel values to prevent cross-channel injection.
+func (c *Client) stampClientChannel(msg *shared.Message) {
+	if strings.TrimSpace(msg.Recipient) != "" {
+		return
+	}
+	msg.Channel = c.hub.getClientChannel(c)
+}
+
+func isBuiltinAdminCommand(cmd string) bool {
+	switch cmd {
+	case ":cleardb", ":kick", ":ban", ":unban", ":allow", ":cleanup", ":forcedisconnect", ":backup", ":stats":
+		return true
+	default:
+		return false
+	}
+}
+
 // handleCommand processes both plugin commands and built-in admin commands
 func (c *Client) handleCommand(command string) {
 	// Parse command with proper quote handling
@@ -467,15 +489,18 @@ func (c *Client) handleCommand(command string) {
 	}
 
 	// Fall back to built-in admin commands (these require admin privileges)
-	// Check admin status for built-in commands
 	if !c.isAdmin {
-		SecurityLogger.Warn("Unauthorized admin command attempt", map[string]interface{}{
-			"user":    c.username,
-			"command": parts[0],
-		})
+		content := fmt.Sprintf("Unknown command: %s", parts[0])
+		if isBuiltinAdminCommand(parts[0]) {
+			SecurityLogger.Warn("Unauthorized admin command attempt", map[string]interface{}{
+				"user":    c.username,
+				"command": parts[0],
+			})
+			content = "This command requires admin privileges"
+		}
 		c.send <- shared.Message{
 			Sender:    "System",
-			Content:   "This command requires admin privileges",
+			Content:   content,
 			CreatedAt: time.Now(),
 			Type:      shared.TextMessage,
 		}
@@ -677,7 +702,7 @@ func (c *Client) handleCommand(command string) {
 	case ":backup":
 		log.Printf("[ADMIN] Database backup requested by %s", c.username)
 		// Use the configured database path
-		backupFilename, err := BackupDatabase(c.dbPath)
+		backupFilename, err := BackupDatabase(c.db, c.dbPath)
 		if err != nil {
 			log.Printf("Failed to backup database: %v", err)
 			c.send <- shared.Message{

@@ -166,44 +166,24 @@ func sendSnippetOutbound(ws *websocket.Conn, keystore *crypto.KeyStore, username
 }
 
 func debugEncryptAndSend(recipients []string, plaintext string, ws *websocket.Conn, keystore *crypto.KeyStore, username string) error {
-	log.Printf("DEBUG: Starting global encryption for %d recipients", len(recipients))
-	log.Printf("DEBUG: Plaintext length: %d", len(plaintext))
-
+	_ = recipients
 	if keystore == nil {
-		log.Printf("ERROR: Keystore is nil")
 		return fmt.Errorf("keystore not initialized")
 	}
-	log.Printf("DEBUG: Keystore loaded: %t", keystore != nil)
-
-	globalKey := keystore.GetSessionKey("global")
-	if globalKey == nil {
-		log.Printf("ERROR: Global key not found")
+	if keystore.GetSessionKey("global") == nil {
 		return fmt.Errorf("global key not available - global E2E encryption not initialized")
 	}
-	log.Printf("DEBUG: Global key available (ID: %s)", globalKey.KeyID)
-
-	if err := sendEncryptedChatMessage(ws, keystore, username, plaintext, shared.TextMessage, ""); err != nil {
-		log.Printf("ERROR: Global encryption send failed: %v", err)
-		return err
-	}
-
-	log.Printf("DEBUG: Global encrypted message sent successfully")
-	return nil
+	return sendEncryptedChatMessage(ws, keystore, username, plaintext, shared.TextMessage, "")
 }
 
 func validateEncryptionRoundtrip(keystore *crypto.KeyStore, username string) error {
 	testPlaintext := "Hello, global encryption test!"
-
-	log.Printf("DEBUG: Testing global encryption roundtrip")
-
 	conversationID := "global"
 
 	globalKey := keystore.GetSessionKey(conversationID)
 	if globalKey == nil {
 		return fmt.Errorf("global key not found - global E2E encryption not available")
 	}
-
-	log.Printf("DEBUG: Global key found (ID: %s)", globalKey.KeyID)
 
 	encryptedMsg, err := keystore.EncryptMessage(username, testPlaintext, conversationID)
 	if err != nil {
@@ -214,8 +194,6 @@ func validateEncryptionRoundtrip(keystore *crypto.KeyStore, username string) err
 		return fmt.Errorf("global encryption test produced empty ciphertext")
 	}
 
-	log.Printf("DEBUG: Global encryption test successful - ciphertext length: %d", len(encryptedMsg.Encrypted))
-
 	decryptedMsg, err := keystore.DecryptMessage(encryptedMsg, conversationID)
 	if err != nil {
 		return fmt.Errorf("global decryption test failed: %v", err)
@@ -225,7 +203,6 @@ func validateEncryptionRoundtrip(keystore *crypto.KeyStore, username string) err
 		return fmt.Errorf("global decryption roundtrip failed: expected '%s', got '%s'", testPlaintext, decryptedMsg.Content)
 	}
 
-	log.Printf("DEBUG: Global encryption roundtrip test successful")
 	return nil
 }
 
@@ -233,37 +210,13 @@ func verifyKeystoreUnlocked(keystore *crypto.KeyStore) error {
 	if keystore == nil {
 		return fmt.Errorf("keystore is nil")
 	}
-
-	globalKey := keystore.GetGlobalKey()
-	if globalKey == nil {
+	if keystore.GetGlobalKey() == nil {
 		return fmt.Errorf("global key not available")
 	}
-
-	log.Printf("DEBUG: Keystore properly unlocked for global encryption")
 	return nil
 }
 
 func debugWebSocketWrite(ws *websocket.Conn, msg interface{}) error {
-	jsonData, err := json.Marshal(msg)
-	if err != nil {
-		log.Printf("ERROR: JSON marshal failed: %v", err)
-		return err
-	}
-
-	log.Printf("DEBUG: Sending WebSocket message - length: %d bytes", len(jsonData))
-
-	var parsed map[string]interface{}
-	if err := json.Unmarshal(jsonData, &parsed); err == nil {
-		if content, exists := parsed["content"]; exists {
-			if contentStr, ok := content.(string); ok {
-				log.Printf("DEBUG: Message content length: %d", len(contentStr))
-				if len(contentStr) == 0 {
-					log.Printf("WARNING: Sending message with empty content!")
-				}
-			}
-		}
-	}
-
 	return ws.WriteJSON(msg)
 }
 
@@ -429,13 +382,11 @@ func (m *model) connectWebSocket(serverURL string) error {
 							chatMsg.File.Size = int64(len(decData))
 						}
 					} else {
-						log.Printf("DEBUG: Attempting to decrypt message from %s", chatMsg.Sender)
 						plaintext, decryptErr := decryptEncryptedChatContent(m.keystore, chatMsg)
 						if decryptErr != nil {
 							log.Printf("ERROR: Decryption failed for message from %s: %v", chatMsg.Sender, decryptErr)
 							chatMsg.Content = "[ENCRYPTED - DECRYPTION FAILED]"
 						} else {
-							log.Printf("DEBUG: Successfully decrypted message from %s", chatMsg.Sender)
 							chatMsg.Content = plaintext
 						}
 					}
@@ -505,33 +456,48 @@ func (m *model) listenWebSocket() tea.Cmd {
 
 var ansiEscRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
 
-func (m *model) findURLAtClickPosition(clickX, clickY int) string {
-	content := m.viewport.View()
-	lines := strings.Split(content, "\n")
+// chatPanelOrigin returns terminal coordinates of the top-left of the chat transcript viewport.
+func (m *model) chatPanelOrigin() (x0, y0 int) {
+	x0 = userListWidth + 1
+	y0 = 1 // header row
+	if m.banner != "" || m.sending {
+		bannerText := m.banner
+		if m.sending && strings.TrimSpace(bannerText) == "" {
+			bannerText = "[Sending...]"
+		}
+		fullW := chromeFullWidth(m.viewport.Width)
+		shown := layoutBannerForStrip(bannerText, fullW)
+		y0 += strings.Count(shown, "\n") + 1
+	}
+	return x0, y0
+}
 
-	adjustedY := clickY - 3
-	if adjustedY < 0 || adjustedY >= len(lines) {
+func (m *model) findURLAtClickPosition(clickX, clickY int) string {
+	x0, y0 := m.chatPanelOrigin()
+	relX := clickX - x0
+	relY := clickY - y0
+	if relX < 0 || relY < 0 || relX >= m.viewport.Width || relY >= m.viewport.Height {
 		return ""
 	}
 
-	line := ansiEscRegex.ReplaceAllString(lines[adjustedY], "")
+	content := m.viewport.View()
+	lines := strings.Split(content, "\n")
+	if relY >= len(lines) {
+		return ""
+	}
+
+	line := ansiEscRegex.ReplaceAllString(lines[relY], "")
 	line = strings.ReplaceAll(line, "\u2011", "-")
 
-	adjustedX := clickX - userListWidth - 1
-	if adjustedX < 0 || adjustedX >= len(line) {
+	if relX >= len(line) {
 		return ""
 	}
 
 	matches := urlRegex.FindAllStringIndex(line, -1)
 	for _, loc := range matches {
-		if adjustedX >= loc[0] && adjustedX < loc[1] {
+		if relX >= loc[0] && relX < loc[1] {
 			return line[loc[0]:loc[1]]
 		}
-	}
-
-	urls := urlRegex.FindAllString(line, -1)
-	if len(urls) > 0 {
-		return urls[0]
 	}
 
 	return ""

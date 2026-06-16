@@ -73,5 +73,5 @@ Set `MARCHAT_DOCTOR_NO_NETWORK=1` in tests that hit doctor update checks.
 - [ ] New behavior has a focused test
 - [ ] `go test ./...` passes; `-race` when touching concurrency
 - [ ] `plugin/sdk` tested if SDK touched
-- [ ] Coverage docs updated if totals moved materially
+- [ ] `go test -coverprofile=mergedcoverage ./...` and refresh `README.md` / `TESTING.md` when totals shift materially (~0.2% or new test files)
 - [ ] Report actual `go test` outcome in the final response

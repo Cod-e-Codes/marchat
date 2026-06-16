@@ -78,7 +78,7 @@ Prefer this repo (`go.mod`, `ARCHITECTURE.md`, `PROTOCOL.md`, skills) as source 
 
 ### Client
 - Bubble Tea (model, update, view); Lipgloss for TUI styling; **`cli_output.go`** for **colorized** pre-TUI stdout (connection, E2E, profiles, etc.)
-- **Reconnect**: automatic WebSocket reconnect with **exponential backoff** (capped); skips reconnect on fatal username/handshake errors - see `client/main.go`, `client/websocket.go`
+- **Reconnect**: automatic WebSocket reconnect with **exponential backoff** (capped at 30s; resets only after successful connect); skips reconnect on fatal username/handshake errors - see `client/main.go`, `client/websocket.go`
 - **`:q`** quits; **Esc** closes menus; help documents shortcuts vs text commands (`client/commands.go`)
 - **Message metadata**: **Alt+M** or **`:msginfo`** toggles optional per-line **message id** and **encrypted** flag in the transcript (`client/render.go`, `client/main.go`)
 - **Chrome**: terminal-native labels for UI chrome; avoid decorative lock-style emoji in chrome - user content (reactions, messages) may still use emoji
@@ -87,22 +87,22 @@ Prefer this repo (`go.mod`, `ARCHITECTURE.md`, `PROTOCOL.md`, skills) as source 
 - **Notifications**: bell, desktop (**Alt+N**), **`:notify-mode`**, quiet hours (**`:quiet`**), focus mode (**`:focus`**) - `notification_manager.go` + help text
 - **Mentions**: `@user` highlighting in render; mention-aware notification path - see `client/render.go`
 - **Transcript wrap**: ANSI-aware word wrap in `wrapStyledBlock` / `renderMessages`; long URLs use non-breaking hyphens and `ansi.Wrap` path breakpoints; hyperlink style applied per wrapped segment via URL span markers (`markURLsForWrap`, `applyURLMarkers`)
-- **Client-local System lines**: ephemeral command feedback uses the banner or negative `message_id` for scrollable lists; `pruneEphemeralSystemMessages` on send or inbound persisted message. Server one-line command errors (admin-only, usage) route to banner via `isTranscriptSystemMessage`; durable notices (search, join channel) stay in transcript.
+- **Client-local System lines**: ephemeral command feedback uses the banner; negative `message_id` transcript notices (themes, search, channel lists) stay in the transcript when `isTranscriptSystemNotice` matches and carry the active channel. `pruneEphemeralSystemMessages` on send or inbound persisted message removes only non-transcript System lines.
 - **Profiles**: `profiles.json`; **dedupe** display names on load; default **Profile-N** naming when adding profiles (`client/config/config.go`)
 - **Config paths**: app data dir or **`MARCHAT_CONFIG_DIR`** via **`ResolveClientConfigDir()`**; **`GetConfigPath()`** uses the same rules as keystore primary path; **`GetKeystorePath`** checks primary -> user-dir `keystore.dat` when override has none -> last legacy **`./keystore.dat`** in cwd - `MigrateKeystoreToNewLocation`
 
 ### Server
 - **Startup**: validated before serve - at least one admin, non-empty admin key, valid listen port; **admin names** trimmed, lowercased, case-insensitive **dedupe** (`cmd/server`, extracted validation helpers)
-- **Hub**: per-channel routing, DMs, typing/read receipts/reactions; **reserved usernames** so handshake cannot double-book a name before registration
+- **Hub**: per-channel routing, DMs, typing/read receipts/reactions; outbound client messages channel-stamped from membership (`stampClientChannel`); **reserved usernames** so handshake cannot double-book a name before registration
 - **WebSocket**: **serialized writes** per connection (avoid concurrent write + control-frame panics)
-- **SQLite**: **WAL** enabled when backend is SQLite; backups (**VACUUM INTO**, etc.) must **quote paths** safely when SQL embeds paths
+- **SQLite**: **WAL** enabled when backend is SQLite; in-process `:backup` uses **VACUUM INTO** (SQLite only; quote paths safely when SQL embeds paths). Postgres/MySQL use native backup tools.
 - **Web admin** (`server/admin_web.go`, `server/admin_web.html`): session cookies; **`MARCHAT_SESSION_SECRET`** preferred, **`MARCHAT_JWT_SECRET`** deprecated alias; `config.GenerateSessionSecret()` when unset; **login rate limiting** per IP; **CSRF** on mutating routes
 - **Interactive server config** (`server/config_ui.go`): can generate session secret when saving config
 - **Health**: metrics and health HTTP endpoints (`server/health.go`)
 - **Rate limiting**: WebSocket message rate limits where implemented in hub/client handlers - do not bypass without intent
 
 ### Plugins
-- JSON IPC over stdin/stdout (`plugin/sdk`, `plugin/host`); install/store/manage via `plugin/manager`, `plugin/store`; **`StopPlugin`** waits for stdout/stderr reader goroutines before niling pipes/decoder so disable/enable does not race under **`go test -race`**
+- JSON IPC over stdin/stdout (`plugin/sdk`, `plugin/host`); install/store/manage via `plugin/manager`, `plugin/store`; **`StopPlugin`** waits for stdout/stderr reader goroutines before niling pipes/decoder so disable/enable does not race under **`go test -race`**; stdin writes serialized via **`stdinMu`**
 - **Persisted enable/disable** (and related state) in **`plugin_state.json`** under server **data** directory - `plugin/manager/manager.go`
 - **Non-admin users** may invoke plugin chat commands when the manifest marks them **not** admin-only (`AdminOnly: false`); admin-only install/enable/disable paths stay gated
 - **License cache**: treat as security-sensitive - cached entries are **re-signature-checked** and **plugin name** must match cache key (`plugin/license`); do not weaken validation
