@@ -339,6 +339,45 @@ func TestWrapStyledBlockURLUnderlineNotOnContinuationIndent(t *testing.T) {
 	}
 }
 
+func TestFindURLAtTranscriptClickWrappedCommitURL(t *testing.T) {
+	url := "https://github.com/Cod-e-Codes/marchat/commit/e579461ea4d75e8f4971bcf6095342f7fa2205e1"
+	styles := getThemeStyles("patriot")
+	msgs := []shared.Message{
+		{
+			Sender:    "Cody",
+			Content:   url,
+			CreatedAt: time.Now(),
+			Type:      shared.TextMessage,
+			MessageID: 84,
+		},
+	}
+	const width = 62
+	out := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, width, true, true)
+	rawLines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+
+	clicked := false
+	for relY, line := range rawLines {
+		plain := plainTranscriptLine(line)
+		if !strings.Contains(plain, "github.com") && !strings.Contains(plain, "e579461") {
+			continue
+		}
+		lineWidth := ansi.StringWidth(plain)
+		for relX := 0; relX <= lineWidth; relX++ {
+			got := findURLAtTranscriptClick(rawLines, relY, relX)
+			if got == "" {
+				continue
+			}
+			if got != url {
+				t.Fatalf("click relY=%d relX=%d: got %q want full URL", relY, relX, got)
+			}
+			clicked = true
+		}
+	}
+	if !clicked {
+		t.Fatal("no click position resolved the wrapped commit URL")
+	}
+}
+
 func TestWrapStyledBlockShortMessageUnchanged(t *testing.T) {
 	styles := getThemeStyles("patriot")
 	msgs := []shared.Message{

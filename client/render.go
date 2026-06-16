@@ -13,6 +13,7 @@ import (
 	"github.com/alecthomas/chroma/quick"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/mattn/go-runewidth"
 )
 
 // sortMessagesByTimestamp ensures messages are displayed in chronological order.
@@ -463,6 +464,149 @@ func renderHyperlinks(content string, styles themeStyles) string {
 	return urlRegex.ReplaceAllStringFunc(content, func(url string) string {
 		return styles.Hyperlink.Render(url)
 	})
+}
+
+var transcriptMessageStart = regexp.MustCompile(`\[[0-9]{1,2}:[0-9]{2}\]`)
+
+func stripURLMarkers(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == urlStartMarker || r == urlEndMarker {
+			return -1
+		}
+		return r
+	}, s)
+}
+
+// plainTranscriptLine is viewport text with ANSI, URL sentinels, and non-breaking
+// hyphens normalized so click-to-open matches rendered hyperlinks.
+func plainTranscriptLine(line string) string {
+	line = ansi.Strip(line)
+	line = strings.ReplaceAll(line, string(urlNBHyphen), "-")
+	return stripURLMarkers(line)
+}
+
+func trimTranscriptMetadataSuffix(s string) string {
+	for _, token := range []string{" [id:", " [encrypted"} {
+		if idx := strings.Index(s, token); idx >= 0 {
+			return s[:idx]
+		}
+	}
+	return s
+}
+
+func isDateSeparatorLine(line string) bool {
+	trimmed := strings.TrimSpace(line)
+	return strings.Count(trimmed, "───") >= 2
+}
+
+func isReactionTranscriptLine(line string) bool {
+	trimmed := strings.TrimLeft(line, " ")
+	if len(line)-len(trimmed) != 7 {
+		return false
+	}
+	return !strings.Contains(trimmed, "://") && !strings.Contains(trimmed, "http")
+}
+
+func isMessageBodyContinuation(line string) bool {
+	plain := plainTranscriptLine(line)
+	if strings.TrimSpace(plain) == "" {
+		return false
+	}
+	if isDateSeparatorLine(plain) {
+		return false
+	}
+	if transcriptMessageStart.MatchString(plain) {
+		return false
+	}
+	if isReactionTranscriptLine(plain) {
+		return false
+	}
+	return strings.HasPrefix(plain, " ")
+}
+
+func stitchedMessageSegment(line string, isFirst bool) string {
+	plain := plainTranscriptLine(line)
+	if !isFirst {
+		plain = strings.TrimLeft(plain, " ")
+	}
+	return trimTranscriptMetadataSuffix(plain)
+}
+
+func byteOffsetAtCellWidth(s string, targetCols int) int {
+	if targetCols < 0 {
+		return 0
+	}
+	col := 0
+	pos := 0
+	for pos < len(s) {
+		r, sz := utf8.DecodeRuneInString(s[pos:])
+		w := runewidth.RuneWidth(r)
+		if col+w > targetCols {
+			return pos
+		}
+		col += w
+		pos += sz
+	}
+	return len(s)
+}
+
+// findURLAtTranscriptClick resolves a URL under a mouse click in the chat viewport.
+// Wrapped URLs are stitched across continuation lines before matching.
+func findURLAtTranscriptClick(lines []string, relY, relX int) string {
+	if urlRegex == nil || relY < 0 || relY >= len(lines) {
+		return ""
+	}
+
+	start := relY
+	for start > 0 && isMessageBodyContinuation(lines[start]) {
+		start--
+	}
+	end := relY
+	for end+1 < len(lines) && isMessageBodyContinuation(lines[end+1]) {
+		end++
+	}
+
+	var stitched strings.Builder
+	segStart := make([]int, end-start+1)
+	for i := start; i <= end; i++ {
+		segStart[i-start] = stitched.Len()
+		stitched.WriteString(stitchedMessageSegment(lines[i], i == start))
+	}
+	stitchedStr := stitched.String()
+
+	clickOff := -1
+	for i := start; i <= end; i++ {
+		if i != relY {
+			continue
+		}
+		plain := plainTranscriptLine(lines[i])
+		seg := stitchedMessageSegment(lines[i], i == start)
+		var byteInSeg int
+		if i == start {
+			byteInSeg = byteOffsetAtCellWidth(plain, relX)
+		} else {
+			indentCols := ansi.StringWidth(plain) - ansi.StringWidth(strings.TrimLeft(plain, " "))
+			if relX < indentCols {
+				return ""
+			}
+			byteInSeg = byteOffsetAtCellWidth(strings.TrimLeft(plain, " "), relX-indentCols)
+		}
+		if byteInSeg > len(seg) {
+			byteInSeg = len(seg)
+		}
+		clickOff = segStart[i-start] + byteInSeg
+		break
+	}
+	if clickOff < 0 {
+		return ""
+	}
+
+	for _, loc := range urlRegex.FindAllStringIndex(stitchedStr, -1) {
+		if clickOff >= loc[0] && clickOff < loc[1] {
+			return stitchedStr[loc[0]:loc[1]]
+		}
+	}
+	return ""
 }
 
 func openURL(u string) error {

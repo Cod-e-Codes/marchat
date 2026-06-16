@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"log"
 	"net/url"
-	"regexp"
 	"strings"
 	"time"
 
@@ -454,8 +453,6 @@ func (m *model) listenWebSocket() tea.Cmd {
 	}
 }
 
-var ansiEscRegex = regexp.MustCompile(`\x1b\[[0-9;]*m`)
-
 // chatPanelOrigin returns terminal coordinates of the top-left of the chat transcript viewport.
 func (m *model) chatPanelOrigin() (x0, y0 int) {
 	x0 = userListWidth + 1
@@ -486,19 +483,5 @@ func (m *model) findURLAtClickPosition(clickX, clickY int) string {
 		return ""
 	}
 
-	line := ansiEscRegex.ReplaceAllString(lines[relY], "")
-	line = strings.ReplaceAll(line, "\u2011", "-")
-
-	if relX >= len(line) {
-		return ""
-	}
-
-	matches := urlRegex.FindAllStringIndex(line, -1)
-	for _, loc := range matches {
-		if relX >= loc[0] && relX < loc[1] {
-			return line[loc[0]:loc[1]]
-		}
-	}
-
-	return ""
+	return findURLAtTranscriptClick(lines, relY, relX)
 }

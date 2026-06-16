@@ -107,8 +107,7 @@ func (c *Client) readPump() {
 				log.Printf("Rejected file from %s: too large (%d bytes)", c.username, msg.File.Size)
 				continue
 			}
-			msg.CreatedAt = time.Now()
-			c.stampClientChannel(&msg)
+			c.stampTimedOutbound(&msg)
 			c.hub.broadcast <- msg
 			continue
 		}
@@ -122,10 +121,8 @@ func (c *Client) readPump() {
 					Type:      shared.TextMessage,
 				}
 			} else {
-				msg.Sender = c.username
-				msg.CreatedAt = time.Now()
 				msg.Edited = true
-				c.stampClientChannel(&msg)
+				c.stampSenderTimedOutbound(&msg)
 				c.hub.broadcast <- msg
 			}
 			continue
@@ -140,9 +137,7 @@ func (c *Client) readPump() {
 					Type:      shared.TextMessage,
 				}
 			} else {
-				msg.Sender = c.username
-				msg.CreatedAt = time.Now()
-				c.stampClientChannel(&msg)
+				c.stampSenderTimedOutbound(&msg)
 				c.hub.broadcast <- msg
 			}
 			continue
@@ -160,17 +155,14 @@ func (c *Client) readPump() {
 		}
 
 		if msg.Type == shared.ReactionMessage && msg.Reaction != nil {
-			msg.Sender = c.username
-			msg.CreatedAt = time.Now()
-			c.stampClientChannel(&msg)
+			c.stampSenderTimedOutbound(&msg)
 			PersistReaction(c.db, msg)
 			c.hub.broadcast <- msg
 			continue
 		}
 
 		if msg.Type == shared.DirectMessage && msg.Recipient != "" {
-			msg.Sender = c.username
-			msg.CreatedAt = time.Now()
+			c.stampSenderTimedOutbound(&msg)
 			if msgID, err := InsertMessage(c.db, msg); err != nil {
 				log.Printf("Failed to persist DM from %s to %s: %v", c.username, msg.Recipient, err)
 			} else {
@@ -327,8 +319,7 @@ func (c *Client) readPump() {
 			c.handleCommand(msg.Content)
 			continue
 		}
-		msg.CreatedAt = time.Now()
-		c.stampClientChannel(&msg)
+		c.stampTimedOutbound(&msg)
 		if msg.Type == "" || msg.Type == shared.TextMessage {
 			if msgID, err := InsertMessage(c.db, msg); err != nil {
 				log.Printf("Failed to persist message from %s: %v", c.username, err)
@@ -417,6 +408,16 @@ func parseCommandWithQuotes(command string) []string {
 	}
 
 	return parts
+}
+
+func (c *Client) stampTimedOutbound(msg *shared.Message) {
+	msg.CreatedAt = time.Now()
+	c.stampClientChannel(msg)
+}
+
+func (c *Client) stampSenderTimedOutbound(msg *shared.Message) {
+	msg.Sender = c.username
+	c.stampTimedOutbound(msg)
 }
 
 // stampClientChannel sets outbound routing channel from hub membership, ignoring
