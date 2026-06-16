@@ -16,7 +16,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 
 **Doctor env tests:** Production code reads process env via **`collectMarchatEnviron`** and the swappable **`osEnviron`** variable (see `internal/doctor/env.go`), guarded by **`environMu`**. Tests that replace **`osEnviron`** must capture the previous function while holding **`environMu`** and must not use **`t.Parallel()`** alongside other tests that also swap it, or **`go test -race`** can observe races and overlapping mocks. **`buildEnvLines`** tests are therefore sequential in the package.
 
-**Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. **GitHub Actions** runs an extra **`database-smoke`** job (see `.github/workflows/go.yml`) with Postgres 16 and MySQL 8 service containers: it sets `MARCHAT_CI_POSTGRES_URL` and `MARCHAT_CI_MYSQL_URL` and runs `TestPostgresInitDBAndSchemaSmoke` / `TestMySQLInitDBAndSchemaSmoke` in `server/db_ci_smoke_test.go` (`InitDB` + `CreateSchema` + table checks). Locally, those tests **skip** unless you export the same variables (for MySQL, use a `mysql:` or `mysql://` prefix on the DSN so it is not parsed as a SQLite path). Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
+**Database backends:** Automated tests open **SQLite** (usually in-memory or a temp file). PostgreSQL and MySQL/MariaDB are supported at runtime via `MARCHAT_DB_PATH`. **GitHub Actions** runs an extra **`database-smoke`** job (see `.github/workflows/go.yml`) with Postgres 16 and MySQL 8 service containers: it sets `MARCHAT_CI_POSTGRES_URL` and `MARCHAT_CI_MYSQL_URL` and runs `TestPostgresInitDBAndSchemaSmoke` / `TestMySQLInitDBAndSchemaSmoke` in `server/db_ci_smoke_test.go` (`InitDB` + `CreateSchema` + table checks + `GetRecentMessagesForUser` visible-replay SQL smoke). Locally, those tests **skip** unless you export the same variables (for MySQL, use a `mysql:` or `mysql://` prefix on the DSN so it is not parsed as a SQLite path). Schema creation is dialect-aware (including MySQL/MariaDB rules for indexed text).
 
 **Release workflow (maintainers):** `.github/workflows/release.yml` uses a **`resolve-version`** job so the version string is available to Docker and all matrix legs (GitHub Actions does not support job outputs from matrix jobs). The **`build`** job sets **`CGO_ENABLED=0`** for static cross-compiled binaries. On a **published** release (not `workflow_dispatch`), **`upload-assets`** uploads all matrix **`.zip`** files with **`gh release upload`**, and the **`docker`** job appends Docker Hub pull instructions with **`gh release edit`** (GitHub CLI on the runner, **`GITHUB_TOKEN`**), avoiding third-party actions that still declare Node 20. **Termux** installs use the **linux-arm64** zip; `install.sh` / `install.ps1` map Android+aarch64 to that asset when needed.
 
@@ -43,17 +43,17 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `internal/doctor/db_checks_test.go` | Doctor DB probes | SQLite connectivity and version checks used by `-doctor` |
 | `cmd/server/main_test.go` | Server main function and startup | Flag parsing, configuration validation, TLS setup, admin normalization, `validateStartupConfig`, deprecated flags |
 | `cmd/server/subprocess_doctor_test.go` | Server binary smoke | `go run ./cmd/server -doctor` / `-doctor-json` subprocess (covers `main` early exits) |
-| `server/handlers_test.go` | Server-side request handling | Database operations, message insertion, IP extraction |
+| `server/handlers_test.go` | Server-side request handling | Database operations, message insertion, visible handshake replay (`GetRecentMessagesForUser`), reconnect replay, DM limit under DM noise, IP extraction |
 | `server/hub_test.go` | WebSocket hub management | User bans, kicks, connection management, non-blocking send verification |
 | `server/loadverify_ratelimit_test.go` | WebSocket read-pump rate limit | Window, burst (20), and cooldown behavior (same constants as `client.go`) |
 | `server/loadverify_bench_test.go` | Hub broadcast benchmarks (optional) | Channel vs system-wide fan-out, parallel senders, JSON marshal baseline; see [Optional hub load benchmarks](#optional-hub-load-benchmarks-server) |
-| `server/integration_test.go` | End-to-end workflows | Message flow, ban flow, concurrent operations |
+| `server/integration_test.go` | End-to-end workflows | Message flow, ban flow, WebSocket handshake replay on reconnect (`TestIntegrationWebSocketHandshakeReplayOnReconnect`), concurrent operations |
 | `server/admin_web_test.go` | Admin web interface | HTTP endpoints, authentication, admin panel functionality |
 | `server/config_ui_test.go` | Server configuration UI | Configuration management, environment handling |
 | `server/admin_panel_test.go` | Admin panel functionality | Admin-specific operations and controls |
 | `server/db_test.go` | Database operations | Database initialization, schema setup |
 | `server/db_dialect_test.go` | SQL dialect helpers | DSN → driver detection, Postgres placeholder rebinding, `mysql://` DSN form |
-| `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables (env-gated) |
+| `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables, visible handshake replay query (env-gated) |
 | `server/message_state_test.go` | Durable reactions | Reaction persistence and replay helpers |
 | `server/config_test.go` | Server configuration | Server configuration logic and validation |
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations, unknown admin command system reply (`TestHandleCommandUnknownAdminSendsSystemReply`) |
@@ -100,6 +100,7 @@ Per-file statement percentages for important paths are listed under [Test Covera
 #### 2. Integration Tests
 - **Message Flow**: Complete message lifecycle from insertion to retrieval
 - **User Management**: Ban/kick/unban workflows with database persistence
+- **Handshake replay**: WebSocket connect/disconnect/reconnect receives persisted history on the wire (`TestIntegrationWebSocketHandshakeReplayOnReconnect`)
 - **Concurrent Operations**: Thread-safe operations and race condition testing
 - **Database Operations**: Schema creation, message capping, backup functionality
 

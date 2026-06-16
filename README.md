@@ -142,7 +142,7 @@ Runs a guided wizard **only when** `MARCHAT_ADMIN_KEY` or `MARCHAT_USERS` is not
 
 Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQL):
 - **messages**: Core message storage with `message_id`, encryption fields, edit/delete/pin flags, recipient, and persisted `channel`
-- **user_message_state**: Per-user message history state and last-seen timestamp
+- **user_message_state**: Per-user `last_seen` timestamp after handshake (`last_message_id` column is legacy/unused for replay)
 - **ban_history**: Ban/unban event tracking for history gaps
 - **message_reactions**: Durable emoji reactions (unique per message + user + emoji)
 - **user_channels**: Last channel per user, persisted across reconnects
@@ -773,7 +773,7 @@ The TUI client can spawn **optional** external programs on send/receive and pass
 | PostgreSQL connection fails | Verify URL format: `postgres://user:pass@host:5432/db?sslmode=disable`; test with `psql` using the same credentials. |
 | MySQL connection fails | Verify DSN prefix `mysql:` and body `user:pass@tcp(host:3306)/db?parseTime=true`; test with the `mysql` CLI. |
 | SQL syntax error after backend switch | Ensure tables were created by the current server version and restart after changing `MARCHAT_DB_PATH`. |
-| Message history looks incomplete | History depends on **channel**, **per-user message state**, and server filters. **Ban/unban** and related flows can reset stored state so scrollback differs from the raw DB. |
+| Message history looks incomplete | History depends on **channel** (reference TUI shows the active channel only), the server replay window (up to 50 recent messages per handshake), and filters such as **DM visibility** and optional **ban history gaps** (`MARCHAT_BAN_HISTORY_GAPS`). **Ban/unban** can reset per-user state so scrollback differs from the raw DB. |
 | Transcript resets after reconnect | On each successful WebSocket connect the reference client clears local messages and rebuilds from the server handshake replay (up to 50 recent lines). That avoids duplicates when the server comes back while the client stayed open. Lines older than that replay window are not shown again in that session unless you saved them with **`:export`** earlier. Third-party clients should replace or dedupe history on handshake; see **PROTOCOL.md** (Server Behavior). |
 | Banner stuck on `[Sending...]` | Current **client** clears sending after each successful WebSocket write for normal chat and for `admin_command`, so dropped or slow server work does not leave the banner stuck. Current **server** sends a `System` line for unknown admin `:` commands (`Unknown command:` plus the token) and one `System` line when per-connection message rate burst is exceeded (see **PROTOCOL.md** Rate Limiting). |
 | Footer unread looks wrong | The reference client increments unread only for other users' new `text`, `dm`, or `file` while the transcript is not at the bottom. It does not increment for typing, reactions, read receipts, edits, deletes, or your own echoed sends. See **ARCHITECTURE.md** (client). |

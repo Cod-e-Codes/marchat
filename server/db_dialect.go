@@ -72,17 +72,30 @@ func dbQueryRow(db *sql.DB, query string, args ...interface{}) *sql.Row {
 	return db.QueryRow(rebindQuery(db, query), args...)
 }
 
-func upsertUserMessageStateSQL(db *sql.DB) string {
+// touchUserLastSeenSQL records when a user last completed a successful handshake.
+// last_message_id is legacy schema; replay no longer uses incremental catch-up.
+func touchUserLastSeenSQL(db *sql.DB) string {
 	switch getDBDialect(db) {
 	case DialectPostgres:
-		return `INSERT INTO user_message_state (username, last_message_id, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON CONFLICT (username) DO UPDATE SET last_message_id = EXCLUDED.last_message_id, last_seen = EXCLUDED.last_seen`
+		return `INSERT INTO user_message_state (username, last_message_id, last_seen) VALUES (?, 0, CURRENT_TIMESTAMP)
+		ON CONFLICT (username) DO UPDATE SET last_seen = EXCLUDED.last_seen`
 	case DialectMySQL:
-		return `INSERT INTO user_message_state (username, last_message_id, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)
-		ON DUPLICATE KEY UPDATE last_message_id = VALUES(last_message_id), last_seen = VALUES(last_seen)`
+		return `INSERT INTO user_message_state (username, last_message_id, last_seen) VALUES (?, 0, CURRENT_TIMESTAMP)
+		ON DUPLICATE KEY UPDATE last_seen = CURRENT_TIMESTAMP`
 	default:
-		return `INSERT OR REPLACE INTO user_message_state (username, last_message_id, last_seen) VALUES (?, ?, CURRENT_TIMESTAMP)`
+		return `INSERT INTO user_message_state (username, last_message_id, last_seen) VALUES (?, 0, CURRENT_TIMESTAMP)
+		ON CONFLICT(username) DO UPDATE SET last_seen = excluded.last_seen`
 	}
+}
+
+// visibleMessagesForUserSQL returns up to limit rows visible to lowerUsername:
+// channel/public rows (empty recipient) plus DMs where the user is sender or recipient.
+func visibleMessagesForUserSQL() string {
+	return `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, ''), COALESCE(channel, 'general')
+FROM messages
+WHERE (COALESCE(TRIM(recipient), '') = '' OR LOWER(TRIM(sender)) = ? OR LOWER(TRIM(recipient)) = ?)
+ORDER BY created_at DESC
+LIMIT ?`
 }
 
 func upsertUserChannelSQL(db *sql.DB) string {

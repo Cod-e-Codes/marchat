@@ -7,6 +7,7 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 - **Client**: Word-wrap chat message bodies to the transcript viewport width (ANSI-aware). Reaction aliases `thumbsup` / `thumbsdown`; `:unreact`, `:thumbsup`, and `:thumbsdown` commands. When E2E is on and server search returns no matches, a `System` line explains that search matches stored ciphertext, not decrypted plaintext.
+- **Server**: Handshake replay queries up to 50 **visible** recent messages (SQL `LIMIT` after DM/public filter), on every connect including reconnect with no new traffic. `user_message_state` records `last_seen` only (`last_message_id` legacy/unused). `:cleardb` clears `user_message_state`. Postgres/MySQL CI smoke and WebSocket integration test cover visible replay SQL and second-connect wire replay.
 - **Dependencies**: **github.com/jackc/pgx/v5** v5.10.0, **golang.org/x/crypto** v0.53.0, **golang.org/x/term** v0.44.0, **modernc.org/sqlite** v1.52.0 (SQLite 3.53.2).
 
 ## v1.2.0

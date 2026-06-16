@@ -4,6 +4,9 @@ import (
 	"database/sql"
 	"os"
 	"testing"
+	"time"
+
+	"github.com/Cod-e-Codes/marchat/shared"
 )
 
 // CI sets MARCHAT_CI_POSTGRES_URL and MARCHAT_CI_MYSQL_URL when Postgres / MySQL (or MariaDB)
@@ -27,6 +30,7 @@ func TestPostgresInitDBAndSchemaSmoke(t *testing.T) {
 
 	CreateSchema(db)
 	assertCISmokeTables(t, db, "postgres")
+	assertCIHandshakeReplaySmoke(t, db)
 }
 
 func TestMySQLInitDBAndSchemaSmoke(t *testing.T) {
@@ -46,6 +50,7 @@ func TestMySQLInitDBAndSchemaSmoke(t *testing.T) {
 
 	CreateSchema(db)
 	assertCISmokeTables(t, db, "mysql")
+	assertCIHandshakeReplaySmoke(t, db)
 }
 
 func assertCISmokeTables(t *testing.T, db *sql.DB, kind string) {
@@ -68,5 +73,41 @@ func assertCISmokeTables(t *testing.T, db *sql.DB, kind string) {
 		if n != 1 {
 			t.Fatalf("expected table %q to exist (count=%d)", name, n)
 		}
+	}
+}
+
+func assertCIHandshakeReplaySmoke(t *testing.T, db *sql.DB) {
+	t.Helper()
+	invalidateRecentMessagesCache()
+
+	now := time.Now()
+	if _, err := InsertMessage(db, shared.Message{
+		Sender:    "alice",
+		Content:   "ci-smoke-public",
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("InsertMessage public: %v", err)
+	}
+	if _, err := InsertMessage(db, shared.Message{
+		Sender:    "alice",
+		Recipient: "carol",
+		Type:      shared.DirectMessage,
+		Content:   "ci-smoke-dm",
+		CreatedAt: now.Add(time.Minute),
+	}); err != nil {
+		t.Fatalf("InsertMessage dm: %v", err)
+	}
+
+	bobMsgs := GetRecentMessagesForUser(db, "bob", HandshakeReplayLimit, false)
+	if len(bobMsgs) != 1 {
+		t.Fatalf("bob visible replay len = %d, want 1", len(bobMsgs))
+	}
+	if bobMsgs[0].Content != "ci-smoke-public" {
+		t.Fatalf("bob visible replay content = %q, want ci-smoke-public", bobMsgs[0].Content)
+	}
+
+	carolMsgs := GetRecentMessagesForUser(db, "carol", HandshakeReplayLimit, false)
+	if len(carolMsgs) != 2 {
+		t.Fatalf("carol visible replay len = %d, want 2", len(carolMsgs))
 	}
 }

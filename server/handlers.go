@@ -31,6 +31,9 @@ var upgrader = websocket.Upgrader{
 	CheckOrigin:     checkWebSocketOrigin,
 }
 
+// HandshakeReplayLimit is the scrollback window sent on every successful WebSocket handshake.
+const HandshakeReplayLimit = 50
+
 var (
 	recentMessagesCache      []shared.Message
 	recentMessagesCachedAt   time.Time
@@ -349,56 +352,89 @@ func InsertEncryptedMessage(db *sql.DB, encryptedMsg *shared.EncryptedMessage) e
 	return nil
 }
 
-func GetRecentMessages(db *sql.DB) []shared.Message {
-	recentMessagesCacheMutex.RLock()
-	if time.Since(recentMessagesCachedAt) <= recentMessagesCacheTTL && len(recentMessagesCache) > 0 {
-		out := make([]shared.Message, len(recentMessagesCache))
-		copy(out, recentMessagesCache)
-		recentMessagesCacheMutex.RUnlock()
-		return out
+func normalizeMessageChannel(channel string) string {
+	ch := strings.ToLower(strings.TrimSpace(channel))
+	if ch == "" {
+		return "general"
 	}
-	recentMessagesCacheMutex.RUnlock()
+	return ch
+}
 
-	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, ''), COALESCE(channel, 'general') FROM messages ORDER BY created_at DESC LIMIT 50`)
+func scanMessagesFromRows(rows *sql.Rows) []shared.Message {
+	var messages []shared.Message
+	for rows.Next() {
+		var msg shared.Message
+		var isEncrypted, edited, deleted bool
+		if err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted, &msg.Recipient, &msg.Channel); err != nil {
+			continue
+		}
+		msg.Encrypted = isEncrypted
+		msg.Edited = edited
+		if strings.TrimSpace(msg.Recipient) != "" {
+			msg.Type = shared.DirectMessage
+		}
+		msg.Channel = normalizeMessageChannel(msg.Channel)
+		if deleted {
+			msg.Type = shared.DeleteMessage
+		}
+		messages = append(messages, msg)
+	}
+	return messages
+}
+
+// GetRecentMessages returns the newest messages up to HandshakeReplayLimit (admin/utility path).
+func GetRecentMessages(db *sql.DB) []shared.Message {
+	return GetRecentMessagesWithLimit(db, HandshakeReplayLimit)
+}
+
+func GetRecentMessagesWithLimit(db *sql.DB, limit int) []shared.Message {
+	if limit <= 0 {
+		limit = HandshakeReplayLimit
+	}
+
+	if limit == HandshakeReplayLimit {
+		recentMessagesCacheMutex.RLock()
+		if time.Since(recentMessagesCachedAt) <= recentMessagesCacheTTL && len(recentMessagesCache) > 0 {
+			out := make([]shared.Message, len(recentMessagesCache))
+			copy(out, recentMessagesCache)
+			recentMessagesCacheMutex.RUnlock()
+			return out
+		}
+		recentMessagesCacheMutex.RUnlock()
+	}
+
+	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, ''), COALESCE(channel, 'general') FROM messages ORDER BY created_at DESC LIMIT ?`, limit)
 	if err != nil {
 		log.Println("Query error:", err)
 		return nil
 	}
 	defer rows.Close()
 
-	var messages []shared.Message
-	for rows.Next() {
-		var msg shared.Message
-		var isEncrypted, edited, deleted bool
-		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted, &msg.Recipient, &msg.Channel)
-		if err == nil {
-			msg.Encrypted = isEncrypted
-			msg.Edited = edited
-			if strings.TrimSpace(msg.Recipient) != "" {
-				msg.Type = shared.DirectMessage
-			}
-			msg.Channel = strings.ToLower(strings.TrimSpace(msg.Channel))
-			if msg.Channel == "" {
-				msg.Channel = "general"
-			}
-			if deleted {
-				msg.Type = shared.DeleteMessage
-			}
-			messages = append(messages, msg)
-		}
-	}
-
-	// CRITICAL FIX: Always sort messages by timestamp for consistent chronological display
-	// Note: SQL query fetches newest messages first (DESC), but we sort chronologically (ASC) for display
+	messages := scanMessagesFromRows(rows)
 	sortMessagesByTimestamp(messages)
 
-	recentMessagesCacheMutex.Lock()
-	recentMessagesCache = make([]shared.Message, len(messages))
-	copy(recentMessagesCache, messages)
-	recentMessagesCachedAt = time.Now()
-	recentMessagesCacheMutex.Unlock()
+	if limit == HandshakeReplayLimit {
+		recentMessagesCacheMutex.Lock()
+		recentMessagesCache = make([]shared.Message, len(messages))
+		copy(recentMessagesCache, messages)
+		recentMessagesCachedAt = time.Now()
+		recentMessagesCacheMutex.Unlock()
+	}
 
 	return messages
+}
+
+func queryVisibleMessagesForUser(db *sql.DB, lowerUsername string, limit int) []shared.Message {
+	if limit <= 0 {
+		limit = HandshakeReplayLimit
+	}
+	rows, err := dbQuery(db, visibleMessagesForUserSQL(), lowerUsername, lowerUsername, limit)
+	if err != nil {
+		log.Printf("Query error in queryVisibleMessagesForUser for %s: %v", lowerUsername, err)
+		return nil
+	}
+	defer rows.Close()
+	return scanMessagesFromRows(rows)
 }
 
 func enforceMessageRetention(db *sql.DB) {
@@ -434,76 +470,21 @@ func enforceMessageRetention(db *sql.DB) {
 	}
 }
 
-// GetRecentMessagesForUser returns personalized message history for a specific user
-func GetRecentMessagesForUser(db *sql.DB, username string, defaultLimit int, banGapsHistory bool) ([]shared.Message, int64) {
-	lowerUsername := strings.ToLower(username)
-
-	// Get user's last seen message ID
-	lastMessageID, err := getUserLastMessageID(db, lowerUsername)
-	if err != nil && err != sql.ErrNoRows {
-		log.Printf("Error getting last message ID for user %s: %v", username, err)
-		// Fall back to recent messages for new users or on error
-		messages := GetRecentMessages(db)
-		sortMessagesByTimestamp(messages) // Ensure consistent ordering
-		return messages, 0
+// GetRecentMessagesForUser returns up to limit messages visible to username for handshake replay.
+func GetRecentMessagesForUser(db *sql.DB, username string, limit int, banGapsHistory bool) []shared.Message {
+	lowerUsername := strings.ToLower(strings.TrimSpace(username))
+	if limit <= 0 {
+		limit = HandshakeReplayLimit
 	}
 
-	var messages []shared.Message
-
-	if lastMessageID == 0 {
-		// New user or no history - get recent messages
-		messages = GetRecentMessages(db)
-	} else {
-		// Returning user - get messages after their last seen ID
-		messages = GetMessagesAfter(db, lastMessageID, defaultLimit)
-
-		// If they have few new messages, combine with recent history
-		if len(messages) < defaultLimit/2 {
-			recentMessages := GetRecentMessages(db)
-			// Combine recent messages with new messages, avoiding duplicates
-			existingIDs := make(map[string]bool)
-			for _, msg := range messages {
-				key := msg.Sender + ":" + msg.Content + ":" + msg.CreatedAt.Format("2006-01-02 15:04:05")
-				existingIDs[key] = true
-			}
-
-			for _, msg := range recentMessages {
-				key := msg.Sender + ":" + msg.Content + ":" + msg.CreatedAt.Format("2006-01-02 15:04:05")
-				if !existingIDs[key] && len(messages) < defaultLimit {
-					messages = append(messages, msg)
-				}
-			}
-		}
-	}
-
-	// CRITICAL FIX: Always sort messages by timestamp for consistent chronological display
-	// Note: SQL queries fetch newest messages first (DESC), but we sort chronologically (ASC) for display
+	messages := queryVisibleMessagesForUser(db, lowerUsername, limit)
 	sortMessagesByTimestamp(messages)
 
-	// Filter to messages visible to this user.
-	// Public/channel messages have empty recipient.
-	// DMs are visible only to sender and recipient.
-	visible := make([]shared.Message, 0, len(messages))
-	for _, msg := range messages {
-		recipient := strings.ToLower(strings.TrimSpace(msg.Recipient))
-		if recipient == "" {
-			visible = append(visible, msg)
-			continue
-		}
-		sender := strings.ToLower(strings.TrimSpace(msg.Sender))
-		if sender == lowerUsername || recipient == lowerUsername {
-			visible = append(visible, msg)
-		}
-	}
-	messages = visible
-
-	// Filter messages during ban periods if feature is enabled
 	if banGapsHistory {
 		banPeriods, err := getUserBanPeriods(db, lowerUsername)
 		if err != nil {
 			log.Printf("Warning: failed to get ban periods for user %s: %v", username, err)
 		} else if len(banPeriods) > 0 {
-			// Filter out messages sent during ban periods
 			filteredMessages := make([]shared.Message, 0, len(messages))
 			for _, msg := range messages {
 				if !isMessageInBanPeriod(msg.CreatedAt, banPeriods) {
@@ -511,83 +492,17 @@ func GetRecentMessagesForUser(db *sql.DB, username string, defaultLimit int, ban
 				}
 			}
 			messages = filteredMessages
-			log.Printf("Filtered %d messages for user %s due to ban history gaps", len(messages), username)
 		}
 	}
 
-	// Update user's last seen message ID
-	if len(messages) > 0 {
-		latestID := getLatestMessageID(db)
-		if latestID > 0 {
-			err = setUserLastMessageID(db, lowerUsername, latestID)
-			if err != nil {
-				log.Printf("Warning: failed to update last message ID for user %s: %v", username, err)
-			}
-		}
-	}
-
-	return messages, lastMessageID
-}
-
-// GetMessagesAfter retrieves messages with ID > lastMessageID
-func GetMessagesAfter(db *sql.DB, lastMessageID int64, limit int) []shared.Message {
-	rows, err := dbQuery(db, `SELECT sender, content, created_at, is_encrypted, message_id, COALESCE(edited, 0), COALESCE(deleted, 0), COALESCE(recipient, ''), COALESCE(channel, 'general') FROM messages WHERE message_id > ? ORDER BY created_at DESC LIMIT ?`, lastMessageID, limit)
-	if err != nil {
-		log.Println("Query error in GetMessagesAfter:", err)
-		return nil
-	}
-	defer rows.Close()
-
-	var messages []shared.Message
-	for rows.Next() {
-		var msg shared.Message
-		var isEncrypted, edited, deleted bool
-		err := rows.Scan(&msg.Sender, &msg.Content, &msg.CreatedAt, &isEncrypted, &msg.MessageID, &edited, &deleted, &msg.Recipient, &msg.Channel)
-		if err == nil {
-			msg.Encrypted = isEncrypted
-			msg.Edited = edited
-			if strings.TrimSpace(msg.Recipient) != "" {
-				msg.Type = shared.DirectMessage
-			}
-			msg.Channel = strings.ToLower(strings.TrimSpace(msg.Channel))
-			if msg.Channel == "" {
-				msg.Channel = "general"
-			}
-			if deleted {
-				msg.Type = shared.DeleteMessage
-			}
-			messages = append(messages, msg)
-		}
-	}
-
-	// CRITICAL FIX: Always sort messages by timestamp for consistent chronological display
-	// Note: SQL query fetches newest messages first (DESC), but we sort chronologically (ASC) for display
-	sortMessagesByTimestamp(messages)
 	return messages
 }
 
-// getUserLastMessageID queries user_message_state table
-func getUserLastMessageID(db *sql.DB, username string) (int64, error) {
-	var lastMessageID int64
-	err := dbQueryRow(db, `SELECT last_message_id FROM user_message_state WHERE username = ?`, username).Scan(&lastMessageID)
-	return lastMessageID, err
-}
-
-// setUserLastMessageID upserts user_message_state in a backend-compatible way
-func setUserLastMessageID(db *sql.DB, username string, messageID int64) error {
-	_, err := dbExec(db, upsertUserMessageStateSQL(db), username, messageID)
+// touchUserLastSeen records a successful handshake in user_message_state (last_seen only).
+func touchUserLastSeen(db *sql.DB, username string) error {
+	lowerUsername := strings.ToLower(strings.TrimSpace(username))
+	_, err := dbExec(db, touchUserLastSeenSQL(db), lowerUsername)
 	return err
-}
-
-// getLatestMessageID returns MAX(id) from messages table
-func getLatestMessageID(db *sql.DB) int64 {
-	var latestID int64
-	err := dbQueryRow(db, `SELECT MAX(id) FROM messages`).Scan(&latestID)
-	if err != nil {
-		// Handle empty table case
-		return 0
-	}
-	return latestID
 }
 
 // clearUserMessageState deletes user's record from user_message_state
@@ -687,6 +602,11 @@ func sortMessagesByTimestamp(messages []shared.Message) {
 
 func ClearMessages(db *sql.DB) error {
 	_, err := dbExec(db, `DELETE FROM messages`)
+	if err != nil {
+		invalidateRecentMessagesCache()
+		return err
+	}
+	_, err = dbExec(db, `DELETE FROM user_message_state`)
 	invalidateRecentMessagesCache()
 	return err
 }
@@ -1076,7 +996,10 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 		// indefinitely when total items exceed the buffer.
 		go client.writePump()
 
-		msgs, _ := GetRecentMessagesForUser(db, username, 50, banGapsHistory)
+		msgs := GetRecentMessagesForUser(db, username, HandshakeReplayLimit, banGapsHistory)
+		if err := touchUserLastSeen(db, username); err != nil {
+			log.Printf("Warning: failed to record last_seen for user %s: %v", username, err)
+		}
 		messageIDs := make([]int64, 0, len(msgs))
 		for _, msg := range msgs {
 			select {

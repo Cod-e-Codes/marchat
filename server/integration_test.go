@@ -4,13 +4,16 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/gorilla/websocket"
 	_ "modernc.org/sqlite"
 )
 
@@ -59,17 +62,9 @@ func TestIntegrationMessageFlow(t *testing.T) {
 		t.Errorf("Expected third message 'How are you?', got '%s'", recentMessages[2].Content)
 	}
 
-	// Test GetMessagesAfter
-	messagesAfter := GetMessagesAfter(db, 1, 10)
-	if len(messagesAfter) != 2 {
-		t.Errorf("Expected 2 messages after ID 1, got %d", len(messagesAfter))
-	}
-
-	if messagesAfter[0].Content != "Hi Alice!" {
-		t.Errorf("Expected first message after ID 1 'Hi Alice!', got '%s'", messagesAfter[0].Content)
-	}
-	if messagesAfter[1].Content != "How are you?" {
-		t.Errorf("Expected second message after ID 1 'How are you?', got '%s'", messagesAfter[1].Content)
+	visible := GetRecentMessagesForUser(db, "bob", HandshakeReplayLimit, false)
+	if len(visible) != 3 {
+		t.Errorf("Expected 3 visible messages for bob, got %d", len(visible))
 	}
 }
 
@@ -262,58 +257,85 @@ func TestIntegrationMessageCap(t *testing.T) {
 	}
 }
 
-func TestIntegrationWebSocketHandshake(t *testing.T) {
-	// Create a test database
+func TestIntegrationWebSocketHandshakeReplayOnReconnect(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 	defer db.Close()
-
-	// Create schema
 	CreateSchema(db)
 
-	// Create hub
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
-
-	// Test admin authentication
-	adminList := []string{"admin1", "admin2"}
-	adminKey := "secret-admin-key"
-	banGapsHistory := false
-	maxFileBytes := int64(10 * 1024 * 1024) // 10MB
-
-	// Create handler
-	dbPath := "test_marchat.db"
-	handler := ServeWs(hub, db, adminList, adminKey, banGapsHistory, maxFileBytes, dbPath)
-
-	// Test regular user handshake
-	handshake := shared.Handshake{
-		Username: "regularuser",
-		Admin:    false,
-		AdminKey: "",
+	now := time.Now()
+	for i, content := range []string{"replay-one", "replay-two", "replay-three"} {
+		if _, err := InsertMessage(db, shared.Message{
+			Sender:    "alice",
+			Content:   content,
+			CreatedAt: now.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("InsertMessage: %v", err)
+		}
 	}
 
-	handshakeData, err := json.Marshal(handshake)
-	if err != nil {
-		t.Fatalf("Failed to marshal handshake: %v", err)
+	tdir := t.TempDir()
+	hub := NewHub(tdir, tdir, "", db)
+	go hub.Run()
+
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, filepath.Join(tdir, "test.db"))
+	srv := httptest.NewServer(handler)
+	defer srv.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+
+	readHandshakeHistory := func(username string) map[string]bool {
+		t.Helper()
+		conn, _, err := websocket.DefaultDialer.Dial(wsURL, nil)
+		if err != nil {
+			t.Fatalf("dial websocket: %v", err)
+		}
+		defer conn.Close()
+
+		if err := conn.WriteJSON(shared.Handshake{Username: username}); err != nil {
+			t.Fatalf("write handshake: %v", err)
+		}
+
+		got := make(map[string]bool)
+		wantCount := 3
+		deadline := time.Now().Add(5 * time.Second)
+		for time.Now().Before(deadline) {
+			_ = conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+			_, raw, err := conn.ReadMessage()
+			if err != nil {
+				if ne, ok := err.(net.Error); ok && ne.Timeout() {
+					if len(got) >= wantCount {
+						break
+					}
+					continue
+				}
+				break
+			}
+
+			var chat shared.Message
+			if err := json.Unmarshal(raw, &chat); err == nil && chat.Sender != "" && chat.Sender != "System" && chat.Content != "" {
+				got[chat.Content] = true
+			}
+		}
+		time.Sleep(100 * time.Millisecond)
+		return got
 	}
 
-	// Create test request
-	req := httptest.NewRequest("GET", "/ws", strings.NewReader(string(handshakeData)))
-	req.Header.Set("Upgrade", "websocket")
-	req.Header.Set("Connection", "Upgrade")
-	req.Header.Set("Sec-WebSocket-Key", "test-key")
-	req.Header.Set("Sec-WebSocket-Version", "13")
+	first := readHandshakeHistory("viewer")
+	for _, want := range []string{"replay-one", "replay-two", "replay-three"} {
+		if !first[want] {
+			t.Fatalf("first connect missing %q; got %#v", want, first)
+		}
+	}
 
-	// Create response recorder
-	w := httptest.NewRecorder()
-
-	// Note: This test is simplified - actual WebSocket testing would require
-	// a WebSocket client and more complex setup
-	handler.ServeHTTP(w, req)
-
-	// The handler should attempt to upgrade the connection
-	// In a real test, we'd verify the WebSocket upgrade response
+	second := readHandshakeHistory("viewer")
+	for _, want := range []string{"replay-one", "replay-two", "replay-three"} {
+		if !second[want] {
+			t.Fatalf("reconnect missing %q; first=%#v second=%#v", want, first, second)
+		}
+	}
 }
 
 func TestIntegrationConcurrentOperations(t *testing.T) {

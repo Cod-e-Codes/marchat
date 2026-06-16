@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"encoding/binary"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -182,50 +183,44 @@ func TestGetRecentMessages(t *testing.T) {
 	}
 }
 
-func TestGetMessagesAfter(t *testing.T) {
-	// Create a real database for this test
+func TestQueryVisibleMessagesForUserRespectsLimit(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
 	defer db.Close()
-
-	// Create schema
 	CreateSchema(db)
 
-	// Insert test messages
 	now := time.Now()
-	messages := []shared.Message{
-		{Sender: "user1", Content: "Message 1", CreatedAt: now.Add(-3 * time.Hour), Encrypted: false},
-		{Sender: "user2", Content: "Message 2", CreatedAt: now.Add(-2 * time.Hour), Encrypted: false},
-		{Sender: "user1", Content: "Message 3", CreatedAt: now.Add(-1 * time.Hour), Encrypted: false},
-		{Sender: "user2", Content: "Message 4", CreatedAt: now, Encrypted: false},
+	for i := 0; i < 60; i++ {
+		if _, err := InsertMessage(db, shared.Message{
+			Sender:    "alice",
+			Content:   fmt.Sprintf("public-%d", i),
+			CreatedAt: now.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("InsertMessage public: %v", err)
+		}
 	}
-
-	for _, msg := range messages {
-		if _, err := InsertMessage(db, msg); err != nil {
-			t.Fatalf("InsertMessage failed: %v", err)
+	for i := 0; i < 100; i++ {
+		if _, err := InsertMessage(db, shared.Message{
+			Sender:    "alice",
+			Recipient: "carol",
+			Type:      shared.DirectMessage,
+			Content:   "dm noise",
+			CreatedAt: now.Add(time.Duration(60+i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("InsertMessage dm: %v", err)
 		}
 	}
 
-	// Get messages after the first one (message_id = 1)
-	messagesAfter := GetMessagesAfter(db, 1, 10)
-
-	if len(messagesAfter) != 3 {
-		t.Errorf("Expected 3 messages after ID 1, got %d", len(messagesAfter))
+	msgs := GetRecentMessagesForUser(db, "bob", HandshakeReplayLimit, false)
+	if len(msgs) != HandshakeReplayLimit {
+		t.Fatalf("got %d visible messages, want %d", len(msgs), HandshakeReplayLimit)
 	}
-
-	// Messages should be sorted chronologically
-	if messagesAfter[0].Content != "Message 2" {
-		t.Errorf("Expected first message 'Message 2', got '%s'", messagesAfter[0].Content)
-	}
-
-	if messagesAfter[1].Content != "Message 3" {
-		t.Errorf("Expected second message 'Message 3', got '%s'", messagesAfter[1].Content)
-	}
-
-	if messagesAfter[2].Content != "Message 4" {
-		t.Errorf("Expected third message 'Message 4', got '%s'", messagesAfter[2].Content)
+	for _, msg := range msgs {
+		if msg.Type == shared.DirectMessage {
+			t.Fatalf("bob should not receive dm in visible query: %+v", msg)
+		}
 	}
 }
 
@@ -250,7 +245,7 @@ func TestGetRecentMessagesForUserFiltersDMs(t *testing.T) {
 		}
 	}
 
-	bobMessages, _ := GetRecentMessagesForUser(db, "bob", 50, false)
+	bobMessages := GetRecentMessagesForUser(db, "bob", HandshakeReplayLimit, false)
 	for _, msg := range bobMessages {
 		if msg.Type == shared.DirectMessage {
 			if !strings.EqualFold(msg.Sender, "bob") && !strings.EqualFold(msg.Recipient, "bob") {
@@ -259,7 +254,7 @@ func TestGetRecentMessagesForUserFiltersDMs(t *testing.T) {
 		}
 	}
 
-	carolMessages, _ := GetRecentMessagesForUser(db, "carol", 50, false)
+	carolMessages := GetRecentMessagesForUser(db, "carol", HandshakeReplayLimit, false)
 	foundCarolDM := false
 	for _, msg := range carolMessages {
 		if msg.Type == shared.DirectMessage && strings.EqualFold(msg.Recipient, "carol") {
@@ -271,6 +266,201 @@ func TestGetRecentMessagesForUserFiltersDMs(t *testing.T) {
 	}
 	if !foundCarolDM {
 		t.Fatal("expected carol to receive her direct message")
+	}
+}
+
+func TestGetRecentMessagesForUserReconnectReplay(t *testing.T) {
+	tests := []struct {
+		name         string
+		seed         func(t *testing.T, db *sql.DB, now time.Time)
+		username     string
+		wantContents []string
+	}{
+		{
+			name: "first connect gets recent general history",
+			seed: func(t *testing.T, db *sql.DB, now time.Time) {
+				for i, content := range []string{"alpha", "beta", "gamma"} {
+					if _, err := InsertMessage(db, shared.Message{
+						Sender:    "alice",
+						Content:   content,
+						CreatedAt: now.Add(time.Duration(i) * time.Minute),
+					}); err != nil {
+						t.Fatalf("InsertMessage: %v", err)
+					}
+				}
+			},
+			username:     "alice",
+			wantContents: []string{"alpha", "beta", "gamma"},
+		},
+		{
+			name: "reconnect with no new traffic replays same window",
+			seed: func(t *testing.T, db *sql.DB, now time.Time) {
+				for i, content := range []string{"one", "two", "three"} {
+					if _, err := InsertMessage(db, shared.Message{
+						Sender:    "bob",
+						Content:   content,
+						CreatedAt: now.Add(time.Duration(i) * time.Minute),
+					}); err != nil {
+						t.Fatalf("InsertMessage: %v", err)
+					}
+				}
+				GetRecentMessagesForUser(db, "bob", HandshakeReplayLimit, false) // first connect
+			},
+			username:     "bob",
+			wantContents: []string{"one", "two", "three"},
+		},
+		{
+			name: "reconnect after cleardb does not leave stale high-water mark",
+			seed: func(t *testing.T, db *sql.DB, now time.Time) {
+				if _, err := InsertMessage(db, shared.Message{
+					Sender:    "dana",
+					Content:   "before clear",
+					CreatedAt: now,
+				}); err != nil {
+					t.Fatalf("InsertMessage: %v", err)
+				}
+				GetRecentMessagesForUser(db, "dana", HandshakeReplayLimit, false)
+				if err := ClearMessages(db); err != nil {
+					t.Fatalf("ClearMessages: %v", err)
+				}
+				if _, err := InsertMessage(db, shared.Message{
+					Sender:    "dana",
+					Content:   "after clear",
+					CreatedAt: now.Add(time.Minute),
+				}); err != nil {
+					t.Fatalf("InsertMessage: %v", err)
+				}
+			},
+			username:     "dana",
+			wantContents: []string{"after clear"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db, err := sql.Open("sqlite", ":memory:")
+			if err != nil {
+				t.Fatalf("open db: %v", err)
+			}
+			defer db.Close()
+			CreateSchema(db)
+
+			now := time.Now()
+			tt.seed(t, db, now)
+
+			msgs := GetRecentMessagesForUser(db, tt.username, HandshakeReplayLimit, false)
+			if len(msgs) != len(tt.wantContents) {
+				t.Fatalf("got %d messages, want %d", len(msgs), len(tt.wantContents))
+			}
+			for i, want := range tt.wantContents {
+				if msgs[i].Content != want {
+					t.Fatalf("message[%d] content = %q, want %q", i, msgs[i].Content, want)
+				}
+			}
+		})
+	}
+}
+
+func TestGetRecentMessagesForUserReconnectWithNewMessages(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	now := time.Now()
+	base := []string{"old-1", "old-2"}
+	for i, content := range base {
+		if _, err := InsertMessage(db, shared.Message{
+			Sender:    "erin",
+			Content:   content,
+			CreatedAt: now.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("InsertMessage: %v", err)
+		}
+	}
+
+	first := GetRecentMessagesForUser(db, "erin", HandshakeReplayLimit, false)
+	if len(first) != 2 {
+		t.Fatalf("first connect: got %d messages, want 2", len(first))
+	}
+
+	if _, err := InsertMessage(db, shared.Message{
+		Sender:    "erin",
+		Content:   "new-after-quit",
+		CreatedAt: now.Add(10 * time.Minute),
+	}); err != nil {
+		t.Fatalf("InsertMessage new: %v", err)
+	}
+
+	second := GetRecentMessagesForUser(db, "erin", HandshakeReplayLimit, false)
+	if len(second) != 3 {
+		t.Fatalf("reconnect: got %d messages, want 3", len(second))
+	}
+
+	seen := make(map[string]int)
+	for _, msg := range second {
+		seen[msg.Content]++
+	}
+	for _, content := range []string{"old-1", "old-2", "new-after-quit"} {
+		if seen[content] != 1 {
+			t.Fatalf("content %q appears %d times, want 1", content, seen[content])
+		}
+	}
+}
+
+func TestGetRecentMessagesForUserInvisibleDMsDoNotSuppressScrollback(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open db: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	now := time.Now()
+	public := []string{"general-a", "general-b", "general-c"}
+	for i, content := range public {
+		if _, err := InsertMessage(db, shared.Message{
+			Sender:    "alice",
+			Content:   content,
+			CreatedAt: now.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("InsertMessage public: %v", err)
+		}
+	}
+	GetRecentMessagesForUser(db, "bob", HandshakeReplayLimit, false)
+
+	// Many DMs between other users after bob's high-water mark; bob must still see general scrollback.
+	for i := 0; i < 30; i++ {
+		if _, err := InsertMessage(db, shared.Message{
+			Sender:    "alice",
+			Recipient: "carol",
+			Type:      shared.DirectMessage,
+			Content:   "dm batch",
+			CreatedAt: now.Add(time.Duration(10+i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("InsertMessage dm: %v", err)
+		}
+	}
+
+	msgs := GetRecentMessagesForUser(db, "bob", HandshakeReplayLimit, false)
+	if len(msgs) < 3 {
+		t.Fatalf("bob reconnect got %d messages, want at least 3 general lines", len(msgs))
+	}
+	for _, msg := range msgs {
+		if msg.Type == shared.DirectMessage {
+			t.Fatalf("bob should not receive carol dm: %+v", msg)
+		}
+	}
+	found := 0
+	for _, msg := range msgs {
+		if msg.Content == "general-a" || msg.Content == "general-b" || msg.Content == "general-c" {
+			found++
+		}
+	}
+	if found != 3 {
+		t.Fatalf("expected all three general messages in replay, found %d", found)
 	}
 }
 
@@ -340,6 +530,9 @@ func TestClearMessages(t *testing.T) {
 	if _, err := InsertMessage(db, msg); err != nil {
 		t.Fatalf("InsertMessage failed: %v", err)
 	}
+	if err := touchUserLastSeen(db, "testuser"); err != nil {
+		t.Fatalf("touchUserLastSeen: %v", err)
+	}
 
 	// Verify message exists
 	recentMessages := GetRecentMessages(db)
@@ -357,6 +550,14 @@ func TestClearMessages(t *testing.T) {
 	recentMessages = GetRecentMessages(db)
 	if len(recentMessages) != 0 {
 		t.Errorf("Expected 0 messages after clear, got %d", len(recentMessages))
+	}
+
+	var stateRows int
+	if err := db.QueryRow(`SELECT COUNT(*) FROM user_message_state`).Scan(&stateRows); err != nil {
+		t.Fatalf("count user_message_state: %v", err)
+	}
+	if stateRows != 0 {
+		t.Errorf("Expected user_message_state cleared, got %d rows", stateRows)
 	}
 }
 

@@ -322,6 +322,7 @@ CREATE TABLE user_message_state (
     last_seen DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 ```
+Tracks `last_seen` per username after each successful WebSocket handshake (`touchUserLastSeen`). The `last_message_id` column remains in the schema for compatibility but is not used for replay. Ban, kick, and unban clear the row via `clearUserMessageState`. `:cleardb` deletes all rows in this table along with `messages`.
 
 #### `ban_history`
 ```sql

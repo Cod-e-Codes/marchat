@@ -108,7 +108,7 @@ func (h *Hub) BanUser(username string, adminUsername string) {
 		}
 	}
 
-	// Clear user's message state to ensure fresh history on unban
+	// Clear per-user last_seen bookkeeping on ban (ban gaps use ban_history, not this table).
 	if h.getDB() != nil {
 		err := clearUserMessageState(h.getDB(), lowerUsername)
 		if err != nil {
@@ -142,7 +142,7 @@ func (h *Hub) UnbanUser(username string, adminUsername string) bool {
 			}
 		}
 
-		// Clear user's message state to ensure clean slate on reconnection
+		// Clear per-user last_seen bookkeeping on unban.
 		if h.getDB() != nil {
 			err := clearUserMessageState(h.getDB(), lowerUsername)
 			if err != nil {
@@ -247,7 +247,7 @@ func (h *Hub) KickUser(username string, adminUsername string) {
 		}
 	}
 
-	// Clear user's message state
+	// Clear per-user last_seen bookkeeping on kick (ban gaps use ban_history, not this table).
 	if h.getDB() != nil {
 		err := clearUserMessageState(h.getDB(), lowerUsername)
 		if err != nil {
