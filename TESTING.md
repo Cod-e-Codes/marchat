@@ -20,6 +20,17 @@ The Marchat test suite provides foundational coverage of the application's core 
 
 **Release workflow (maintainers):** `.github/workflows/release.yml` uses a **`resolve-version`** job so the version string is available to Docker and all matrix legs (GitHub Actions does not support job outputs from matrix jobs). The **`build`** job sets **`CGO_ENABLED=0`** for static cross-compiled binaries. On a **published** release (not `workflow_dispatch`), **`upload-assets`** uploads all matrix **`.zip`** files with **`gh release upload`**, and the **`docker`** job appends Docker Hub pull instructions with **`gh release edit`** (GitHub CLI on the runner, **`GITHUB_TOKEN`**), avoiding third-party actions that still declare Node 20. **Termux** installs use the **linux-arm64** zip; `install.sh` / `install.ps1` map Android+aarch64 to that asset when needed.
 
+## Manual testing gaps
+
+Some client behavior is only verifiable in a real terminal emulator with mouse reporting enabled. CI and `go test` do not cover these paths today.
+
+| Area | Automated coverage | Manual check |
+|------|-------------------|--------------|
+| Wrapped URL click-to-open | `client/render_test.go` and `client/main_test.go` exercise headless viewport strings, line indexing, and single-line clicks | In a narrow chat panel, post a long GitHub commit URL, left-click the underlined link, confirm the browser opens the **full** URL (not a prefix such as `https://github.com/Cod`). See [#103](https://github.com/Cod-e-Codes/marchat/issues/103). |
+| Lipgloss box + mouse coordinates | `chatPanelOrigin()` offset is unit-tested for banner/border rows only | Click URLs with and without banner text; confirm banner shows `[OK] Opening URL: ...` with the full href before the browser opens. |
+
+**Workaround for users:** copy the URL from the message text when click-to-open opens a truncated link.
+
 ## Test Structure
 
 ### Test Files
@@ -37,8 +48,8 @@ The Marchat test suite provides foundational coverage of the application's core 
 | `client/code_snippet_test.go` | Client code snippet functionality | Text editing, selection, clipboard, syntax highlighting |
 | `client/file_picker_test.go` | Client file picker functionality | File browsing, selection, size validation, directory navigation |
 | `client/testmain_test.go` | Client test harness | Forces Lipgloss ANSI256 profile for headless hyperlink/render assertions |
-| `client/render_test.go` | Message transcript rendering | URL wrap breakpoints, URL span markers, hyperlink style on wrapped segments, continuation indent not underlined, system line severity, negative-ID transcript notice classification |
-| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling (click miss vs hit), encryption functions, flag validation, `wsConnected` transcript reset on reconnect, reconnect backoff doubling, `TestMessageIncrementsUnread`, client System prune/sort (`TestPruneEphemeralSystemMessages`, `TestPruneKeepsTranscriptSystemNotices`, `TestSortMessagesPersistedBeforeClientSystem`), reaction wire channel |
+| `client/render_test.go` | Message transcript rendering | URL wrap breakpoints, URL span markers, hyperlink style on wrapped segments, continuation indent not underlined, system line severity, negative-ID transcript notice classification, headless URL click/index helpers (`buildTranscriptLineURLs`, `findURLAtTranscriptClick`; see [Manual testing gaps](#manual-testing-gaps)) |
+| `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling (single-line click miss vs hit, headless), encryption functions, flag validation, `wsConnected` transcript reset on reconnect, reconnect backoff doubling, `TestMessageIncrementsUnread`, client System prune/sort (`TestPruneEphemeralSystemMessages`, `TestPruneKeepsTranscriptSystemNotices`, `TestSortMessagesPersistedBeforeClientSystem`), reaction wire channel |
 | `client/websocket_sanitize_test.go` | WebSocket URL / TLS hints | Sanitization helpers for display and connection hints |
 | `client/websocket_e2e_test.go` | E2E DM and channel wire helpers | Encrypted outbound message shape, DM send wire format, decrypt roundtrip |
 | `client/exthook/exthook_test.go` | Client hook helpers | Executable validation, hook JSON shaping, path rules |

@@ -46,7 +46,7 @@ go clean -cache -testcache
 | Postgres / MySQL | `server/db_ci_smoke_test.go`; skip locally unless `MARCHAT_CI_POSTGRES_URL` / `MARCHAT_CI_MYSQL_URL` set; MySQL DSN uses `mysql:` or `mysql://` prefix |
 | Doctor env | `internal/doctor/env.go`: swap `osEnviron` under `environMu`; no `t.Parallel()` with other tests that swap it |
 | TUI client | Inject `tea.Msg`; no real terminal; `testmain_test.go` sets Lipgloss ANSI256 for SGR assertions |
-| Client render | `render_test.go`: URL wrap/hyperlink; `main_test.go`: transcript sort, prune, filters |
+| Client render | `render_test.go`: URL wrap/hyperlink (headless); URL click/index helpers do not prove real-terminal opens; see `TESTING.md` Manual testing gaps |
 | cmd/server | Subprocess pattern in `cmd/server/subprocess_doctor_test.go` |
 | Plugins | `plugin/host/plugin_lifecycle_test.go` builds minimal plugin with `go build` |
 | Race | CI runs `go test -race ./...`; plugin host `StopPlugin` must drain readers before reuse |

@@ -31,7 +31,7 @@ Update domain skills when shipped behavior changes. Recent fixes on `main` (or i
 
 - Reconnect backoff advances on failure (not reset each `Init()`); channel stamping on server outbound messages
 - Client transcript notices: negative `message_id` classified by content; scoped to active channel
-- URL click uses `chatPanelOrigin()`; plugin `stdinMu` serializes IPC writes
+- URL click: partial headless helpers (`buildTranscriptLineURLs`, `chatPanelOrigin`); wrapped long URLs still fail in manual testing; [#103](https://github.com/Cod-e-Codes/marchat/issues/103); workaround is copy/paste
 - `:backup` SQLite-only; Postgres/MySQL migrations use `BOOLEAN DEFAULT FALSE`
 
 ## Skill index

@@ -35,6 +35,8 @@ func (m *model) generateHelpContent() string {
 	shortcuts += "  Alt+M                Toggle message metadata (id/encrypted)\n"
 	shortcuts += "  Alt+N                Toggle desktop notifications\n"
 	shortcuts += "  Ctrl+L               Clear chat history\n"
+	shortcuts += "\nMouse:\n"
+	shortcuts += "  Left-click URL       Open link (may fail on wrapped long URLs; copy from message if truncated)\n"
 
 	commands := "\nText Commands:\n"
 	commands += "  :q                   Quit client\n"
