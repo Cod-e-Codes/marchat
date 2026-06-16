@@ -262,8 +262,8 @@ export MARCHAT_DB_PATH='mysql:marchat:marchat@tcp(127.0.0.1:3306)/marchat?parseT
 
 Notes:
 - PostgreSQL requires a reachable database and credentials with schema/table create permissions.
-- MySQL DSNs should include `parseTime=true` so timestamp fields decode correctly.
-- **MariaDB** generally works with the same `mysql:` DSN shape and `parseTime=true` as MySQL.
+- MySQL/MariaDB: `InitDB` parses the DSN with `mysql.Config`, sets `parseTime=true` and `Loc` to local time when needed (you may still include `parseTime=true` in examples; explicit `parseTime=false` is overridden with a log warning).
+- **MariaDB** generally works with the same `mysql:` DSN shape as MySQL.
 - The server creates **dialect-specific DDL** (for example, MySQL/MariaDB use fixed-width strings where indexes, primary keys, or unique constraints apply, because full `TEXT` keys are rejected). Long message bodies still use a large text type.
 - SQLite remains the easiest local development option.
 
@@ -771,7 +771,7 @@ The TUI client can spawn **optional** external programs on send/receive and pass
 | Port in use | Set `MARCHAT_PORT` (e.g. `8081`) in the environment or `config/.env` and restart the server. |
 | Database migration fails | Check file permissions; back up the database before upgrades; run the **same** server binary version that created the schema. |
 | PostgreSQL connection fails | Verify URL format: `postgres://user:pass@host:5432/db?sslmode=disable`; test with `psql` using the same credentials. |
-| MySQL connection fails | Verify DSN prefix `mysql:` and body `user:pass@tcp(host:3306)/db?parseTime=true`; test with the `mysql` CLI. |
+| MySQL connection fails | Verify DSN prefix `mysql:` and body `user:pass@tcp(host:3306)/db` (optional `?parseTime=true`; server forces parseTime when opening). Test with the `mysql` CLI. |
 | SQL syntax error after backend switch | Ensure tables were created by the current server version and restart after changing `MARCHAT_DB_PATH`. |
 | Message history looks incomplete | History depends on **channel** (reference TUI shows the active channel only), the server replay window (up to 50 recent messages per handshake), and filters such as **DM visibility** and optional **ban history gaps** (`MARCHAT_BAN_HISTORY_GAPS`). **Ban/unban** can reset per-user state so scrollback differs from the raw DB. |
 | Transcript resets after reconnect | On each successful WebSocket connect the reference client clears local messages and rebuilds from the server handshake replay (up to 50 recent lines). That avoids duplicates when the server comes back while the client stayed open. Lines older than that replay window are not shown again in that session unless you saved them with **`:export`** earlier. Third-party clients should replace or dedupe history on handshake; see **PROTOCOL.md** (Server Behavior). |
@@ -823,26 +823,26 @@ cd plugin/sdk && go test ./...   # Nested SDK module (separate go.mod)
 - **Windows**: `.\test.ps1`
 
 ### Coverage Summary
-Percentages are **statement coverage** from a merged profile (`go test -coverprofile=... ./...` then `go tool cover -func=...`). **Size** is non-test `.go` lines per package (approximate). Authoritative tables and regeneration steps: [TESTING.md](TESTING.md). The nested **`plugin/sdk`** module is measured separately (**58.8%** statements); see [TESTING.md](TESTING.md).
+Percentages are **statement coverage** from a merged profile (`go test -coverprofile=... ./...` then `go tool cover -func=...`). Authoritative tables and regeneration steps: [TESTING.md](TESTING.md). The nested **`plugin/sdk`** module is measured separately (**58.8%** statements); see [TESTING.md](TESTING.md).
 
-| Package | Coverage | Size | Status |
-|---------|----------|------|--------|
-| `shared` | 88.1% | 253 LOC | High |
-| `plugin/license` | 87.1% | 246 LOC | High |
-| `client/crypto` | 80.3% | 387 LOC | High |
-| `config` | 73.2% | 339 LOC | High |
-| `plugin/host` | 64.6% | 721 LOC | Medium |
-| `client/config` | 58.0% | 1993 LOC | Medium |
-| `internal/doctor` | 66.5% | 828 LOC | Medium |
-| `plugin/store` | 47.0% | 552 LOC | Medium |
-| `cmd/license` | 42.2% | 160 LOC | Medium |
-| `server` | 39.8% | 7495 LOC | Low |
-| `plugin/manager` | 66.1% | 724 LOC | Medium |
-| `client/exthook` | 24.1% | 204 LOC | Low |
-| `client` | 29.4% | 6372 LOC | Low |
-| `cmd/server` | 13.7% | 484 LOC | Low |
+| Package | Coverage | Status |
+|---------|----------|--------|
+| `shared` | 88.1% | High |
+| `plugin/license` | 87.1% | High |
+| `client/crypto` | 80.3% | High |
+| `config` | 73.2% | High |
+| `plugin/host` | 64.6% | Medium |
+| `client/config` | 58.0% | Medium |
+| `internal/doctor` | 65.9% | Medium |
+| `plugin/store` | 47.1% | Medium |
+| `cmd/license` | 42.2% | Medium |
+| `server` | 43.4% | Low |
+| `plugin/manager` | 66.1% | Medium |
+| `client/exthook` | 24.1% | Low |
+| `client` | 29.4% | Low |
+| `cmd/server` | 13.7% | Low |
 
-**Overall: 42.6%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 43.7%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

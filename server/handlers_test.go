@@ -946,7 +946,7 @@ func TestTogglePinMessage(t *testing.T) {
 			t.Error("expected pinned true")
 		}
 		var dbPinned bool
-		if err := db.QueryRow(`SELECT COALESCE(pinned, 0) FROM messages WHERE message_id = ?`, id).Scan(&dbPinned); err != nil {
+		if err := dbQueryRow(db, fmt.Sprintf(`SELECT %s FROM messages WHERE message_id = ?`, coalesceBoolSQL(db, "pinned")), id).Scan(&dbPinned); err != nil {
 			t.Fatalf("query: %v", err)
 		}
 		if !dbPinned {

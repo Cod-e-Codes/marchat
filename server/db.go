@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"log"
 	"strings"
+	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "modernc.org/sqlite"
 )
@@ -25,21 +26,29 @@ func detectDriver(conn string) (string, DBDialect, string) {
 	}
 }
 
-func ensureMySQLParseTime(dsn string) string {
-	if strings.Contains(strings.ToLower(dsn), "parsetime=") {
-		return dsn
+func prepareMySQLDSN(dsn string) (string, error) {
+	cfg, err := mysql.ParseDSN(dsn)
+	if err != nil {
+		return "", fmt.Errorf("parse mysql dsn: %w", err)
 	}
-	sep := "?"
-	if strings.Contains(dsn, "?") {
-		sep = "&"
+	if !cfg.ParseTime {
+		log.Printf("Warning: MySQL DSN has parseTime=false; marchat requires parseTime=true for DATETIME scans")
 	}
-	return dsn + sep + "parseTime=true"
+	cfg.ParseTime = true
+	if cfg.Loc == nil {
+		cfg.Loc = time.Local
+	}
+	return cfg.FormatDSN(), nil
 }
 
 func InitDB(conn string) (*sql.DB, error) {
 	driver, dialect, dsn := detectDriver(conn)
 	if dialect == DialectMySQL {
-		dsn = ensureMySQLParseTime(dsn)
+		var err error
+		dsn, err = prepareMySQLDSN(dsn)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	db, err := sql.Open(driver, dsn)

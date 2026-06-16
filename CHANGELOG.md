@@ -7,7 +7,8 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 - **Client**: Word-wrap chat message bodies to the transcript viewport width (ANSI-aware). Reaction aliases `thumbsup` / `thumbsdown`; `:unreact`, `:thumbsup`, and `:thumbsdown` commands. When E2E is on and server search returns no matches, a `System` line explains that search matches stored ciphertext, not decrypted plaintext.
-- **Server**: Handshake replay queries up to 50 **visible** recent messages (SQL `LIMIT` after DM/public filter), on every connect including reconnect with no new traffic. `user_message_state` records `last_seen` only (`last_message_id` legacy/unused). `:cleardb` clears `user_message_state`. Postgres/MySQL CI smoke and WebSocket integration test cover visible replay SQL and second-connect wire replay.
+- **Server**: Handshake replay queries up to 50 **visible** recent messages (SQL `LIMIT` after DM/public filter), on every connect including reconnect with no new traffic. `user_message_state` records `last_seen` only (`last_message_id` legacy/unused). `:cleardb` clears `user_message_state`. Postgres/MySQL CI smoke and WebSocket integration test cover visible replay SQL and second-connect wire replay. **Fix:** Postgres `boolean = integer` errors on `:search`, pin toggle, and pinned listing (shared dialect boolean helpers). **Fix:** MySQL `InitDB` parses DSNs with `mysql.Config`, forces `parseTime=true` (overrides explicit `parseTime=false`; logs a warning), and sets `Loc` to local time when unset.
+- **Docs**: Coverage tables in **README** and **TESTING** drop per-package line counts; regeneration uses `go test -coverprofile` and `go tool cover -func` only.
 - **Dependencies**: **github.com/jackc/pgx/v5** v5.10.0, **golang.org/x/crypto** v0.53.0, **golang.org/x/term** v0.44.0, **modernc.org/sqlite** v1.52.0 (SQLite 3.53.2).
 
 ## v1.2.0
@@ -49,7 +50,7 @@ On **`main`** only; not part of the latest tagged release until you tag and publ
 - **Client**: Experimental env-driven **exthook** and **`-doctor`** integration.
 - **Plugin SDK**: **`RunStdio`** / **`HandlePluginRequest`** stdio loop; echo sample uses the SDK; docs and **README** plugin examples aligned (**GetConfig**, **Marshal**); **`plugin/sdk/cov`** gitignored; CI runs nested plugin modules (**fmt**, **govulncheck**).
 - **Tests / CI**: Server loadverify benches and rate-limit coverage; **`-doctor`** tests use the injectable **`osEnviron`** hook under **`environMu`** (no parallel **`buildEnvLines`** tests that swap it); **plugin host** **`StopPlugin`** waits for stdout/stderr reader goroutines before reuse so **`-race`** is clean on disable/enable; Dependabot Node 20 note in **`.github/dependabot.yml`**.
-- **Docs**: **TESTING** bench section; coverage/LoC tables refreshed from **`go test -coverprofile=mergedcoverage ./...`**; hook example lives under **`_example_hook`**; prose uses ASCII hyphens where edited.
+- **Docs**: **TESTING** bench section; coverage tables refreshed from **`go test -coverprofile=mergedcoverage ./...`**; hook example lives under **`_example_hook`**; prose uses ASCII hyphens where edited.
 - **Deps**: **`golang.org/x/crypto`**, **`golang.org/x/term`**, **`modernc.org/sqlite`**.
 
 ## v0.11.0-beta.4

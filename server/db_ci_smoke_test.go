@@ -31,6 +31,7 @@ func TestPostgresInitDBAndSchemaSmoke(t *testing.T) {
 	CreateSchema(db)
 	assertCISmokeTables(t, db, "postgres")
 	assertCIHandshakeReplaySmoke(t, db)
+	assertCISearchAndPinSmoke(t, db)
 }
 
 func TestMySQLInitDBAndSchemaSmoke(t *testing.T) {
@@ -51,6 +52,7 @@ func TestMySQLInitDBAndSchemaSmoke(t *testing.T) {
 	CreateSchema(db)
 	assertCISmokeTables(t, db, "mysql")
 	assertCIHandshakeReplaySmoke(t, db)
+	assertCISearchAndPinSmoke(t, db)
 }
 
 func assertCISmokeTables(t *testing.T, db *sql.DB, kind string) {
@@ -109,5 +111,54 @@ func assertCIHandshakeReplaySmoke(t *testing.T, db *sql.DB) {
 	carolMsgs := GetRecentMessagesForUser(db, "carol", HandshakeReplayLimit, false)
 	if len(carolMsgs) != 2 {
 		t.Fatalf("carol visible replay len = %d, want 2", len(carolMsgs))
+	}
+}
+
+func assertCISearchAndPinSmoke(t *testing.T, db *sql.DB) {
+	t.Helper()
+	invalidateRecentMessagesCache()
+
+	now := time.Now()
+	activeID, err := InsertMessage(db, shared.Message{
+		Sender:    "alice",
+		Content:   "ci-smoke-searchable-term",
+		CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage active: %v", err)
+	}
+	delID, err := InsertMessage(db, shared.Message{
+		Sender:    "bob",
+		Content:   "ci-smoke-searchable-term",
+		CreatedAt: now.Add(time.Second),
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage deletable: %v", err)
+	}
+	if err := DeleteMessage(db, delID, "bob", false); err != nil {
+		t.Fatalf("DeleteMessage: %v", err)
+	}
+
+	found := SearchMessages(db, "ci-smoke-searchable-term", 10)
+	if len(found) != 1 {
+		t.Fatalf("search len = %d, want 1", len(found))
+	}
+	if found[0].MessageID != activeID {
+		t.Fatalf("search message_id = %d, want %d", found[0].MessageID, activeID)
+	}
+
+	pinned, err := TogglePinMessage(db, activeID)
+	if err != nil {
+		t.Fatalf("TogglePinMessage: %v", err)
+	}
+	if !pinned {
+		t.Fatal("expected pinned true after toggle")
+	}
+	pinnedList := GetPinnedMessages(db)
+	if len(pinnedList) != 1 {
+		t.Fatalf("pinned list len = %d, want 1", len(pinnedList))
+	}
+	if pinnedList[0].MessageID != activeID {
+		t.Fatalf("pinned message_id = %d, want %d", pinnedList[0].MessageID, activeID)
 	}
 }

@@ -612,8 +612,7 @@ func ClearMessages(db *sql.DB) error {
 }
 
 func EditMessage(db *sql.DB, messageID int64, sender, newContent string, encrypted bool) error {
-	result, err := dbExec(db,
-		`UPDATE messages SET content = ?, edited = 1, is_encrypted = ? WHERE message_id = ? AND sender = ?`,
+	result, err := dbExec(db, editMessageUpdateSQL(db),
 		newContent, encrypted, messageID, sender)
 	if err != nil {
 		return fmt.Errorf("edit message: %w", err)
@@ -630,10 +629,10 @@ func DeleteMessage(db *sql.DB, messageID int64, sender string, isAdmin bool) err
 	var query string
 	var args []interface{}
 	if isAdmin {
-		query = `UPDATE messages SET content = '[deleted]', deleted = 1, is_encrypted = 0 WHERE message_id = ?`
+		query = deleteMessageUpdateSQL(db, false)
 		args = []interface{}{messageID}
 	} else {
-		query = `UPDATE messages SET content = '[deleted]', deleted = 1, is_encrypted = 0 WHERE message_id = ? AND sender = ?`
+		query = deleteMessageUpdateSQL(db, true)
 		args = []interface{}{messageID, sender}
 	}
 	result, err := dbExec(db, query, args...)
@@ -652,8 +651,7 @@ func SearchMessages(db *sql.DB, query string, limit int) []shared.Message {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := dbQuery(db,
-		`SELECT sender, content, created_at, is_encrypted, message_id FROM messages WHERE content LIKE ? AND deleted = 0 ORDER BY created_at DESC LIMIT ?`,
+	rows, err := dbQuery(db, searchMessagesSQL(db),
 		"%"+query+"%", limit)
 	if err != nil {
 		log.Println("Search query error:", err)
@@ -675,7 +673,7 @@ func SearchMessages(db *sql.DB, query string, limit int) []shared.Message {
 
 func TogglePinMessage(db *sql.DB, messageID int64) (bool, error) {
 	var currentlyPinned bool
-	err := dbQueryRow(db, `SELECT COALESCE(pinned, 0) FROM messages WHERE message_id = ?`, messageID).Scan(&currentlyPinned)
+	err := dbQueryRow(db, fmt.Sprintf(`SELECT %s FROM messages WHERE message_id = ?`, coalesceBoolSQL(db, "pinned")), messageID).Scan(&currentlyPinned)
 	if err != nil {
 		return false, fmt.Errorf("message not found: %w", err)
 	}
@@ -688,7 +686,7 @@ func TogglePinMessage(db *sql.DB, messageID int64) (bool, error) {
 }
 
 func GetPinnedMessages(db *sql.DB) []shared.Message {
-	rows, err := dbQuery(db, `SELECT sender, content, created_at, message_id FROM messages WHERE pinned = 1 ORDER BY created_at DESC`)
+	rows, err := dbQuery(db, pinnedMessagesSQL(db))
 	if err != nil {
 		log.Println("Pinned messages query error:", err)
 		return nil

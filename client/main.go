@@ -2053,7 +2053,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textarea.SetValue("")
 				return m, nil
 			}
-			// :dmhide and :dms before :dm — ":dmhide" and ":dms" have prefix ":dm" and would otherwise be parsed as :dm.
+			// :dmhide and :dms before :dm; ":dmhide" and ":dms" have prefix ":dm" and would otherwise be parsed as :dm.
 			if strings.HasPrefix(text, ":dmhide") {
 				parts := strings.Fields(text)
 				target := ""

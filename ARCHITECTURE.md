@@ -257,7 +257,7 @@ Client: WebSocket Receive → Decrypt → Display
   - SQLite path (default local setup)
   - PostgreSQL DSN (`postgres://` / `postgresql://`)
   - MySQL DSN (`mysql:` / `mysql://`)
-- Schema creation and upsert/insert-ignore SQL are dialect-aware.
+- Schema creation and upsert/insert-ignore SQL are dialect-aware; message query helpers in `server/db_dialect.go` emit Postgres `TRUE`/`FALSE` or SQLite/MySQL `1`/`0` for boolean columns as needed.
 - Placeholder rebinding keeps shared query callsites portable across backends.
 - SQLite-specific optimizations (for example WAL mode) are applied only when the selected backend is SQLite.
 - Durable state includes:

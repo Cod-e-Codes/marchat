@@ -88,19 +88,63 @@ func touchUserLastSeenSQL(db *sql.DB) string {
 	}
 }
 
-// messageHistoryRowSelectColumns is the shared SELECT list for message history rows.
-// Postgres BOOLEAN columns cannot use COALESCE(..., 0); use FALSE instead.
-func messageHistoryRowSelectColumns(db *sql.DB) string {
-	editedExpr := "COALESCE(edited, 0)"
-	deletedExpr := "COALESCE(deleted, 0)"
+// boolSQLLiteral returns a dialect-safe boolean literal for SQL (WHERE/SET/COALESCE).
+// Postgres rejects boolean = integer; SQLite and MySQL accept 0/1.
+func boolSQLLiteral(db *sql.DB, value bool) string {
 	if getDBDialect(db) == DialectPostgres {
-		editedExpr = "COALESCE(edited, FALSE)"
-		deletedExpr = "COALESCE(deleted, FALSE)"
+		if value {
+			return "TRUE"
+		}
+		return "FALSE"
 	}
+	if value {
+		return "1"
+	}
+	return "0"
+}
+
+func coalesceBoolSQL(db *sql.DB, column string) string {
+	return fmt.Sprintf("COALESCE(%s, %s)", column, boolSQLLiteral(db, false))
+}
+
+// messageHistoryRowSelectColumns is the shared SELECT list for message history rows.
+func messageHistoryRowSelectColumns(db *sql.DB) string {
 	return fmt.Sprintf(
 		"sender, content, created_at, is_encrypted, message_id, %s, %s, COALESCE(recipient, ''), COALESCE(channel, 'general')",
-		editedExpr, deletedExpr,
+		coalesceBoolSQL(db, "edited"), coalesceBoolSQL(db, "deleted"),
 	)
+}
+
+func searchMessagesSQL(db *sql.DB) string {
+	return fmt.Sprintf(
+		`SELECT sender, content, created_at, is_encrypted, message_id FROM messages WHERE content LIKE ? AND deleted = %s ORDER BY created_at DESC LIMIT ?`,
+		boolSQLLiteral(db, false),
+	)
+}
+
+func pinnedMessagesSQL(db *sql.DB) string {
+	return fmt.Sprintf(
+		`SELECT sender, content, created_at, message_id FROM messages WHERE pinned = %s ORDER BY created_at DESC`,
+		boolSQLLiteral(db, true),
+	)
+}
+
+func editMessageUpdateSQL(db *sql.DB) string {
+	return fmt.Sprintf(
+		`UPDATE messages SET content = ?, edited = %s, is_encrypted = ? WHERE message_id = ? AND sender = ?`,
+		boolSQLLiteral(db, true),
+	)
+}
+
+func deleteMessageUpdateSQL(db *sql.DB, requireSender bool) string {
+	q := fmt.Sprintf(
+		`UPDATE messages SET content = '[deleted]', deleted = %s, is_encrypted = %s WHERE message_id = ?`,
+		boolSQLLiteral(db, true), boolSQLLiteral(db, false),
+	)
+	if requireSender {
+		return q + ` AND sender = ?`
+	}
+	return q
 }
 
 // visibleMessagesForUserSQL returns up to limit rows visible to lowerUsername:
