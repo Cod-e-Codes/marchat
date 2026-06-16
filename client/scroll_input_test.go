@@ -112,6 +112,31 @@ func TestApplyMouseWheelToList(t *testing.T) {
 	applyMouseWheelToList(&l, tea.MouseWheelMsg{Button: tea.MouseWheelDown})
 }
 
+func TestTextareaWantsArrowKeys(t *testing.T) {
+	m := &model{textarea: textarea.New()}
+	m.textarea.Focus()
+	if m.textareaWantsArrowKeys() {
+		t.Fatal("single-line composer should not capture arrows")
+	}
+	m.textarea.SetValue("line one\nline two")
+	if !m.textareaWantsArrowKeys() {
+		t.Fatal("multiline composer should capture arrows")
+	}
+}
+
+func TestHandleComposerScrollKeyMultiline(t *testing.T) {
+	m := &model{textarea: textarea.New(), keys: newKeyMap()}
+	m.textarea.Focus()
+	m.textarea.SetValue("a\nb\nc")
+	m.textarea.SetHeight(3)
+	m.textarea.SetWidth(40)
+
+	handled, _ := m.handleComposerScrollKey(tea.KeyPressMsg(tea.Key{Code: tea.KeyDown}))
+	if !handled {
+		t.Fatal("expected down arrow to be handled by multiline composer")
+	}
+}
+
 func TestOverlayCapturesKeyboard(t *testing.T) {
 	m := &model{}
 	if m.overlayCapturesKeyboard() {

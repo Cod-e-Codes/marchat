@@ -14,7 +14,7 @@ Bubble Tea + Lipgloss TUI on **Charm v2** (`charm.land/bubbletea/v2`, `bubbles/v
 
 ## Patterns
 
-- **Charm v2**: `View() tea.View` sets `AltScreen` and `MouseModeCellMotion` on the main client; `KeyPressMsg` replaces `KeyMsg`; bubbles use `SetWidth` / `SetHeight` / `SetStyles`.
+- **Charm v2**: `newMainTeaView` sets `AltScreen`, `MouseModeCellMotion` (disabled while Shift is held for terminal drag-select), and `tea.View.BackgroundColor` (`altScreenFill` / black). `chromeComposerPanel` is full-width with theme `Input` background only (textarea styles are foreground-only). Transcript interior uses `transcriptFill` on `Box`. `configureTextareaChrome` syncs textarea colors with theme `Input`. Multiline composer: Ctrl+J via `textarea.Update`; up/down move cursor when value contains `\n`, else scroll chat. `KeyPressMsg` / `KeyReleaseMsg`; bubbles use `SetWidth` / `SetHeight` / `SetStyles`.
 - **Reconnect**: exponential backoff (capped at 30s); delay resets only after successful connect (`wsConnected`), not each `Init()` retry; no reconnect on fatal username/handshake errors (`websocket.go`, `main.go`).
 - **Commands**: `:q` quits; `Esc` closes menus; help in `commands.go` (shortcuts vs text commands). Transient command results belong in the **banner** when short; longer lists (e.g. `:themes`) may use transcript System lines.
 - **E2E**: same wire path for channel text and DMs when encryption on; files via keystore `EncryptRaw` / `DecryptRaw`. Do not log plaintext on send/decrypt paths.

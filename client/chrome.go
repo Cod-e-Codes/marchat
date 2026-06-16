@@ -12,19 +12,116 @@ package main
 
 import (
 	"fmt"
+	"image/color"
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/textarea"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/shared"
+	"github.com/lucasb-eyer/go-colorful"
 )
 
 const readReceiptDebounce = 750 * time.Millisecond
 
+// altScreenFill is the Bubble Tea v2 alt-screen base color (unpainted cells). Kept black
+// so the transcript reads on true black; header/footer/input carry theme chrome colors.
+const altScreenFill = "#000000"
+
+// transcriptFill is the chat viewport interior behind messages.
+const transcriptFill = "#000000"
+
 // chromeFullWidth matches header and footer: chat viewport plus user list plus gap.
 func chromeFullWidth(viewportW int) int {
 	return viewportW + userListWidth + 4
+}
+
+// composeInputWidth is the bubbles textarea width inside the full-width composer bar.
+func composeInputWidth(viewportW int) int {
+	w := chromeFullWidth(viewportW) - 4
+	if w < 20 {
+		return 20
+	}
+	return w
+}
+
+// configureTextareaChrome syncs textarea foreground/prompt with theme Input.
+// Background fill comes from chromeComposerPanel only (avoids nested boxes).
+func configureTextareaChrome(ta *textarea.Model, input lipgloss.Style) {
+	s := textarea.DefaultDarkStyles()
+	noBG := lipgloss.NewStyle()
+	text := noBG
+	if fg := input.GetForeground(); fg != nil {
+		text = text.Foreground(fg)
+	}
+	faint := text.Copy().Faint(true)
+	for _, state := range []*textarea.StyleState{&s.Focused, &s.Blurred} {
+		state.Base = noBG
+		state.Text = text
+		state.CursorLine = text
+		state.Prompt = faint
+		state.Placeholder = faint
+		state.LineNumber = faint
+		state.CursorLineNumber = faint
+		state.EndOfBuffer = faint
+	}
+	s.Cursor.Blink = false
+	if fg := input.GetForeground(); fg != nil {
+		s.Cursor.Color = fg
+	}
+	ta.SetStyles(s)
+}
+
+// chromeComposerPanel renders the full-width message composer (header/footer alignment).
+func chromeComposerPanel(styles themeStyles, fullW int, inputContent string) string {
+	return styles.Input.Width(fullW).Padding(0, 1).Render(inputContent)
+}
+
+// chromeTypingLine renders a full-width typing indicator under the main grid.
+func chromeTypingLine(fullW int, line string) string {
+	if strings.TrimSpace(line) == "" {
+		return ""
+	}
+	return lipgloss.NewStyle().Faint(true).Italic(true).Width(fullW).PaddingLeft(1).Render(line)
+}
+
+// newMainTeaView renders the main TUI on the alt screen. Bubble Tea v2 leaves unpainted
+// alt-screen cells black unless BackgroundColor is set; lipgloss Background.Render alone
+// only covers laid-out content (main v1 did not have this gap).
+func newMainTeaView(styles themeStyles, ui string, shiftHeld bool) tea.View {
+	v := tea.NewView(styles.Background.Render(ui))
+	if bg, ok := styles.terminalBGColor(); ok {
+		v.BackgroundColor = bg
+	}
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	if shiftHeld {
+		// Release mouse capture so the terminal can drag-select transcript text (Shift+drag).
+		v.MouseMode = tea.MouseModeNone
+	}
+	return v
+}
+
+func (s themeStyles) terminalBGColor() (color.Color, bool) {
+	if s.screenBG == "" {
+		return nil, false
+	}
+	c, err := colorful.Hex(s.screenBG)
+	if err != nil {
+		return nil, false
+	}
+	return c, true
+}
+
+// updateModifierKeys tracks Shift for terminal text selection passthrough.
+func (m *model) updateModifierKeys(k tea.Key) {
+	switch k.Code {
+	case tea.KeyLeftShift, tea.KeyRightShift:
+		m.shiftHeld = true
+	default:
+		m.shiftHeld = k.Mod&tea.ModShift != 0
+	}
 }
 
 // layoutBannerForStrip collapses newlines to spaces and truncates to one line so a

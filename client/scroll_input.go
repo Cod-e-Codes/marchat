@@ -1,6 +1,9 @@
 package main
 
 import (
+	"strings"
+
+	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
@@ -15,6 +18,47 @@ func (m *model) overlayCapturesKeyboard() bool {
 // subModelCapturesInput is true when file picker or code snippet modals are open.
 func (m *model) subModelCapturesInput() bool {
 	return m.showFilePicker || m.showCodeSnippet
+}
+
+// textareaWantsArrowKeys is true when up/down should move the cursor inside a
+// multiline composer instead of scrolling the chat transcript.
+func (m *model) textareaWantsArrowKeys() bool {
+	return m.textarea.Focused() && strings.Contains(m.textarea.Value(), "\n")
+}
+
+// handleComposerScrollKey routes arrow/page keys between the composer and the
+// active scroll viewport. Returns handled and an optional command.
+func (m *model) handleComposerScrollKey(v tea.KeyPressMsg) (bool, tea.Cmd) {
+	if m.textareaWantsArrowKeys() {
+		switch {
+		case key.Matches(v, m.keys.ScrollUp), key.Matches(v, m.keys.ScrollDown):
+			var cmd tea.Cmd
+			m.textarea, cmd = m.textarea.Update(v)
+			return true, cmd
+		}
+	}
+	switch {
+	case key.Matches(v, m.keys.ScrollUp):
+		m.scrollActiveViewport(-1)
+		return true, nil
+	case key.Matches(v, m.keys.ScrollDown):
+		m.scrollActiveViewport(1)
+		if cmd := m.maybeFlushReadReceipt(); cmd != nil {
+			return true, cmd
+		}
+		return true, nil
+	case key.Matches(v, m.keys.PageUp):
+		m.pageScrollActiveViewport(-1)
+		return true, nil
+	case key.Matches(v, m.keys.PageDown):
+		m.pageScrollActiveViewport(1)
+		if cmd := m.maybeFlushReadReceipt(); cmd != nil {
+			return true, cmd
+		}
+		return true, nil
+	default:
+		return false, nil
+	}
 }
 
 // activeScrollViewport returns the viewport that should receive scroll and wheel

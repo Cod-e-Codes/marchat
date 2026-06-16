@@ -4,6 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"charm.land/bubbles/v2/textarea"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/shared"
 )
 
@@ -139,5 +142,52 @@ func TestMaxMessageID(t *testing.T) {
 	}
 	if id := maxMessageID(nil); id != 0 {
 		t.Fatalf("maxMessageID(nil) = %d, want 0", id)
+	}
+}
+
+func TestConfigureTextareaChrome(t *testing.T) {
+	styles := getThemeStyles("modern")
+	ta := textarea.New()
+	before := ta.Styles().Focused.CursorLine.Render("x")
+	configureTextareaChrome(&ta, styles.Input)
+	after := ta.Styles().Focused.CursorLine.Render("x")
+	if before == after {
+		t.Fatal("expected CursorLine styling to change")
+	}
+	if ta.Styles().Cursor.Blink {
+		t.Fatal("expected cursor blink disabled")
+	}
+}
+
+func TestNewMainTeaViewSetsTerminalBG(t *testing.T) {
+	styles := getThemeStyles("modern")
+	v := newMainTeaView(styles, "hello", false)
+	if v.BackgroundColor == nil {
+		t.Fatal("expected modern theme to set alt-screen background color")
+	}
+	if !v.AltScreen || v.MouseMode != tea.MouseModeCellMotion {
+		t.Fatal("expected alt screen and mouse mode")
+	}
+}
+
+func TestNewMainTeaViewShiftDisablesMouse(t *testing.T) {
+	styles := getThemeStyles("modern")
+	v := newMainTeaView(styles, "hello", true)
+	if v.MouseMode != tea.MouseModeNone {
+		t.Fatalf("shift-held view should disable mouse, got %v", v.MouseMode)
+	}
+}
+
+func TestChromeComposerPanelFullWidth(t *testing.T) {
+	styles := getThemeStyles("retro")
+	row := chromeComposerPanel(styles, 72, "type here")
+	if lipgloss.Width(row) < 72 {
+		t.Fatalf("expected full composer width, got %d", lipgloss.Width(row))
+	}
+}
+
+func TestComposeInputWidth(t *testing.T) {
+	if w := composeInputWidth(50); w != chromeFullWidth(50)-4 {
+		t.Fatalf("composeInputWidth = %d, want %d", w, chromeFullWidth(50)-4)
 	}
 }

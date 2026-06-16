@@ -148,6 +148,8 @@ type model struct {
 	width  int // NEW: track window width
 	height int // NEW: track window height
 
+	shiftHeld bool // disables mouse capture for terminal text selection
+
 	userListViewport viewport.Model // NEW: scrollable user list
 
 	twentyFourHour      bool // NEW: timestamp format toggle
@@ -685,6 +687,7 @@ type themeStyles struct {
 	Other    lipgloss.Style // NEW: other user style
 
 	Background lipgloss.Style // NEW: main background
+	screenBG   string         // alt-screen fill hex; empty = terminal default (system theme)
 	Header     lipgloss.Style // NEW: header background
 	Footer     lipgloss.Style // NEW: footer background
 	Input      lipgloss.Style // NEW: input background
@@ -823,13 +826,14 @@ func getThemeStyles(theme string) themeStyles {
 		s.User = s.User.Foreground(lipgloss.Color("#002868"))              // Navy blue
 		s.Time = s.Time.Foreground(lipgloss.Color("#BF0A30")).Faint(false) // Red
 		s.Msg = s.Msg.Foreground(lipgloss.Color("#FFFFFF"))
-		s.Box = s.Box.BorderForeground(lipgloss.Color("#BF0A30"))
+		s.Box = s.Box.BorderForeground(lipgloss.Color("#BF0A30")).Background(lipgloss.Color(transcriptFill))
 		s.Mention = s.Mention.Foreground(lipgloss.Color("#FFD700"))     // Gold
 		s.Hyperlink = s.Hyperlink.Foreground(lipgloss.Color("#87CEEB")) // Sky blue
 		s.UserList = s.UserList.BorderForeground(lipgloss.Color("#002868"))
 		s.Me = s.Me.Foreground(lipgloss.Color("#BF0A30"))
 		// Background and UI
-		s.Background = lipgloss.NewStyle().Background(lipgloss.Color("#00203F")) // Deep navy
+		s.Background = lipgloss.NewStyle().Background(lipgloss.Color(altScreenFill))
+		s.screenBG = altScreenFill
 		s.Header = lipgloss.NewStyle().Background(lipgloss.Color("#BF0A30")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 		s.Footer = lipgloss.NewStyle().Background(lipgloss.Color("#00203F")).Foreground(lipgloss.Color("#FFD700"))
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#002868")).Foreground(lipgloss.Color("#FFFFFF"))
@@ -838,13 +842,14 @@ func getThemeStyles(theme string) themeStyles {
 		s.User = s.User.Foreground(lipgloss.Color("#FF8800"))              // Orange
 		s.Time = s.Time.Foreground(lipgloss.Color("#00FF00")).Faint(false) // Green
 		s.Msg = s.Msg.Foreground(lipgloss.Color("#FFFFAA"))
-		s.Box = s.Box.BorderForeground(lipgloss.Color("#FF8800"))
+		s.Box = s.Box.BorderForeground(lipgloss.Color("#FF8800")).Background(lipgloss.Color(transcriptFill))
 		s.Mention = s.Mention.Foreground(lipgloss.Color("#00FFFF"))     // Cyan
 		s.Hyperlink = s.Hyperlink.Foreground(lipgloss.Color("#00FFFF")) // Cyan
 		s.UserList = s.UserList.BorderForeground(lipgloss.Color("#FF8800"))
 		s.Me = s.Me.Foreground(lipgloss.Color("#FF8800"))
 		// Background and UI
-		s.Background = lipgloss.NewStyle().Background(lipgloss.Color("#181818")) // Retro dark
+		s.Background = lipgloss.NewStyle().Background(lipgloss.Color(altScreenFill))
+		s.screenBG = altScreenFill
 		s.Header = lipgloss.NewStyle().Background(lipgloss.Color("#FF8800")).Foreground(lipgloss.Color("#181818")).Bold(true)
 		s.Footer = lipgloss.NewStyle().Background(lipgloss.Color("#181818")).Foreground(lipgloss.Color("#00FF00"))
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#222200")).Foreground(lipgloss.Color("#FFFFAA"))
@@ -853,13 +858,14 @@ func getThemeStyles(theme string) themeStyles {
 		s.User = s.User.Foreground(lipgloss.Color("#4F8EF7"))              // Blue
 		s.Time = s.Time.Foreground(lipgloss.Color("#A0A0A0")).Faint(false) // Gray
 		s.Msg = s.Msg.Foreground(lipgloss.Color("#E0E0E0"))
-		s.Box = s.Box.BorderForeground(lipgloss.Color("#4F8EF7"))
+		s.Box = s.Box.BorderForeground(lipgloss.Color("#4F8EF7")).Background(lipgloss.Color(transcriptFill))
 		s.Mention = s.Mention.Foreground(lipgloss.Color("#FF5F5F"))     // Red
 		s.Hyperlink = s.Hyperlink.Foreground(lipgloss.Color("#4A9EFF")) // Bright blue
 		s.UserList = s.UserList.BorderForeground(lipgloss.Color("#4F8EF7"))
 		s.Me = s.Me.Foreground(lipgloss.Color("#4F8EF7"))
 		// Background and UI
-		s.Background = lipgloss.NewStyle().Background(lipgloss.Color("#181C24")) // Modern dark blue-gray
+		s.Background = lipgloss.NewStyle().Background(lipgloss.Color(altScreenFill))
+		s.screenBG = altScreenFill
 		s.Header = lipgloss.NewStyle().Background(lipgloss.Color("#4F8EF7")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 		s.Footer = lipgloss.NewStyle().Background(lipgloss.Color("#181C24")).Foreground(lipgloss.Color("#4F8EF7"))
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#23272E")).Foreground(lipgloss.Color("#E0E0E0"))
@@ -882,20 +888,22 @@ type fileSendMsg struct {
 
 func (m *model) Init() tea.Cmd {
 	m.msgChan = make(chan tea.Msg, 10) // buffered to avoid blocking
-	return func() tea.Msg {
-		err := m.connectWebSocket(m.cfg.ServerURL)
-		if err != nil {
-			log.Printf("connectWebSocket returned error: %v (type: %T)", err, err)
-			// Preserve wsUsernameError type
-			if usernameErr, ok := err.(wsUsernameError); ok {
-				log.Printf("Detected username error: %s", usernameErr.message)
-				return usernameErr
+	return tea.Batch(
+		tea.RequestWindowSize,
+		func() tea.Msg {
+			err := m.connectWebSocket(m.cfg.ServerURL)
+			if err != nil {
+				log.Printf("connectWebSocket returned error: %v (type: %T)", err, err)
+				if usernameErr, ok := err.(wsUsernameError); ok {
+					log.Printf("Detected username error: %s", usernameErr.message)
+					return usernameErr
+				}
+				log.Printf("Returning generic wsErr")
+				return wsErr{err}
 			}
-			log.Printf("Returning generic wsErr")
-			return wsErr{err}
-		}
-		return wsConnected{}
-	}
+			return wsConnected{}
+		},
+	)
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -1175,6 +1183,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m.Init()()
 		})
 	case tea.KeyPressMsg:
+		m.updateModifierKeys(v.Key())
 		switch {
 		case key.Matches(v, m.keys.Help):
 			// Close any open menus first
@@ -1335,6 +1344,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newTheme := themes[nextIndex]
 			m.cfg.Theme = newTheme
 			m.styles = getThemeStyles(m.cfg.Theme)
+			configureTextareaChrome(&m.textarea, m.styles.Input)
 			_ = config.SaveConfig(m.configFilePath, m.cfg)
 
 			// Update profile with new theme
@@ -1443,27 +1453,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.promptForUsername("allow")
 			}
 			return m, nil
+		case key.Matches(v, m.keys.ScrollUp), key.Matches(v, m.keys.ScrollDown),
+			key.Matches(v, m.keys.PageUp), key.Matches(v, m.keys.PageDown):
+			_, cmd := m.handleComposerScrollKey(v)
+			return m, cmd
 		case key.Matches(v, m.keys.ForceDisconnectUser):
 			if *isAdmin && m.selectedUser != "" && m.selectedUser != m.cfg.Username {
 				return m.executeAdminAction("forcedisconnect", m.selectedUser)
-			}
-			return m, nil
-		case key.Matches(v, m.keys.ScrollUp):
-			m.scrollActiveViewport(-1)
-			return m, nil
-		case key.Matches(v, m.keys.ScrollDown):
-			m.scrollActiveViewport(1)
-			if cmd := m.maybeFlushReadReceipt(); cmd != nil {
-				return m, cmd
-			}
-			return m, nil
-		case key.Matches(v, m.keys.PageUp):
-			m.pageScrollActiveViewport(-1)
-			return m, nil
-		case key.Matches(v, m.keys.PageDown):
-			m.pageScrollActiveViewport(1)
-			if cmd := m.maybeFlushReadReceipt(); cmd != nil {
-				return m, cmd
 			}
 			return m, nil
 		case key.Matches(v, m.keys.Copy): // Custom Copy
@@ -1782,6 +1778,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						m.cfg.Theme = actualThemeName
 						m.styles = getThemeStyles(m.cfg.Theme)
+						configureTextareaChrome(&m.textarea, m.styles.Input)
 						_ = config.SaveConfig(m.configFilePath, m.cfg)
 
 						// Update profile with new theme
@@ -2421,10 +2418,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case key.Matches(v, key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))):
-			current := m.textarea.Value()
-			m.textarea.SetValue(current + "\n")
-			m.textarea.CursorEnd()
-			return m, nil
+			var cmd tea.Cmd
+			m.textarea, cmd = m.textarea.Update(tea.KeyPressMsg(tea.Key{Text: "\n"}))
+			return m, cmd
 		case key.Matches(v, key.NewBinding(key.WithKeys("tab"))):
 			text := m.textarea.Value()
 			words := strings.Fields(text)
@@ -2486,7 +2482,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.viewport.SetWidth(chatWidth)
 		m.viewport.SetHeight(m.height - m.textarea.Height() - 6)
-		m.textarea.SetWidth(chatWidth)
+		m.textarea.SetWidth(composeInputWidth(chatWidth))
 		m.userListViewport.SetWidth(userListWidth)
 		m.userListViewport.SetHeight(m.height - m.textarea.Height() - 6)
 
@@ -2548,6 +2544,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.overlayCapturesKeyboard() || m.subModelCapturesInput() {
 			return m, nil
 		}
+		if v.Mod&tea.ModShift != 0 {
+			return m, nil
+		}
 		if v.Button == tea.MouseLeft {
 			mouse := v.Mouse()
 			clickedURL := m.findURLAtClickPosition(mouse.X, mouse.Y)
@@ -2558,6 +2557,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					m.banner = "[OK] Opening URL: " + clickedURL
 				}
 			}
+		}
+		return m, nil
+	case tea.KeyReleaseMsg:
+		if v.Key().Code == tea.KeyLeftShift || v.Key().Code == tea.KeyRightShift {
+			m.shiftHeld = false
 		}
 		return m, nil
 	default:
@@ -2601,7 +2605,7 @@ func (m *model) View() tea.View {
 	// Chat and user list layout
 	chatBoxStyle := m.styles.Box
 	chatPanel := chatBoxStyle.Width(m.viewport.Width()).Render(m.viewport.View())
-	userPanel := m.userListViewport.View()
+	userPanel := lipgloss.NewStyle().MarginRight(1).Render(m.userListViewport.View())
 	row := lipgloss.JoinHorizontal(lipgloss.Top, userPanel, chatPanel)
 
 	// Typing indicator
@@ -2641,7 +2645,7 @@ func (m *model) View() tea.View {
 			typingLine = strings.Join(activeTypers, ", ") + " are typing..."
 		}
 	}
-	typingIndicator := lipgloss.NewStyle().Faint(true).Italic(true).Width(m.viewport.Width()).Render(typingLine)
+	typingIndicator := chromeTypingLine(chromeFullWidth(m.viewport.Width()), typingLine)
 
 	// DM mode indicator
 	var dmIndicator string
@@ -2654,7 +2658,8 @@ func (m *model) View() tea.View {
 	if dmIndicator != "" {
 		inputContent = dmIndicator + inputContent
 	}
-	inputPanel := m.styles.Input.Width(m.viewport.Width()).Render(inputContent)
+	fullW := chromeFullWidth(m.viewport.Width())
+	inputPanel := chromeComposerPanel(m.styles, fullW, inputContent)
 
 	// Compose layout
 	ui := lipgloss.JoinVertical(lipgloss.Left,
@@ -2692,10 +2697,7 @@ func (m *model) View() tea.View {
 
 		// Center the code snippet modal on the screen
 		ui = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, codeContent)
-		v := tea.NewView(m.styles.Background.Render(ui))
-		v.AltScreen = true
-		v.MouseMode = tea.MouseModeCellMotion
-		return v
+		return newMainTeaView(m.styles, ui, m.shiftHeld)
 	}
 
 	// Show file picker interface as full-screen if shown
@@ -2724,10 +2726,7 @@ func (m *model) View() tea.View {
 
 		// Center the file picker modal on the screen
 		ui = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, fileContent)
-		v := tea.NewView(m.styles.Background.Render(ui))
-		v.AltScreen = true
-		v.MouseMode = tea.MouseModeCellMotion
-		return v
+		return newMainTeaView(m.styles, ui, m.shiftHeld)
 	}
 
 	// Show help as full-screen modal if shown
@@ -2752,7 +2751,7 @@ func (m *model) View() tea.View {
 
 		// Create help footer with navigation instructions
 		helpFooter := "Use ↑/↓, PgUp/PgDn, or mouse wheel to scroll • Press Ctrl+H to close help"
-		footerStyle := lipgloss.NewStyle().
+		footerStyle := m.styles.HelpOverlay.
 			Width(helpWidth).
 			Align(lipgloss.Center).
 			Foreground(lipgloss.Color("#888888")).
@@ -2793,10 +2792,7 @@ func (m *model) View() tea.View {
 		ui = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dbMenu)
 	}
 
-	v := tea.NewView(m.styles.Background.Render(ui))
-	v.AltScreen = true
-	v.MouseMode = tea.MouseModeCellMotion
-	return v
+	return newMainTeaView(m.styles, ui, m.shiftHeld)
 }
 
 func main() {
@@ -3175,6 +3171,7 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	ta.SetHeight(3)
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline.SetEnabled(false)
+	configureTextareaChrome(&ta, getThemeStyles(cfg.Theme).Input)
 
 	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
