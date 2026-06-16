@@ -176,6 +176,8 @@ type model struct {
 	showHelp     bool
 	helpViewport viewport.Model // NEW: scrollable help viewport
 
+	transcriptLineURLs map[int][]string // global line index -> full URLs from render
+
 	// Admin UI system
 	showDBMenu     bool
 	dbMenuViewport viewport.Model
@@ -653,7 +655,10 @@ func (m *model) saveDMUIState() {
 }
 
 func (m *model) refreshTranscript() {
-	m.viewport.SetContent(renderMessages(m.visibleMessages(), m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions))
+	msgs := m.visibleMessages()
+	content := renderMessages(msgs, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions)
+	m.transcriptLineURLs = buildTranscriptLineURLs(msgs, content)
+	m.viewport.SetContent(content)
 	m.updateSidebar()
 }
 

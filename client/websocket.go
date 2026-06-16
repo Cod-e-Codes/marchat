@@ -489,6 +489,11 @@ func (m *model) findURLAtClickPosition(clickX, clickY int) string {
 	}
 	trimViewportViewLines(lines)
 
+	lineIdx := m.viewport.YOffset + relY
+	if u := urlFromTranscriptIndex(m.transcriptLineURLs, lineIdx, relX, lines[relY]); u != "" {
+		return u
+	}
+
 	partial := findURLAtTranscriptClick(lines, relY, relX)
 	return expandClickedURL(partial, m.visibleMessages())
 }

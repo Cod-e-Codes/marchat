@@ -414,6 +414,58 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 	return b.String()
 }
 
+// buildTranscriptLineURLs maps rendered transcript line indices to full URLs from message bodies.
+func buildTranscriptLineURLs(msgs []shared.Message, rendered string) map[int][]string {
+	index := make(map[int][]string)
+	if rendered == "" || urlRegex == nil {
+		return index
+	}
+	lines := strings.Split(strings.TrimRight(rendered, "\n"), "\n")
+	sorted := append([]shared.Message(nil), msgs...)
+	sortMessagesByTimestamp(sorted)
+
+	cursor := 0
+	for _, msg := range sorted {
+		if msg.Type == shared.TypingMessage || msg.Type == shared.ReadReceiptType {
+			continue
+		}
+		urls := urlsFromMessageContent(msg.Content)
+		if msg.Type == shared.DeleteMessage || msg.Type == shared.FileMessageType {
+			urls = nil
+		}
+
+		for cursor < len(lines) {
+			plain := plainTranscriptLine(lines[cursor])
+			if strings.TrimSpace(plain) == "" || isDateSeparatorLine(plain) {
+				cursor++
+				continue
+			}
+			if strings.Contains(plain, msg.Sender+":") {
+				break
+			}
+			cursor++
+		}
+		if cursor >= len(lines) {
+			break
+		}
+
+		blockEnd := cursor
+		for blockEnd+1 < len(lines) && isMessageBodyContinuation(lines[blockEnd+1]) {
+			blockEnd++
+		}
+		if len(urls) > 0 {
+			for i := cursor; i <= blockEnd; i++ {
+				index[i] = urls
+			}
+		}
+		cursor = blockEnd + 1
+		if cursor < len(lines) && isReactionTranscriptLine(lines[cursor]) {
+			cursor++
+		}
+	}
+	return index
+}
+
 func renderEmojis(s string) string {
 	emojis := map[string]string{
 		":)": "😊",
@@ -618,14 +670,58 @@ func expandClickedURL(partial string, messages []shared.Message) string {
 	}
 	best := partial
 	for _, msg := range messages {
-		norm := normalizeURLHyphens(msg.Content)
-		for _, u := range urlRegex.FindAllString(norm, -1) {
+		for _, u := range urlsFromMessageContent(msg.Content) {
 			if strings.HasPrefix(u, partial) && len(u) > len(best) {
 				best = u
 			}
 		}
 	}
 	return best
+}
+
+func urlsFromMessageContent(content string) []string {
+	if urlRegex == nil {
+		return nil
+	}
+	return urlRegex.FindAllString(normalizeURLHyphens(content), -1)
+}
+
+func longestURL(urls []string) string {
+	best := ""
+	for _, u := range urls {
+		if len(u) > len(best) {
+			best = u
+		}
+	}
+	return best
+}
+
+// urlFromTranscriptIndex returns a full URL when the click lands on a transcript line
+// that was indexed during render (avoids viewport padding / wrap regex truncation).
+func urlFromTranscriptIndex(lineURLs map[int][]string, lineIdx, relX int, viewLine string) string {
+	urls := lineURLs[lineIdx]
+	if len(urls) == 0 {
+		return ""
+	}
+	if !transcriptClickOnURLBody(viewLine, relX) {
+		return ""
+	}
+	return longestURL(urls)
+}
+
+func transcriptClickOnURLBody(viewLine string, relX int) bool {
+	plain := plainTranscriptLine(viewLine)
+	if strings.TrimSpace(plain) == "" {
+		return false
+	}
+	if transcriptMessageStart.MatchString(plain) {
+		if idx := strings.Index(plain, ": "); idx >= 0 {
+			if relX <= ansi.StringWidth(plain[:idx+2]) {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func normalizeURLHyphens(s string) string {

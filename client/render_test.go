@@ -393,12 +393,13 @@ func TestFindURLAtClickPositionThroughViewport(t *testing.T) {
 	}
 	const chatWidth = 62
 	content := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, chatWidth, true, true)
+	lineURLs := buildTranscriptLineURLs(msgs, content)
 	vp := viewport.New(chatWidth, 20)
 	vp.Width = chatWidth
 	vp.Height = 20
 	vp.SetContent(content)
 
-	m := &model{viewport: vp}
+	m := &model{viewport: vp, transcriptLineURLs: lineURLs}
 	x0, y0 := m.chatPanelOrigin()
 	viewLines := strings.Split(strings.TrimRight(vp.View(), "\n"), "\n")
 
@@ -451,10 +452,12 @@ func TestChatPanelOriginIncludesBoxBorder(t *testing.T) {
 
 func TestFindURLAtClickPositionExpandsPartialMatch(t *testing.T) {
 	full := "https://github.com/Cod-e-Codes/marchat/commit/85bf012bde8a88b9730e9a4ff3015551556835a9"
+	lineURLs := map[int][]string{0: {full}}
 	m := &model{
-		viewport:       viewport.New(80, 5),
-		messages:       []shared.Message{{Content: full, Type: shared.TextMessage, Channel: "general"}},
-		currentChannel: "general",
+		viewport:           viewport.New(80, 5),
+		messages:           []shared.Message{{Content: full, Type: shared.TextMessage, Channel: "general"}},
+		currentChannel:     "general",
+		transcriptLineURLs: lineURLs,
 	}
 	m.viewport.SetContent("[20:20] Cody: https://github.com/Cod\n")
 	x0, y0 := m.chatPanelOrigin()
@@ -463,6 +466,31 @@ func TestFindURLAtClickPositionExpandsPartialMatch(t *testing.T) {
 	got := m.findURLAtClickPosition(x0+relX, y0)
 	if got != full {
 		t.Fatalf("partial viewport match: got %q want %q", got, full)
+	}
+}
+
+func TestTranscriptLineURLsIndexWrappedCommitURL(t *testing.T) {
+	url := "https://github.com/Cod-e-Codes/marchat/commit/85bf012bde8a88b9730e9a4ff3015551556835a9"
+	styles := getThemeStyles("patriot")
+	msgs := []shared.Message{{
+		Sender: "Cody", Content: url, CreatedAt: time.Now(),
+		Type: shared.TextMessage, MessageID: 84,
+	}}
+	lineURLs := buildTranscriptLineURLs(msgs, renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, 62, true, true))
+	out := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, 62, true, true)
+	lines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	found := 0
+	for i, line := range lines {
+		if strings.Contains(plainTranscriptLine(line), "github.com") || strings.Contains(plainTranscriptLine(line), "85bf012") {
+			got := lineURLs[i]
+			if len(got) != 1 || got[0] != url {
+				t.Fatalf("line %d urls=%v want [%q]", i, got, url)
+			}
+			found++
+		}
+	}
+	if found < 2 {
+		t.Fatalf("expected wrapped URL lines indexed, found %d", found)
 	}
 }
 
