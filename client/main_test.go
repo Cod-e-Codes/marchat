@@ -1374,6 +1374,48 @@ func TestReactionMetaSerialization(t *testing.T) {
 	}
 }
 
+func TestReactionWireMessageRemoval(t *testing.T) {
+	msg := reactionWireMessage("alice", 20, "thumbsup", true)
+	if msg.Type != shared.ReactionMessage {
+		t.Fatalf("type: got %v", msg.Type)
+	}
+	if msg.Reaction == nil || !msg.Reaction.IsRemoval {
+		t.Fatal("expected removal reaction meta")
+	}
+	if msg.Reaction.Emoji != "👍" {
+		t.Fatalf("emoji: got %q want thumbs up", msg.Reaction.Emoji)
+	}
+	if msg.Reaction.TargetID != 20 {
+		t.Fatalf("target: got %d want 20", msg.Reaction.TargetID)
+	}
+	data, err := json.Marshal(msg)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(data), `"is_removal":true`) {
+		t.Fatalf("JSON missing is_removal: %s", data)
+	}
+}
+
+func TestAppendChatMessageE2ESearchHint(t *testing.T) {
+	noResults := shared.Message{
+		Sender:  "System",
+		Content: searchNoResultsPrefix + " test",
+		Type:    shared.TextMessage,
+	}
+	got := appendChatMessage(nil, noResults, true)
+	if len(got) != 2 {
+		t.Fatalf("len: got %d want 2", len(got))
+	}
+	if got[1].Content != e2eSearchNoResultsHint {
+		t.Fatalf("hint: got %q", got[1].Content)
+	}
+	plain := appendChatMessage(nil, noResults, false)
+	if len(plain) != 1 {
+		t.Fatalf("plain len: got %d want 1", len(plain))
+	}
+}
+
 func TestMessageWithChannelSerialization(t *testing.T) {
 	msg := shared.Message{
 		Sender:    "alice",

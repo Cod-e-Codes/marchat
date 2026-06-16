@@ -345,8 +345,10 @@ Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text 
 | `:dm [user] [msg]` | Send a DM, switch to a DM conversation (`:dm <user>`), or return to global chat (`:dm off`) |
 | `:dms` | List DM conversations currently visible in the sidebar (includes unread counts) |
 | `:dmhide [user]` | Hide a DM conversation from the sidebar (or hide the active DM thread when no user is provided) |
-| `:search <query>` | Search message history on the server |
-| `:react <id> <emoji>` | React to a message (supports aliases: `+1`, `heart`, `fire`, `party`, `laugh`, `eyes`, `check`, `rocket`, `think`, etc.) |
+| `:search <query>` | Search message history on the server (SQL `LIKE` on stored `content`; with E2E, that is ciphertext, not decrypted plaintext) |
+| `:react <id> <emoji>` | React to a message (aliases include `+1`, `thumbsup`, `-1`, `thumbsdown`, `heart`, `fire`, `party`, etc.) |
+| `:unreact <id> <emoji>` | Remove your reaction from a message |
+| `:thumbsup <id>` / `:thumbsdown <id>` | Shortcuts to react with thumbs up or down |
 | `:pin <id>` | Toggle pin on a message |
 | `:pinned` | List all pinned messages |
 

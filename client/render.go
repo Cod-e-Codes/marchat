@@ -11,6 +11,7 @@ import (
 	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/alecthomas/chroma/quick"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // sortMessagesByTimestamp ensures messages are displayed in chronological order
@@ -69,6 +70,46 @@ func systemLineStyle(styles themeStyles, content string) lipgloss.Style {
 	default:
 		return styles.SystemMsg
 	}
+}
+
+// wrapStyledBlock word-wraps ANSI-styled chat body text to width, preserving escape codes.
+// prefix is printed once on the first line; continuation lines align under the body column.
+func wrapStyledBlock(prefix, content, suffix string, width int) string {
+	if content == "" {
+		return prefix + suffix
+	}
+	if width <= 0 {
+		return prefix + content + suffix
+	}
+
+	prefixCells := ansi.StringWidth(prefix)
+	lineWidth := width - prefixCells
+	if lineWidth < 1 {
+		lineWidth = width
+		prefixCells = 0
+		prefix = ""
+	}
+	continuationIndent := strings.Repeat(" ", prefixCells)
+
+	var out strings.Builder
+	first := true
+	for _, paragraph := range strings.Split(content, "\n") {
+		wrapped := ansi.Wordwrap(paragraph, lineWidth, " ")
+		for _, wl := range strings.Split(wrapped, "\n") {
+			if !first {
+				out.WriteString("\n")
+			}
+			if first {
+				out.WriteString(prefix)
+				first = false
+			} else {
+				out.WriteString(continuationIndent)
+			}
+			out.WriteString(wl)
+		}
+	}
+	out.WriteString(suffix)
+	return out.String()
 }
 
 func renderMessages(msgs []shared.Message, styles themeStyles, username string, users []string, width int, twentyFourHour bool, showMessageMetadata bool, reactions ...map[int64]map[string]map[string]bool) string {
@@ -148,31 +189,19 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 			}
 		}
 
+		headPrefix := timestamp + " " + prefix
 		switch msg.Sender {
 		case "System":
-			b.WriteString(timestamp)
-			b.WriteString(" ")
-			b.WriteString(prefix)
-			b.WriteString(systemLineStyle(styles, content).Render(content))
-			b.WriteString(metaSuffix)
+			styled := systemLineStyle(styles, content).Render(content)
+			b.WriteString(wrapStyledBlock(headPrefix, styled, metaSuffix, width))
 			b.WriteString("\n")
 		case username:
-			b.WriteString(timestamp)
-			b.WriteString(" ")
-			b.WriteString(prefix)
-			b.WriteString(styles.Me.Render(msg.Sender))
-			b.WriteString(": ")
-			b.WriteString(content)
-			b.WriteString(metaSuffix)
+			head := headPrefix + styles.Me.Render(msg.Sender) + ": "
+			b.WriteString(wrapStyledBlock(head, content, metaSuffix, width))
 			b.WriteString("\n")
 		default:
-			b.WriteString(timestamp)
-			b.WriteString(" ")
-			b.WriteString(prefix)
-			b.WriteString(styles.Other.Render(msg.Sender))
-			b.WriteString(": ")
-			b.WriteString(content)
-			b.WriteString(metaSuffix)
+			head := headPrefix + styles.Other.Render(msg.Sender) + ": "
+			b.WriteString(wrapStyledBlock(head, content, metaSuffix, width))
 			b.WriteString("\n")
 		}
 
@@ -210,26 +239,28 @@ func renderEmojis(s string) string {
 }
 
 var reactionAliases = map[string]string{
-	"+1":     "👍",
-	"-1":     "👎",
-	"heart":  "❤️",
-	"laugh":  "😂",
-	"fire":   "🔥",
-	"party":  "🎉",
-	"eyes":   "👀",
-	"check":  "✅",
-	"x":      "❌",
-	"think":  "🤔",
-	"clap":   "👏",
-	"rocket": "🚀",
-	"wave":   "👋",
-	"100":    "💯",
-	"sad":    "😢",
-	"wow":    "😮",
-	"angry":  "😡",
-	"skull":  "💀",
-	"pray":   "🙏",
-	"star":   "⭐",
+	"+1":         "👍",
+	"-1":         "👎",
+	"thumbsup":   "👍",
+	"thumbsdown": "👎",
+	"heart":      "❤️",
+	"laugh":      "😂",
+	"fire":       "🔥",
+	"party":      "🎉",
+	"eyes":       "👀",
+	"check":      "✅",
+	"x":          "❌",
+	"think":      "🤔",
+	"clap":       "👏",
+	"rocket":     "🚀",
+	"wave":       "👋",
+	"100":        "💯",
+	"sad":        "😢",
+	"wow":        "😮",
+	"angry":      "😡",
+	"skull":      "💀",
+	"pray":       "🙏",
+	"star":       "⭐",
 }
 
 func resolveReactionEmoji(input string) string {

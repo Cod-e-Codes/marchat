@@ -44,6 +44,11 @@ const userListWidth = 18
 const pingPeriod = 50 * time.Second        // moved from magic number
 const reconnectMaxDelay = 30 * time.Second // for exponential backoff
 
+const (
+	searchNoResultsPrefix  = "No results found for:"
+	e2eSearchNoResultsHint = "With E2E enabled, server search matches stored ciphertext, not decrypted plaintext in chat."
+)
+
 var mentionRegex *regexp.Regexp
 var urlRegex *regexp.Regexp
 
@@ -326,6 +331,73 @@ func messageIncrementsUnread(m *model, v shared.Message) bool {
 	default:
 		return false
 	}
+}
+
+func appendChatMessage(messages []shared.Message, msg shared.Message, useE2E bool) []shared.Message {
+	messages = append(messages, msg)
+	if useE2E && msg.Sender == "System" && strings.HasPrefix(msg.Content, searchNoResultsPrefix) {
+		messages = append(messages, shared.Message{
+			Sender:    "System",
+			Content:   e2eSearchNoResultsHint,
+			CreatedAt: time.Now(),
+			Type:      shared.TextMessage,
+		})
+	}
+	return messages
+}
+
+func reactionWireMessage(sender string, targetID int64, emojiInput string, remove bool) shared.Message {
+	return shared.Message{
+		Type:   shared.ReactionMessage,
+		Sender: sender,
+		Reaction: &shared.ReactionMeta{
+			Emoji:     resolveReactionEmoji(emojiInput),
+			TargetID:  targetID,
+			IsRemoval: remove,
+		},
+	}
+}
+
+func (m *model) appendReactionUsage(usage string) {
+	m.messages = append(m.messages, shared.Message{
+		Sender: "System", Content: usage, CreatedAt: time.Now(), Type: shared.TextMessage,
+	})
+	m.refreshTranscript()
+	m.viewport.GotoBottom()
+}
+
+func (m *model) handleReactionCommand(text string, remove bool, fixedEmoji string) bool {
+	parts := strings.Fields(text)
+	needParts := 3
+	if fixedEmoji != "" {
+		needParts = 2
+	}
+	if len(parts) < needParts {
+		usage := "Usage: :react <message_id> <emoji>"
+		switch {
+		case remove:
+			usage = "Usage: :unreact <message_id> <emoji>"
+		case fixedEmoji == "thumbsup":
+			usage = "Usage: :thumbsup <message_id>"
+		case fixedEmoji == "thumbsdown":
+			usage = "Usage: :thumbsdown <message_id>"
+		}
+		m.appendReactionUsage(usage)
+		return true
+	}
+	id, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		m.appendReactionUsage("Invalid message ID")
+		return true
+	}
+	emojiInput := fixedEmoji
+	if emojiInput == "" {
+		emojiInput = parts[2]
+	}
+	if m.conn != nil {
+		_ = m.conn.WriteJSON(reactionWireMessage(m.cfg.Username, id, emojiInput, remove))
+	}
+	return true
 }
 
 // dmTypingVisibleForTranscript returns whether inbound typing should update the typing footer.
@@ -982,7 +1054,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if len(m.messages) >= maxMessages {
 				m.messages = m.messages[len(m.messages)-maxMessages+1:]
 			}
-			m.messages = append(m.messages, v)
+			m.messages = appendChatMessage(m.messages, v, m.useE2E)
 			sortMessagesByTimestamp(m.messages)
 
 			if v.Type == shared.FileMessageType && v.File != nil {
@@ -2108,35 +2180,29 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.textarea.SetValue("")
 				return m, nil
 			}
-			if strings.HasPrefix(text, ":react ") {
-				parts := strings.Fields(text)
-				if len(parts) < 3 {
-					m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Usage: :react <message_id> <emoji>", CreatedAt: time.Now(), Type: shared.TextMessage})
-					m.refreshTranscript()
-					m.viewport.GotoBottom()
-				} else {
-					id, err := strconv.ParseInt(parts[1], 10, 64)
-					if err != nil {
-						m.messages = append(m.messages, shared.Message{Sender: "System", Content: "Invalid message ID", CreatedAt: time.Now(), Type: shared.TextMessage})
-						m.refreshTranscript()
-						m.viewport.GotoBottom()
-					} else {
-						emoji := resolveReactionEmoji(parts[2])
-						reactMsg := shared.Message{
-							Type:   shared.ReactionMessage,
-							Sender: m.cfg.Username,
-							Reaction: &shared.ReactionMeta{
-								Emoji:    emoji,
-								TargetID: id,
-							},
-						}
-						if m.conn != nil {
-							_ = m.conn.WriteJSON(reactMsg)
-						}
-					}
+			if strings.HasPrefix(text, ":unreact ") {
+				if m.handleReactionCommand(text, true, "") {
+					m.textarea.SetValue("")
+					return m, nil
 				}
-				m.textarea.SetValue("")
-				return m, nil
+			}
+			if strings.HasPrefix(text, ":thumbsup ") {
+				if m.handleReactionCommand(text, false, "thumbsup") {
+					m.textarea.SetValue("")
+					return m, nil
+				}
+			}
+			if strings.HasPrefix(text, ":thumbsdown ") {
+				if m.handleReactionCommand(text, false, "thumbsdown") {
+					m.textarea.SetValue("")
+					return m, nil
+				}
+			}
+			if strings.HasPrefix(text, ":react ") {
+				if m.handleReactionCommand(text, false, "") {
+					m.textarea.SetValue("")
+					return m, nil
+				}
 			}
 			if strings.HasPrefix(text, ":pin ") {
 				parts := strings.Fields(text)
@@ -2231,7 +2297,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if m.conn != nil {
 					// Check if this is a server-side command (admin/plugin) that should bypass encryption
 					// Client-side commands are handled above and never reach this point
-					clientOnlyCommands := []string{":theme", ":time", ":msginfo", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":dms", ":dmhide", ":search", ":react", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
+					clientOnlyCommands := []string{":theme", ":time", ":msginfo", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":dms", ":dmhide", ":search", ":react", ":unreact", ":thumbsup", ":thumbsdown", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
 					isClientCommand := false
 					for _, cmd := range clientOnlyCommands {
 						// Check if text is exactly the command or starts with "command "

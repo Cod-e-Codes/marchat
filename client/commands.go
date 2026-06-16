@@ -14,6 +14,7 @@ func (m *model) generateHelpContent() string {
 	var sessionInfo string
 	if m.useE2E {
 		sessionInfo = "Session: E2E Encrypted (messages are encrypted for privacy)\n"
+		sessionInfo += "Search: :search runs on the server against stored ciphertext, not decrypted plaintext in chat.\n"
 	} else {
 		sessionInfo = "Session: Unencrypted (messages are sent in plain text)\n"
 	}
@@ -50,8 +51,11 @@ func (m *model) generateHelpContent() string {
 	commands += "  :dm [user] [msg]     Send DM or toggle DM mode\n"
 	commands += "  :dms                 List DM conversations seen in this session\n"
 	commands += "  :dmhide [user]       Hide a DM conversation from sidebar (reappears on new inbound DM)\n"
-	commands += "  :search <query>      Search message history\n"
-	commands += "  :react <id> <emoji>  React to a message (+1, heart, fire, party, etc.)\n"
+	commands += "  :search <query>      Search message history (matches stored content; see E2E note in help)\n"
+	commands += "  :react <id> <emoji>  React to a message (+1, thumbsup, heart, fire, party, etc.)\n"
+	commands += "  :unreact <id> <emoji> Remove your reaction from a message\n"
+	commands += "  :thumbsup <id>       React with thumbs up (alias for +1)\n"
+	commands += "  :thumbsdown <id>     React with thumbs down (alias for -1)\n"
 	commands += "  :pin <id>            Toggle pin on a message\n"
 	commands += "  :pinned              Show pinned messages\n"
 	commands += "  :join <channel>      Join a channel (default: general)\n"
