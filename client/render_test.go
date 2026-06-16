@@ -425,6 +425,47 @@ func TestFindURLAtClickPositionThroughViewport(t *testing.T) {
 	}
 }
 
+func TestExpandClickedURLFromMessage(t *testing.T) {
+	full := "https://github.com/Cod-e-Codes/marchat/commit/85bf012bde8a88b9730e9a4ff3015551556835a9"
+	msgs := []shared.Message{
+		{Content: full, Type: shared.TextMessage, Channel: "general"},
+	}
+	got := expandClickedURL("https://github.com/Cod", msgs)
+	if got != full {
+		t.Fatalf("expand partial: got %q want %q", got, full)
+	}
+}
+
+func TestChatPanelOriginIncludesBoxBorder(t *testing.T) {
+	m := &model{viewport: viewport.New(62, 10)}
+	_, y0 := m.chatPanelOrigin()
+	if y0 != 2 {
+		t.Fatalf("y0=%d want 2 (header + chat box top border)", y0)
+	}
+	m.banner = "[OK] test"
+	_, y0 = m.chatPanelOrigin()
+	if y0 != 3 {
+		t.Fatalf("y0 with banner=%d want 3", y0)
+	}
+}
+
+func TestFindURLAtClickPositionExpandsPartialMatch(t *testing.T) {
+	full := "https://github.com/Cod-e-Codes/marchat/commit/85bf012bde8a88b9730e9a4ff3015551556835a9"
+	m := &model{
+		viewport:       viewport.New(80, 5),
+		messages:       []shared.Message{{Content: full, Type: shared.TextMessage, Channel: "general"}},
+		currentChannel: "general",
+	}
+	m.viewport.SetContent("[20:20] Cody: https://github.com/Cod\n")
+	x0, y0 := m.chatPanelOrigin()
+	line := "[20:20] Cody: https://github.com/Cod"
+	relX := strings.Index(line, "github.com/Cod") + len("github.com/")
+	got := m.findURLAtClickPosition(x0+relX, y0)
+	if got != full {
+		t.Fatalf("partial viewport match: got %q want %q", got, full)
+	}
+}
+
 func TestWrapStyledBlockShortMessageUnchanged(t *testing.T) {
 	styles := getThemeStyles("patriot")
 	msgs := []shared.Message{

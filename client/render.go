@@ -481,7 +481,7 @@ func stripURLMarkers(s string) string {
 // hyphens normalized so click-to-open matches rendered hyperlinks.
 func plainTranscriptLine(line string) string {
 	line = ansi.Strip(line)
-	line = strings.ReplaceAll(line, string(urlNBHyphen), "-")
+	line = normalizeURLHyphens(line)
 	return stripURLMarkers(line)
 }
 
@@ -610,6 +610,32 @@ func findURLAtTranscriptClick(lines []string, relY, relX int) string {
 	return ""
 }
 
+// expandClickedURL replaces a viewport-derived URL prefix with the longest matching
+// URL from visible message bodies (wrapped lines can truncate regex matches).
+func expandClickedURL(partial string, messages []shared.Message) string {
+	if partial == "" || urlRegex == nil {
+		return partial
+	}
+	best := partial
+	for _, msg := range messages {
+		norm := normalizeURLHyphens(msg.Content)
+		for _, u := range urlRegex.FindAllString(norm, -1) {
+			if strings.HasPrefix(u, partial) && len(u) > len(best) {
+				best = u
+			}
+		}
+	}
+	return best
+}
+
+func normalizeURLHyphens(s string) string {
+	s = strings.ReplaceAll(s, string(urlNBHyphen), "-")
+	s = strings.ReplaceAll(s, "\u2010", "-")
+	s = strings.ReplaceAll(s, "\u2012", "-")
+	s = strings.ReplaceAll(s, "\u2013", "-")
+	return s
+}
+
 func openURL(u string) error {
 	if !strings.HasPrefix(u, "http://") && !strings.HasPrefix(u, "https://") {
 		u = "https://" + u
@@ -621,7 +647,8 @@ func openURL(u string) error {
 	case "windows":
 		cmd = exec.Command("rundll32", "url.dll,FileProtocolHandler", u)
 		if err := cmd.Start(); err != nil {
-			cmd = exec.Command("cmd", "/c", "start", u)
+			// Empty title argument so start treats the URL as the command, not the title.
+			cmd = exec.Command("cmd", "/c", "start", "", u)
 			return cmd.Start()
 		}
 		return nil

@@ -455,8 +455,8 @@ func (m *model) listenWebSocket() tea.Cmd {
 
 // chatPanelOrigin returns terminal coordinates of the top-left of the chat transcript viewport.
 func (m *model) chatPanelOrigin() (x0, y0 int) {
-	x0 = userListWidth + 1
-	y0 = 1 // header row
+	x0 = userListWidth + 1 // user list + chat box left border
+	y0 = 2                 // header row + chat box top border row
 	if m.banner != "" || m.sending {
 		bannerText := m.banner
 		if m.sending && strings.TrimSpace(bannerText) == "" {
@@ -469,6 +469,12 @@ func (m *model) chatPanelOrigin() (x0, y0 int) {
 	return x0, y0
 }
 
+func trimViewportViewLines(lines []string) {
+	for i, line := range lines {
+		lines[i] = strings.TrimRight(line, " ")
+	}
+}
+
 func (m *model) findURLAtClickPosition(clickX, clickY int) string {
 	x0, y0 := m.chatPanelOrigin()
 	relX := clickX - x0
@@ -477,11 +483,12 @@ func (m *model) findURLAtClickPosition(clickX, clickY int) string {
 		return ""
 	}
 
-	content := m.viewport.View()
-	lines := strings.Split(content, "\n")
+	lines := strings.Split(m.viewport.View(), "\n")
 	if relY >= len(lines) {
 		return ""
 	}
+	trimViewportViewLines(lines)
 
-	return findURLAtTranscriptClick(lines, relY, relX)
+	partial := findURLAtTranscriptClick(lines, relY, relX)
+	return expandClickedURL(partial, m.visibleMessages())
 }
