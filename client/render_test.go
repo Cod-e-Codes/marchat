@@ -138,8 +138,8 @@ func TestWrapStyledBlockLongURLBreaksAtSlashes(t *testing.T) {
 			t.Fatalf("line exceeds width %d (%d cells): %q", width, ansi.StringWidth(stripANSIForTest(line)), line)
 		}
 	}
-	if !strings.Contains(out, "/marchat/") && !strings.Contains(out, "/commit/") {
-		if !strings.Contains(out, "github.com/Cod") {
+	if !strings.Contains(ansi.Strip(out), "/marchat/") && !strings.Contains(ansi.Strip(out), "/commit/") {
+		if !strings.Contains(ansi.Strip(out), "github.com/Cod") {
 			t.Fatalf("expected URL path segments in wrapped output, got:\n%s", out)
 		}
 	}
@@ -184,6 +184,85 @@ func underlineOnLeadingWhitespace(s string) bool {
 	return false
 }
 
+func hasHyperlinkANSI(s string) bool {
+	return strings.Contains(s, "[4m") || strings.Contains(s, ";4m") || strings.Contains(s, "[4;")
+}
+
+func TestMarkURLsForWrapInsertsSentinels(t *testing.T) {
+	in := "see https://example.com/path ok"
+	out := markURLsForWrap(in)
+	if !strings.Contains(out, string(urlStartMarker)+"https://example.com/path"+string(urlEndMarker)) {
+		t.Fatalf("expected URL sentinels, got %q", out)
+	}
+}
+
+func TestApplyURLMarkersAcrossWrappedLines(t *testing.T) {
+	styles := getThemeStyles("patriot")
+	url := "https://github.com/Cod-e-Codes/marchat/commit/8b765b04f82a16c51128261c2fef88c6fef05a61"
+	marked := markURLsForWrap(prepareURLWrapping(url))
+	wrapped := ansi.Wrap(marked, 30, wrapBreakpoints)
+	open := false
+	var styled strings.Builder
+	for _, line := range strings.Split(wrapped, "\n") {
+		styled.WriteString(applyURLMarkers(line, styles, &open))
+	}
+	if open {
+		t.Fatal("expected URL span to close after processing all wrapped lines")
+	}
+	plain := ansi.Strip(styled.String())
+	if strings.ContainsRune(plain, urlStartMarker) || strings.ContainsRune(plain, urlEndMarker) {
+		t.Fatalf("URL sentinels leaked into styled output: %q", plain)
+	}
+	if plain != prepareURLWrapping(url) {
+		t.Fatalf("styled plain text mismatch:\n got %q\nwant %q", plain, prepareURLWrapping(url))
+	}
+	open = false
+	for _, line := range strings.Split(wrapped, "\n") {
+		if ansi.Strip(line) == "" {
+			continue
+		}
+		segment := applyURLMarkers(line, styles, &open)
+		if !hasHyperlinkANSI(segment) {
+			t.Fatalf("expected hyperlink style on URL segment %q", line)
+		}
+	}
+}
+
+func TestWrapStyledBlockWrappedURLSegmentsStyled(t *testing.T) {
+	styles := getThemeStyles("patriot")
+	url := "https://github.com/Cod-e-Codes/marchat/commit/8b765b04f82a16c51128261c2fef88c6fef05a61"
+	msgs := []shared.Message{
+		{
+			Sender:    "Cody",
+			Content:   url,
+			CreatedAt: time.Now(),
+			Type:      shared.TextMessage,
+			MessageID: 73,
+		},
+	}
+	const width = 62
+	out := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, width, true, true)
+	plain := ansi.Strip(out)
+	if strings.ContainsRune(plain, urlStartMarker) || strings.ContainsRune(plain, urlEndMarker) {
+		t.Fatalf("URL sentinels leaked into transcript: %q", plain)
+	}
+	if !strings.Contains(plain, "8b765b04f82a16c51128261c2fef88c6fef05a61") {
+		t.Fatalf("full URL missing from output: %q", plain)
+	}
+	rawLines := strings.Split(strings.TrimRight(out, "\n"), "\n")
+	for _, line := range rawLines {
+		trimmed := strings.TrimSpace(ansi.Strip(line))
+		if trimmed == "" || strings.Contains(trimmed, "June") || strings.Contains(trimmed, "Cody:") {
+			continue
+		}
+		if strings.Contains(trimmed, "github.com") || strings.Contains(trimmed, "marchat") || strings.Contains(trimmed, "8b765b") {
+			if !hasHyperlinkANSI(line) {
+				t.Fatalf("wrapped URL segment missing hyperlink style: %q", line)
+			}
+		}
+	}
+}
+
 func TestWrapStyledBlockURLUnderlineNotOnContinuationIndent(t *testing.T) {
 	styles := getThemeStyles("patriot")
 	url := "https://github.com/Cod-e-Codes/marchat/commit/1fc41486340cefc14838f467c4bd09da68ee6947"
@@ -222,12 +301,12 @@ func TestWrapStyledBlockShortMessageUnchanged(t *testing.T) {
 		{Sender: "alice", Content: "hi", CreatedAt: time.Now(), Type: shared.TextMessage},
 	}
 	out := renderMessages(msgs, styles, "bob", []string{"alice", "bob"}, 80, true, false)
-	if !strings.Contains(out, "alice: hi") {
+	if !strings.Contains(ansi.Strip(out), "alice: hi") {
 		t.Fatalf("short message missing: %q", out)
 	}
 	msgLines := 0
 	for _, line := range strings.Split(out, "\n") {
-		if strings.Contains(line, "alice:") {
+		if strings.Contains(ansi.Strip(line), "alice:") {
 			msgLines++
 		}
 	}

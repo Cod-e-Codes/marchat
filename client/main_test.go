@@ -14,6 +14,7 @@ import (
 	"github.com/Cod-e-Codes/marchat/client/config"
 	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/charmbracelet/bubbles/viewport"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func TestDmTypingVisibleForTranscript(t *testing.T) {
@@ -588,7 +589,7 @@ func TestRenderFunctions(t *testing.T) {
 	styles := baseThemeStyles()
 	content := "Check out https://example.com"
 	result := renderHyperlinks(content, styles)
-	if !strings.Contains(result, "https://example.com") {
+	if !strings.Contains(ansi.Strip(result), "https://example.com") {
 		t.Error("renderHyperlinks should preserve URLs")
 	}
 
@@ -1005,7 +1006,7 @@ func TestRenderMessages(t *testing.T) {
 	}
 
 	linkResult := renderMessages(linkMessages, styles, username, users, width, twentyFourHour, true)
-	if !strings.Contains(linkResult, "https://example.com") {
+	if !strings.Contains(ansi.Strip(linkResult), "https://example.com") {
 		t.Error("renderMessages should preserve URLs")
 	}
 

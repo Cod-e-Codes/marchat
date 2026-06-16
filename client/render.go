@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/alecthomas/chroma/quick"
@@ -76,6 +77,10 @@ const (
 	// urlNBHyphen is a non-breaking hyphen so ansi.Wrap does not split URLs at
 	// domain/path hyphens (e.g. Cod-e-Codes). Restored for click-to-open matching.
 	urlNBHyphen = '\u2011'
+	// urlStartMarker and urlEndMarker are zero-width sentinels around URL spans so
+	// hyperlink styling survives ansi.Wrap line breaks (removed before display).
+	urlStartMarker = '\u200B'
+	urlEndMarker   = '\u200C'
 )
 
 // wrapBreakpoints are characters where line wrapping may occur. Slashes and
@@ -93,15 +98,77 @@ func prepareURLWrapping(s string) string {
 	})
 }
 
+// markURLsForWrap inserts zero-width sentinels around detected URLs before wrap.
+func markURLsForWrap(s string) string {
+	if urlRegex == nil {
+		return s
+	}
+	return urlRegex.ReplaceAllStringFunc(s, func(url string) string {
+		return string(urlStartMarker) + url + string(urlEndMarker)
+	})
+}
+
+// applyURLMarkers renders hyperlink style for marked URL spans on one wrapped line.
+// open tracks an URL span that continues from the previous wrapped line.
+func applyURLMarkers(line string, styles themeStyles, open *bool) string {
+	var out strings.Builder
+	var segment strings.Builder
+	link := *open
+
+	writeSegment := func() {
+		if segment.Len() == 0 {
+			return
+		}
+		if link {
+			out.WriteString(styles.Hyperlink.Render(segment.String()))
+		} else {
+			out.WriteString(segment.String())
+		}
+		segment.Reset()
+	}
+
+	pos := 0
+	for pos < len(line) {
+		if line[pos] == '\x1b' {
+			end := strings.IndexByte(line[pos:], 'm')
+			if end < 0 {
+				segment.WriteByte(line[pos])
+				pos++
+				continue
+			}
+			segment.WriteString(line[pos : pos+end+1])
+			pos += end + 1
+			continue
+		}
+		r, sz := utf8.DecodeRuneInString(line[pos:])
+		switch r {
+		case urlStartMarker:
+			writeSegment()
+			link = true
+		case urlEndMarker:
+			writeSegment()
+			link = false
+		default:
+			segment.WriteRune(r)
+		}
+		pos += sz
+	}
+	writeSegment()
+	*open = link
+	return out.String()
+}
+
 // wrapStyledBlock word-wraps ANSI-styled chat body text to width, preserving escape codes.
 // prefix is printed once on the first line; continuation lines align under the body column.
-// Hyperlink styling is applied per wrapped line so underline does not bleed across breaks.
+// Hyperlink styling is applied per wrapped line using URL span markers so underline does
+// not bleed across breaks and wrapped segments stay styled.
 func wrapStyledBlock(prefix, content, suffix string, width int, styles themeStyles) string {
 	if content == "" {
 		return prefix + suffix
 	}
 	if width <= 0 {
-		return prefix + renderHyperlinks(content, styles) + suffix
+		open := false
+		return prefix + applyURLMarkers(content, styles, &open) + suffix
 	}
 
 	prefixCells := ansi.StringWidth(prefix)
@@ -116,9 +183,10 @@ func wrapStyledBlock(prefix, content, suffix string, width int, styles themeStyl
 	var out strings.Builder
 	first := true
 	for _, paragraph := range strings.Split(content, "\n") {
+		urlOpen := false
 		wrapped := ansi.Wrap(paragraph, lineWidth, wrapBreakpoints)
 		for _, wl := range strings.Split(wrapped, "\n") {
-			wl = renderHyperlinks(wl, styles)
+			wl = applyURLMarkers(wl, styles, &urlOpen)
 			if !first {
 				out.WriteString("\n")
 			}
@@ -185,6 +253,7 @@ func renderMessages(msgs []shared.Message, styles themeStyles, username string, 
 			content = renderEmojis(content)
 			content = renderCodeBlocks(content)
 			content = prepareURLWrapping(content)
+			content = markURLsForWrap(content)
 			if mentionRegex != nil {
 				content = mentionRegex.ReplaceAllStringFunc(content, func(match string) string {
 					mentionName := strings.TrimPrefix(match, "@")
