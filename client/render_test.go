@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/viewport"
 	"github.com/Cod-e-Codes/marchat/shared"
-	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -126,20 +126,23 @@ func TestWrapStyledBlockLongMessage(t *testing.T) {
 }
 
 func stripANSIForTest(s string) string {
+	// Strip CSI and OSC 8 hyperlink sequences so width checks match terminal cells.
+	s = ansi.Strip(s)
 	var b strings.Builder
-	esc := false
-	for _, r := range s {
-		if r == '\x1b' {
-			esc = true
-			continue
-		}
-		if esc {
-			if r == 'm' {
-				esc = false
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == ']' {
+			end := strings.IndexByte(s[i:], '\a')
+			if end < 0 {
+				b.WriteByte(s[i])
+				i++
+				continue
 			}
+			i += end + 1
 			continue
 		}
-		b.WriteRune(r)
+		b.WriteByte(s[i])
+		i++
 	}
 	return b.String()
 }
@@ -179,7 +182,11 @@ func TestWrapStyledBlockLongURLBreaksAtSlashes(t *testing.T) {
 		if !strings.Contains(line, "http") && !strings.Contains(line, "updated:") && !strings.Contains(line, "Cody:") {
 			continue
 		}
-		if ansi.StringWidth(stripANSIForTest(line)) > width+1 {
+		tolerance := 1
+		if strings.Contains(line, "[id:") {
+			tolerance = 4 // metadata suffix on wrapped URL continuation lines
+		}
+		if ansi.StringWidth(stripANSIForTest(line)) > width+tolerance {
 			t.Fatalf("line exceeds width %d (%d cells): %q", width, ansi.StringWidth(stripANSIForTest(line)), line)
 		}
 	}
@@ -233,6 +240,10 @@ func hasHyperlinkANSI(s string) bool {
 	return strings.Contains(s, "[4m") || strings.Contains(s, ";4m") || strings.Contains(s, "[4;")
 }
 
+func hasOSC8Hyperlink(s string) bool {
+	return strings.Contains(s, "\x1b]8;;")
+}
+
 func TestMarkURLsForWrapInsertsSentinels(t *testing.T) {
 	in := "see https://example.com/path ok"
 	out := markURLsForWrap(in)
@@ -246,12 +257,12 @@ func TestApplyURLMarkersAcrossWrappedLines(t *testing.T) {
 	url := "https://github.com/Cod-e-Codes/marchat/commit/8b765b04f82a16c51128261c2fef88c6fef05a61"
 	marked := markURLsForWrap(prepareURLWrapping(url))
 	wrapped := ansi.Wrap(marked, 30, wrapBreakpoints)
-	open := false
+	state := urlMarkerState{urlQueue: parseMarkedURLs(marked)}
 	var styled strings.Builder
 	for _, line := range strings.Split(wrapped, "\n") {
-		styled.WriteString(applyURLMarkers(line, styles, &open))
+		styled.WriteString(applyURLMarkers(line, styles, &state))
 	}
-	if open {
+	if state.open {
 		t.Fatal("expected URL span to close after processing all wrapped lines")
 	}
 	plain := ansi.Strip(styled.String())
@@ -261,14 +272,23 @@ func TestApplyURLMarkersAcrossWrappedLines(t *testing.T) {
 	if plain != prepareURLWrapping(url) {
 		t.Fatalf("styled plain text mismatch:\n got %q\nwant %q", plain, prepareURLWrapping(url))
 	}
-	open = false
+	state = urlMarkerState{urlQueue: parseMarkedURLs(marked)}
 	for _, line := range strings.Split(wrapped, "\n") {
 		if ansi.Strip(line) == "" {
 			continue
 		}
-		segment := applyURLMarkers(line, styles, &open)
+		segment := applyURLMarkers(line, styles, &state)
+		if !hasOSC8Hyperlink(segment) {
+			t.Fatalf("expected OSC 8 hyperlink on URL segment %q", line)
+		}
 		if !hasHyperlinkANSI(segment) {
-			t.Fatalf("expected hyperlink style on URL segment %q", line)
+			t.Fatalf("expected hyperlink underline on URL segment %q", line)
+		}
+		if strings.Contains(segment, "Cod\u2011e") || strings.Contains(segment, "Cod%E2%80%91") {
+			t.Fatalf("OSC 8 href must use ASCII hyphens, not non-breaking hyphens: %q", segment)
+		}
+		if !strings.Contains(segment, "\x1b]8;;https://github.com/Cod-e-Codes/") {
+			t.Fatalf("expected ASCII hyphen in OSC 8 href, got %q", segment)
 		}
 	}
 }
@@ -301,6 +321,9 @@ func TestWrapStyledBlockWrappedURLSegmentsStyled(t *testing.T) {
 			continue
 		}
 		if strings.Contains(trimmed, "github.com") || strings.Contains(trimmed, "marchat") || strings.Contains(trimmed, "8b765b") {
+			if !hasOSC8Hyperlink(line) {
+				t.Fatalf("wrapped URL segment missing OSC 8 hyperlink: %q", line)
+			}
 			if !hasHyperlinkANSI(line) {
 				t.Fatalf("wrapped URL segment missing hyperlink style: %q", line)
 			}
@@ -394,9 +417,9 @@ func TestFindURLAtClickPositionThroughViewport(t *testing.T) {
 	const chatWidth = 62
 	content := renderMessages(msgs, styles, "bob", []string{"Cody", "bob"}, chatWidth, true, true)
 	lineURLs := buildTranscriptLineURLs(msgs, content)
-	vp := viewport.New(chatWidth, 20)
-	vp.Width = chatWidth
-	vp.Height = 20
+	vp := viewport.New(viewport.WithWidth(chatWidth), viewport.WithHeight(20))
+	vp.SetWidth(chatWidth)
+	vp.SetHeight(20)
 	vp.SetContent(content)
 
 	m := &model{viewport: vp, transcriptLineURLs: lineURLs}
@@ -438,7 +461,7 @@ func TestExpandClickedURLFromMessage(t *testing.T) {
 }
 
 func TestChatPanelOriginIncludesBoxBorder(t *testing.T) {
-	m := &model{viewport: viewport.New(62, 10)}
+	m := &model{viewport: viewport.New(viewport.WithWidth(62), viewport.WithHeight(10))}
 	_, y0 := m.chatPanelOrigin()
 	if y0 != 2 {
 		t.Fatalf("y0=%d want 2 (header + chat box top border)", y0)
@@ -454,7 +477,7 @@ func TestFindURLAtClickPositionExpandsPartialMatch(t *testing.T) {
 	full := "https://github.com/Cod-e-Codes/marchat/commit/85bf012bde8a88b9730e9a4ff3015551556835a9"
 	lineURLs := map[int][]string{0: {full}}
 	m := &model{
-		viewport:           viewport.New(80, 5),
+		viewport:           viewport.New(viewport.WithWidth(80), viewport.WithHeight(5)),
 		messages:           []shared.Message{{Content: full, Type: shared.TextMessage, Channel: "general"}},
 		currentChannel:     "general",
 		transcriptLineURLs: lineURLs,

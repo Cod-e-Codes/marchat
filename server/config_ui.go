@@ -7,16 +7,15 @@ import (
 	"strconv"
 	"strings"
 
+	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/config"
-	"github.com/charmbracelet/bubbles/textinput"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 var (
 	serverFocusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B9D"))
 	serverBlurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
-	serverCursorStyle  = serverFocusedStyle
 	serverNoStyle      = lipgloss.NewStyle()
 	serverHelpStyle    = serverBlurredStyle
 	serverTitleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFEAA7")).Bold(true)
@@ -25,6 +24,24 @@ var (
 	serverFocusedButton = serverFocusedStyle.Render("[ Start Server ]")
 	serverBlurredButton = fmt.Sprintf("[ %s ]", serverBlurredStyle.Render("Start Server"))
 )
+
+func serverInputStyles() textinput.Styles {
+	s := textinput.DefaultDarkStyles()
+	s.Focused.Prompt = serverFocusedStyle
+	s.Focused.Text = serverFocusedStyle
+	s.Blurred.Prompt = serverNoStyle
+	s.Blurred.Text = serverNoStyle
+	s.Cursor.Color = lipgloss.Color("#FF6B9D")
+	return s
+}
+
+func initServerInput(t *textinput.Model, width int, focus bool) {
+	t.SetStyles(serverInputStyles())
+	t.SetWidth(width)
+	if focus {
+		t.Focus()
+	}
+}
 
 type serverConfigField int
 
@@ -78,17 +95,13 @@ func NewServerConfigUI() ServerConfigModel {
 	var t textinput.Model
 	for i := range m.inputs {
 		t = textinput.New()
-		t.Cursor.Style = serverCursorStyle
 
 		switch serverConfigField(i) {
 		case adminKeyField:
 			t.Placeholder = "Enter a secure admin key"
 			t.Prompt = "Admin Key: "
 			t.CharLimit = 128
-			t.Width = 50
-			t.Focus()
-			t.PromptStyle = serverFocusedStyle
-			t.TextStyle = serverFocusedStyle
+			initServerInput(&t, 50, true)
 			t.EchoMode = textinput.EchoPassword
 			t.EchoCharacter = '•'
 			if config.AdminKey != "" {
@@ -98,7 +111,7 @@ func NewServerConfigUI() ServerConfigModel {
 			t.Placeholder = "admin1,admin2,admin3"
 			t.Prompt = "Admin Users: "
 			t.CharLimit = 256
-			t.Width = 50
+			initServerInput(&t, 50, false)
 			if config.AdminUsers != "" {
 				t.SetValue(config.AdminUsers)
 			}
@@ -106,7 +119,7 @@ func NewServerConfigUI() ServerConfigModel {
 			t.Placeholder = "8080"
 			t.Prompt = "Port: "
 			t.CharLimit = 5
-			t.Width = 10
+			initServerInput(&t, 10, false)
 			t.SetValue(config.Port)
 		}
 
@@ -182,7 +195,7 @@ func (m ServerConfigModel) Init() tea.Cmd {
 
 func (m ServerConfigModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// Clear message on any key press if it's been shown
 		if m.errorMessage != "" && m.errorMessage != "error" {
 			m.errorMessage = ""
@@ -246,12 +259,8 @@ func (m *ServerConfigModel) updateFocus() {
 	for i := 0; i < len(m.inputs); i++ {
 		if i == m.focusIndex {
 			m.inputs[i].Focus()
-			m.inputs[i].PromptStyle = serverFocusedStyle
-			m.inputs[i].TextStyle = serverFocusedStyle
 		} else {
 			m.inputs[i].Blur()
-			m.inputs[i].PromptStyle = serverNoStyle
-			m.inputs[i].TextStyle = serverNoStyle
 		}
 	}
 }
@@ -312,7 +321,7 @@ func (m *ServerConfigModel) validateAndBuildConfig() error {
 	return nil
 }
 
-func (m ServerConfigModel) View() string {
+func (m ServerConfigModel) View() tea.View {
 	var b strings.Builder
 
 	// Title
@@ -356,7 +365,7 @@ func (m ServerConfigModel) View() string {
 	// Help
 	b.WriteString(serverHelpStyle.Render("Tab/Shift+Tab: Navigate • Enter: Select/Submit • Esc: Cancel"))
 
-	return b.String()
+	return tea.NewView(b.String())
 }
 
 // GetConfig returns the built configuration

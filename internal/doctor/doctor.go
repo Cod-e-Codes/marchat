@@ -13,11 +13,11 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/lipgloss/v2"
 	clientcfg "github.com/Cod-e-Codes/marchat/client/config"
 	appconfig "github.com/Cod-e-Codes/marchat/config"
 	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/jackc/pgx/v5/stdlib"

@@ -14,12 +14,12 @@ import (
 	"syscall"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/Cod-e-Codes/marchat/config"
 	"github.com/Cod-e-Codes/marchat/internal/doctor"
 	"github.com/Cod-e-Codes/marchat/server"
 	"github.com/Cod-e-Codes/marchat/shared"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
 )
 
@@ -432,7 +432,7 @@ func main() {
 					// Launch admin panel
 					pluginManager := hub.GetPluginManager()
 					panel := server.NewAdminPanel(hub, db, pluginManager, cfg)
-					p := tea.NewProgram(panel, tea.WithAltScreen())
+					p := tea.NewProgram(panel)
 					if _, err := p.Run(); err != nil {
 						server.ServerLogger.Error("Admin panel error", err)
 					}

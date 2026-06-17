@@ -30,7 +30,7 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 
 ## Admin
 
-- TUI: `admin_panel.go`, `config_ui.go`.
+- TUI: `admin_panel.go`, `config_ui.go` (Charm v2: `tea.View`, `KeyPressMsg`, bubbles setters). Admin panel enables `MouseModeCellMotion` and routes `MouseWheelMsg` for scrollable tabs and user/plugin tables.
 - Web: `admin_web.go`, `admin_web.html`; `MARCHAT_SESSION_SECRET` (preferred), `MARCHAT_JWT_SECRET` deprecated; CSRF on mutating routes; login rate limit per IP.
 - Trusted proxies: `MARCHAT_TRUSTED_PROXIES` for forwarded client IP.
 

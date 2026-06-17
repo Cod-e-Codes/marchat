@@ -27,13 +27,13 @@ import (
 
 	"log"
 
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/textarea"
+	"charm.land/bubbles/v2/viewport"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/textarea"
-	"github.com/charmbracelet/bubbles/viewport"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/gorilla/websocket"
 	"golang.org/x/term"
 )
@@ -147,6 +147,8 @@ type model struct {
 
 	width  int // NEW: track window width
 	height int // NEW: track window height
+
+	shiftHeld bool // disables mouse capture for terminal text selection
 
 	userListViewport viewport.Model // NEW: scrollable user list
 
@@ -612,7 +614,7 @@ func (m *model) sidebarDMThreads() []dmSidebarEntry {
 }
 
 func (m *model) updateSidebar() {
-	sidebarWidth := m.userListViewport.Width
+	sidebarWidth := m.userListViewport.Width()
 	if sidebarWidth <= 0 {
 		sidebarWidth = userListWidth
 	}
@@ -656,7 +658,7 @@ func (m *model) saveDMUIState() {
 
 func (m *model) refreshTranscript() {
 	msgs := m.visibleMessages()
-	content := renderMessages(msgs, m.styles, m.cfg.Username, m.users, m.viewport.Width, m.twentyFourHour, m.showMessageMetadata, m.reactions)
+	content := renderMessages(msgs, m.styles, m.cfg.Username, m.users, m.viewport.Width(), m.twentyFourHour, m.showMessageMetadata, m.reactions)
 	m.transcriptLineURLs = buildTranscriptLineURLs(msgs, content)
 	m.viewport.SetContent(content)
 	m.updateSidebar()
@@ -685,6 +687,7 @@ type themeStyles struct {
 	Other    lipgloss.Style // NEW: other user style
 
 	Background lipgloss.Style // NEW: main background
+	screenBG   string         // alt-screen fill hex; empty = terminal default (system theme)
 	Header     lipgloss.Style // NEW: header background
 	Footer     lipgloss.Style // NEW: footer background
 	Input      lipgloss.Style // NEW: input background
@@ -823,13 +826,14 @@ func getThemeStyles(theme string) themeStyles {
 		s.User = s.User.Foreground(lipgloss.Color("#002868"))              // Navy blue
 		s.Time = s.Time.Foreground(lipgloss.Color("#BF0A30")).Faint(false) // Red
 		s.Msg = s.Msg.Foreground(lipgloss.Color("#FFFFFF"))
-		s.Box = s.Box.BorderForeground(lipgloss.Color("#BF0A30"))
+		s.Box = s.Box.BorderForeground(lipgloss.Color("#BF0A30")).Background(lipgloss.Color(transcriptFill))
 		s.Mention = s.Mention.Foreground(lipgloss.Color("#FFD700"))     // Gold
 		s.Hyperlink = s.Hyperlink.Foreground(lipgloss.Color("#87CEEB")) // Sky blue
 		s.UserList = s.UserList.BorderForeground(lipgloss.Color("#002868"))
 		s.Me = s.Me.Foreground(lipgloss.Color("#BF0A30"))
 		// Background and UI
-		s.Background = lipgloss.NewStyle().Background(lipgloss.Color("#00203F")) // Deep navy
+		s.Background = lipgloss.NewStyle().Background(lipgloss.Color(altScreenFill))
+		s.screenBG = altScreenFill
 		s.Header = lipgloss.NewStyle().Background(lipgloss.Color("#BF0A30")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 		s.Footer = lipgloss.NewStyle().Background(lipgloss.Color("#00203F")).Foreground(lipgloss.Color("#FFD700"))
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#002868")).Foreground(lipgloss.Color("#FFFFFF"))
@@ -838,13 +842,14 @@ func getThemeStyles(theme string) themeStyles {
 		s.User = s.User.Foreground(lipgloss.Color("#FF8800"))              // Orange
 		s.Time = s.Time.Foreground(lipgloss.Color("#00FF00")).Faint(false) // Green
 		s.Msg = s.Msg.Foreground(lipgloss.Color("#FFFFAA"))
-		s.Box = s.Box.BorderForeground(lipgloss.Color("#FF8800"))
+		s.Box = s.Box.BorderForeground(lipgloss.Color("#FF8800")).Background(lipgloss.Color(transcriptFill))
 		s.Mention = s.Mention.Foreground(lipgloss.Color("#00FFFF"))     // Cyan
 		s.Hyperlink = s.Hyperlink.Foreground(lipgloss.Color("#00FFFF")) // Cyan
 		s.UserList = s.UserList.BorderForeground(lipgloss.Color("#FF8800"))
 		s.Me = s.Me.Foreground(lipgloss.Color("#FF8800"))
 		// Background and UI
-		s.Background = lipgloss.NewStyle().Background(lipgloss.Color("#181818")) // Retro dark
+		s.Background = lipgloss.NewStyle().Background(lipgloss.Color(altScreenFill))
+		s.screenBG = altScreenFill
 		s.Header = lipgloss.NewStyle().Background(lipgloss.Color("#FF8800")).Foreground(lipgloss.Color("#181818")).Bold(true)
 		s.Footer = lipgloss.NewStyle().Background(lipgloss.Color("#181818")).Foreground(lipgloss.Color("#00FF00"))
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#222200")).Foreground(lipgloss.Color("#FFFFAA"))
@@ -853,13 +858,14 @@ func getThemeStyles(theme string) themeStyles {
 		s.User = s.User.Foreground(lipgloss.Color("#4F8EF7"))              // Blue
 		s.Time = s.Time.Foreground(lipgloss.Color("#A0A0A0")).Faint(false) // Gray
 		s.Msg = s.Msg.Foreground(lipgloss.Color("#E0E0E0"))
-		s.Box = s.Box.BorderForeground(lipgloss.Color("#4F8EF7"))
+		s.Box = s.Box.BorderForeground(lipgloss.Color("#4F8EF7")).Background(lipgloss.Color(transcriptFill))
 		s.Mention = s.Mention.Foreground(lipgloss.Color("#FF5F5F"))     // Red
 		s.Hyperlink = s.Hyperlink.Foreground(lipgloss.Color("#4A9EFF")) // Bright blue
 		s.UserList = s.UserList.BorderForeground(lipgloss.Color("#4F8EF7"))
 		s.Me = s.Me.Foreground(lipgloss.Color("#4F8EF7"))
 		// Background and UI
-		s.Background = lipgloss.NewStyle().Background(lipgloss.Color("#181C24")) // Modern dark blue-gray
+		s.Background = lipgloss.NewStyle().Background(lipgloss.Color(altScreenFill))
+		s.screenBG = altScreenFill
 		s.Header = lipgloss.NewStyle().Background(lipgloss.Color("#4F8EF7")).Foreground(lipgloss.Color("#FFFFFF")).Bold(true)
 		s.Footer = lipgloss.NewStyle().Background(lipgloss.Color("#181C24")).Foreground(lipgloss.Color("#4F8EF7"))
 		s.Input = lipgloss.NewStyle().Background(lipgloss.Color("#23272E")).Foreground(lipgloss.Color("#E0E0E0"))
@@ -882,20 +888,22 @@ type fileSendMsg struct {
 
 func (m *model) Init() tea.Cmd {
 	m.msgChan = make(chan tea.Msg, 10) // buffered to avoid blocking
-	return func() tea.Msg {
-		err := m.connectWebSocket(m.cfg.ServerURL)
-		if err != nil {
-			log.Printf("connectWebSocket returned error: %v (type: %T)", err, err)
-			// Preserve wsUsernameError type
-			if usernameErr, ok := err.(wsUsernameError); ok {
-				log.Printf("Detected username error: %s", usernameErr.message)
-				return usernameErr
+	return tea.Batch(
+		tea.RequestWindowSize,
+		func() tea.Msg {
+			err := m.connectWebSocket(m.cfg.ServerURL)
+			if err != nil {
+				log.Printf("connectWebSocket returned error: %v (type: %T)", err, err)
+				if usernameErr, ok := err.(wsUsernameError); ok {
+					log.Printf("Detected username error: %s", usernameErr.message)
+					return usernameErr
+				}
+				log.Printf("Returning generic wsErr")
+				return wsErr{err}
 			}
-			log.Printf("Returning generic wsErr")
-			return wsErr{err}
-		}
-		return wsConnected{}
-	}
+			return wsConnected{}
+		},
+	)
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -1174,7 +1182,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, tea.Tick(delay, func(time.Time) tea.Msg {
 			return m.Init()()
 		})
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
+		m.updateModifierKeys(v.Key())
 		switch {
 		case key.Matches(v, m.keys.Help):
 			// Close any open menus first
@@ -1241,6 +1250,23 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			// ESC no longer quits - use :q command instead
 			return m, nil
+		case m.overlayCapturesKeyboard():
+			switch {
+			case key.Matches(v, m.keys.ScrollUp):
+				m.scrollActiveViewport(-1)
+				return m, nil
+			case key.Matches(v, m.keys.ScrollDown):
+				m.scrollActiveViewport(1)
+				return m, nil
+			case key.Matches(v, m.keys.PageUp):
+				m.pageScrollActiveViewport(-1)
+				return m, nil
+			case key.Matches(v, m.keys.PageDown):
+				m.pageScrollActiveViewport(1)
+				return m, nil
+			default:
+				return m, nil
+			}
 		case key.Matches(v, m.keys.DatabaseMenu):
 			// Only show database menu if admin and no other menus are open
 			if *isAdmin && !m.showHelp {
@@ -1318,6 +1344,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			newTheme := themes[nextIndex]
 			m.cfg.Theme = newTheme
 			m.styles = getThemeStyles(m.cfg.Theme)
+			configureTextareaChrome(&m.textarea, m.styles.Input)
 			_ = config.SaveConfig(m.configFilePath, m.cfg)
 
 			// Update profile with new theme
@@ -1426,53 +1453,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m.promptForUsername("allow")
 			}
 			return m, nil
+		case key.Matches(v, m.keys.ScrollUp), key.Matches(v, m.keys.ScrollDown),
+			key.Matches(v, m.keys.PageUp), key.Matches(v, m.keys.PageDown):
+			_, cmd := m.handleComposerScrollKey(v)
+			return m, cmd
 		case key.Matches(v, m.keys.ForceDisconnectUser):
 			if *isAdmin && m.selectedUser != "" && m.selectedUser != m.cfg.Username {
 				return m.executeAdminAction("forcedisconnect", m.selectedUser)
-			}
-			return m, nil
-		case key.Matches(v, m.keys.ScrollUp):
-			if m.showHelp {
-				m.helpViewport.ScrollUp(1)
-			} else if m.textarea.Focused() {
-				m.viewport.ScrollUp(1)
-			} else {
-				m.userListViewport.ScrollUp(1)
-			}
-			return m, nil
-		case key.Matches(v, m.keys.ScrollDown):
-			if m.showHelp {
-				m.helpViewport.ScrollDown(1)
-			} else if m.textarea.Focused() {
-				m.viewport.ScrollDown(1)
-			} else {
-				m.userListViewport.ScrollDown(1)
-			}
-			if m.viewport.AtBottom() {
-				m.unreadCount = 0
-				if rr := m.scheduleReadReceiptFlush(); rr != nil {
-					return m, rr
-				}
-			}
-			return m, nil
-		case key.Matches(v, m.keys.PageUp):
-			if m.showHelp {
-				m.helpViewport.ScrollUp(m.helpViewport.Height)
-			} else {
-				m.viewport.ScrollUp(m.viewport.Height)
-			}
-			return m, nil
-		case key.Matches(v, m.keys.PageDown):
-			if m.showHelp {
-				m.helpViewport.ScrollDown(m.helpViewport.Height)
-			} else {
-				m.viewport.ScrollDown(m.viewport.Height)
-			}
-			if m.viewport.AtBottom() {
-				m.unreadCount = 0
-				if rr := m.scheduleReadReceiptFlush(); rr != nil {
-					return m, rr
-				}
 			}
 			return m, nil
 		case key.Matches(v, m.keys.Copy): // Custom Copy
@@ -1791,6 +1778,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					} else {
 						m.cfg.Theme = actualThemeName
 						m.styles = getThemeStyles(m.cfg.Theme)
+						configureTextareaChrome(&m.textarea, m.styles.Input)
 						_ = config.SaveConfig(m.configFilePath, m.cfg)
 
 						// Update profile with new theme
@@ -2430,10 +2418,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		case key.Matches(v, key.NewBinding(key.WithKeys("alt+enter", "ctrl+j"))):
-			current := m.textarea.Value()
-			m.textarea.SetValue(current + "\n")
-			m.textarea.CursorEnd()
-			return m, nil
+			var cmd tea.Cmd
+			m.textarea, cmd = m.textarea.Update(tea.KeyPressMsg(tea.Key{Text: "\n"}))
+			return m, cmd
 		case key.Matches(v, key.NewBinding(key.WithKeys("tab"))):
 			text := m.textarea.Value()
 			words := strings.Fields(text)
@@ -2453,8 +2440,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		default:
-			if m.showDBMenu && len(v.Runes) > 0 {
-				switch string(v.Runes) {
+			if m.showDBMenu && len(v.Text) > 0 {
+				switch v.Text {
 				case "1":
 					return m.executeDBAction("cleardb")
 				case "2":
@@ -2462,6 +2449,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				case "3":
 					return m.executeDBAction("stats")
 				}
+			}
+			if m.overlayCapturesKeyboard() || m.subModelCapturesInput() {
+				return m, nil
 			}
 
 			var cmd tea.Cmd
@@ -2485,16 +2475,16 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = v.Width
 		m.height = v.Height
-		m.help.Width = v.Width
+		m.help.SetWidth(v.Width)
 		chatWidth := m.width - userListWidth - 4
 		if chatWidth < 20 {
 			chatWidth = 20
 		}
-		m.viewport.Width = chatWidth
-		m.viewport.Height = m.height - m.textarea.Height() - 6
-		m.textarea.SetWidth(chatWidth)
-		m.userListViewport.Width = userListWidth
-		m.userListViewport.Height = m.height - m.textarea.Height() - 6
+		m.viewport.SetWidth(chatWidth)
+		m.viewport.SetHeight(m.height - m.textarea.Height() - 6)
+		m.textarea.SetWidth(composeInputWidth(chatWidth))
+		m.userListViewport.SetWidth(userListWidth)
+		m.userListViewport.SetHeight(m.height - m.textarea.Height() - 6)
 
 		// Update help viewport dimensions to be responsive
 		helpWidth := m.width - 8   // Leave reasonable margins
@@ -2514,44 +2504,83 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		// Don't limit height - let it use the full available space
 
-		m.helpViewport.Width = helpWidth
-		m.helpViewport.Height = helpHeight
+		m.helpViewport.SetWidth(helpWidth)
+		m.helpViewport.SetHeight(helpViewportContentHeight(helpHeight))
+
+		dbW, dbH := dbMenuViewportDimensions(m.width, m.height)
+		m.dbMenuViewport.SetWidth(dbW)
+		m.dbMenuViewport.SetHeight(dbH)
 
 		m.refreshTranscript()
 		m.viewport.GotoBottom()
 		return m, nil
 	case quitMsg:
 		return m, tea.Quit
-	case tea.MouseMsg:
-		// Handle mouse events for hyperlinks
-		switch v.Action {
-		case tea.MouseActionPress:
-			if v.Button == tea.MouseButtonLeft {
-				clickedURL := m.findURLAtClickPosition(v.X, v.Y)
-				if clickedURL != "" {
-					if err := openURL(clickedURL); err != nil {
-						m.banner = "[ERROR] Failed to open URL: " + err.Error()
-					} else {
-						m.banner = "[OK] Opening URL: " + clickedURL
-					}
+	case tea.MouseWheelMsg:
+		if m.showFilePicker {
+			var cmd tea.Cmd
+			updatedModel, cmd := m.filePickerModel.Update(v)
+			if fpModel, ok := updatedModel.(filePickerModel); ok {
+				m.filePickerModel = fpModel
+			}
+			return m, cmd
+		}
+		if m.showCodeSnippet {
+			var cmd tea.Cmd
+			updatedModel, cmd := m.codeSnippetModel.Update(v)
+			if csModel, ok := updatedModel.(codeSnippetModel); ok {
+				m.codeSnippetModel = csModel
+			}
+			return m, cmd
+		}
+		if m.updateActiveScrollViewport(v) {
+			if cmd := m.maybeFlushReadReceipt(); cmd != nil {
+				return m, cmd
+			}
+			return m, nil
+		}
+		return m, nil
+	case tea.MouseClickMsg:
+		if m.overlayCapturesKeyboard() || m.subModelCapturesInput() {
+			return m, nil
+		}
+		if v.Mod&tea.ModShift != 0 {
+			return m, nil
+		}
+		if v.Button == tea.MouseLeft {
+			mouse := v.Mouse()
+			clickedURL := m.findURLAtClickPosition(mouse.X, mouse.Y)
+			if clickedURL != "" {
+				if err := openURL(clickedURL); err != nil {
+					m.banner = "[ERROR] Failed to open URL: " + err.Error()
+				} else {
+					m.banner = "[OK] Opening URL: " + clickedURL
 				}
 			}
 		}
 		return m, nil
+	case tea.KeyReleaseMsg:
+		if v.Key().Code == tea.KeyLeftShift || v.Key().Code == tea.KeyRightShift {
+			m.shiftHeld = false
+		}
+		return m, nil
 	default:
+		if m.overlayCapturesKeyboard() || m.subModelCapturesInput() {
+			return m, nil
+		}
 		var cmd tea.Cmd
 		m.textarea, cmd = m.textarea.Update(v)
 		return m, cmd
 	}
 }
 
-func (m *model) View() string {
+func (m *model) View() tea.View {
 	// Header with version
 	headerText := fmt.Sprintf(" marchat %s ", shared.ClientVersion)
-	header := m.styles.Header.Width(m.viewport.Width + userListWidth + 4).Render(headerText)
+	header := m.styles.Header.Width(m.viewport.Width() + userListWidth + 4).Render(headerText)
 
 	footerText := buildStatusFooter(m.connected, m.showHelp, m.unreadCount, m.useE2E, m.currentChannel, m.activeDMThread)
-	footer := m.styles.Footer.Width(m.viewport.Width + userListWidth + 4).Render(footerText)
+	footer := m.styles.Footer.Width(m.viewport.Width() + userListWidth + 4).Render(footerText)
 
 	// Banner
 	var bannerBox string
@@ -2565,7 +2594,7 @@ func (m *model) View() string {
 			}
 		}
 		kind := stripKindForBanner(bannerText)
-		fullW := chromeFullWidth(m.viewport.Width)
+		fullW := chromeFullWidth(m.viewport.Width())
 		bannerShown := layoutBannerForStrip(bannerText, fullW)
 		bannerBox = m.styles.BannerStrip(kind).
 			Width(fullW).
@@ -2575,8 +2604,8 @@ func (m *model) View() string {
 
 	// Chat and user list layout
 	chatBoxStyle := m.styles.Box
-	chatPanel := chatBoxStyle.Width(m.viewport.Width).Render(m.viewport.View())
-	userPanel := m.userListViewport.View()
+	chatPanel := chatBoxStyle.Width(m.viewport.Width()).Render(m.viewport.View())
+	userPanel := lipgloss.NewStyle().MarginRight(1).Render(m.userListViewport.View())
 	row := lipgloss.JoinHorizontal(lipgloss.Top, userPanel, chatPanel)
 
 	// Typing indicator
@@ -2616,7 +2645,7 @@ func (m *model) View() string {
 			typingLine = strings.Join(activeTypers, ", ") + " are typing..."
 		}
 	}
-	typingIndicator := lipgloss.NewStyle().Faint(true).Italic(true).Width(m.viewport.Width).Render(typingLine)
+	typingIndicator := chromeTypingLine(chromeFullWidth(m.viewport.Width()), typingLine)
 
 	// DM mode indicator
 	var dmIndicator string
@@ -2629,7 +2658,8 @@ func (m *model) View() string {
 	if dmIndicator != "" {
 		inputContent = dmIndicator + inputContent
 	}
-	inputPanel := m.styles.Input.Width(m.viewport.Width).Render(inputContent)
+	fullW := chromeFullWidth(m.viewport.Width())
+	inputPanel := chromeComposerPanel(m.styles, fullW, m.textarea.Height(), inputContent, m.textarea.Value() == "")
 
 	// Compose layout
 	ui := lipgloss.JoinVertical(lipgloss.Left,
@@ -2663,11 +2693,11 @@ func (m *model) View() string {
 		codeContent := m.styles.HelpOverlay.
 			Width(codeWidth).
 			Height(codeHeight).
-			Render(m.codeSnippetModel.View())
+			Render(m.codeSnippetModel.viewContent())
 
 		// Center the code snippet modal on the screen
 		ui = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, codeContent)
-		return m.styles.Background.Render(ui)
+		return newMainTeaView(m.styles, ui, m.shiftHeld)
 	}
 
 	// Show file picker interface as full-screen if shown
@@ -2692,11 +2722,11 @@ func (m *model) View() string {
 		fileContent := m.styles.HelpOverlay.
 			Width(fileWidth).
 			Height(fileHeight).
-			Render(m.filePickerModel.View())
+			Render(m.filePickerModel.viewContent())
 
 		// Center the file picker modal on the screen
 		ui = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, fileContent)
-		return m.styles.Background.Render(ui)
+		return newMainTeaView(m.styles, ui, m.shiftHeld)
 	}
 
 	// Show help as full-screen modal if shown
@@ -2720,8 +2750,8 @@ func (m *model) View() string {
 		// Don't limit height - let it use the full available space
 
 		// Create help footer with navigation instructions
-		helpFooter := "Use ↑/↓ or PgUp/PgDn to scroll • Press Ctrl+H to close help"
-		footerStyle := lipgloss.NewStyle().
+		helpFooter := "Use ↑/↓, PgUp/PgDn, or mouse wheel to scroll • Press Ctrl+H to close help"
+		footerStyle := m.styles.HelpOverlay.
 			Width(helpWidth).
 			Align(lipgloss.Center).
 			Foreground(lipgloss.Color("#888888")).
@@ -2731,10 +2761,7 @@ func (m *model) View() string {
 			PaddingTop(1)
 
 		// Adjust content height to leave room for footer
-		contentHeight := helpHeight - 3 // Reserve 3 lines for footer (border + padding + text)
-		if contentHeight < 10 {
-			contentHeight = 10
-		}
+		contentHeight := helpViewportContentHeight(helpHeight)
 
 		// Create help content viewport
 		helpContent := m.styles.HelpOverlay.
@@ -2755,16 +2782,7 @@ func (m *model) View() string {
 
 	// Show admin menus if open
 	if m.showDBMenu {
-		menuWidth := 60
-		menuHeight := 15
-
-		// Ensure minimum size
-		if m.width < menuWidth+4 {
-			menuWidth = m.width - 4
-		}
-		if m.height < menuHeight+4 {
-			menuHeight = m.height - 4
-		}
+		menuWidth, menuHeight := dbMenuViewportDimensions(m.width, m.height)
 
 		dbMenu := m.styles.HelpOverlay.
 			Width(menuWidth).
@@ -2774,7 +2792,7 @@ func (m *model) View() string {
 		ui = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, dbMenu)
 	}
 
-	return m.styles.Background.Render(ui)
+	return newMainTeaView(m.styles, ui, m.shiftHeld)
 }
 
 func main() {
@@ -3153,16 +3171,17 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	ta.SetHeight(3)
 	ta.ShowLineNumbers = false
 	ta.KeyMap.InsertNewline.SetEnabled(false)
+	configureTextareaChrome(&ta, getThemeStyles(cfg.Theme).Input)
 
-	vp := viewport.New(80, 20)
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 
-	userListVp := viewport.New(18, 10) // height will be set on resize
+	userListVp := viewport.New(viewport.WithWidth(18), viewport.WithHeight(10)) // height will be set on resize
 	userListVp.SetContent(renderUserList([]string{cfg.Username}, cfg.Username, getThemeStyles(cfg.Theme), 18, cfg.IsAdmin, -1, nil))
 
-	helpVp := viewport.New(70, 20) // initial size, will be adjusted on resize
+	helpVp := viewport.New(viewport.WithWidth(70), viewport.WithHeight(20)) // initial size, will be adjusted on resize
 
 	// Initialize admin menu viewports
-	dbMenuVp := viewport.New(60, 15)
+	dbMenuVp := viewport.New(viewport.WithWidth(60), viewport.WithHeight(15))
 
 	// Additional keystore initialization if E2E is enabled
 	if cfg.UseE2E && keystore != nil {
@@ -3247,7 +3266,7 @@ func initializeClient(cfg *config.Config, adminKeyParam, keystorePassphraseParam
 	notifConfig := configToNotificationConfig(*cfg)
 	m.notificationManager = NewNotificationManager(notifConfig)
 
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)

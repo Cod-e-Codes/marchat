@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // File picker states
@@ -173,7 +173,14 @@ func (m filePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.err = nil
 		return m, nil
 
-	case tea.KeyMsg:
+	case tea.MouseWheelMsg:
+		if m.state == stateSelectFile {
+			applyMouseWheelToList(&m.list, msg)
+			return m, nil
+		}
+		return m, nil
+
+	case tea.KeyPressMsg:
 		switch m.state {
 		case stateSelectFile:
 			switch {
@@ -251,7 +258,11 @@ func (m filePickerModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m filePickerModel) View() string {
+func (m filePickerModel) View() tea.View {
+	return tea.NewView(m.viewContent())
+}
+
+func (m filePickerModel) viewContent() string {
 	switch m.state {
 	case stateSelectFile:
 		var s strings.Builder

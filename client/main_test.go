@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
+	"charm.land/bubbles/v2/viewport"
 	"github.com/Cod-e-Codes/marchat/client/config"
 	"github.com/Cod-e-Codes/marchat/shared"
-	"github.com/charmbracelet/bubbles/viewport"
 	"github.com/charmbracelet/x/ansi"
 )
 
@@ -165,7 +165,7 @@ func TestRebuildDMUnreadCounts(t *testing.T) {
 }
 
 func TestWsConnectedClearsTranscript(t *testing.T) {
-	vp := viewport.New(80, 20)
+	vp := viewport.New(viewport.WithWidth(80), viewport.WithHeight(20))
 	vp.SetContent("stale viewport body")
 	m := &model{
 		cfg:       config.Config{Username: "alice", Theme: "retro"},
@@ -1558,7 +1558,7 @@ func TestDebugWebSocketWriteDetailed(t *testing.T) {
 }
 
 func TestFindURLAtClickPositionMissReturnsEmpty(t *testing.T) {
-	m := &model{viewport: viewport.New(80, 3)}
+	m := &model{viewport: viewport.New(viewport.WithWidth(80), viewport.WithHeight(3))}
 	m.viewport.SetContent("see https://a.com and https://b.com")
 	x0, y0 := m.chatPanelOrigin()
 	if got := m.findURLAtClickPosition(x0+2, y0); got != "" {

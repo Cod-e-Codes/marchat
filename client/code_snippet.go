@@ -5,10 +5,10 @@ import (
 	"log"
 	"strings"
 
+	"charm.land/bubbles/v2/list"
+	tea "charm.land/bubbletea/v2"
 	"github.com/alecthomas/chroma/quick"
 	"github.com/atotto/clipboard"
-	"github.com/charmbracelet/bubbles/list"
-	tea "github.com/charmbracelet/bubbletea"
 )
 
 type codeSnippetState int
@@ -248,9 +248,12 @@ func (m codeSnippetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch m.state {
 	case stateSelectLang:
 		var cmd tea.Cmd
-		m.langList, cmd = m.langList.Update(msg)
 		switch msg := msg.(type) {
-		case tea.KeyMsg:
+		case tea.MouseWheelMsg:
+			applyMouseWheelToList(&m.langList, msg)
+			return m, nil
+		case tea.KeyPressMsg:
+			m.langList, cmd = m.langList.Update(msg)
 			switch msg.String() {
 			case "enter":
 				if item, ok := m.langList.SelectedItem().(langItem); ok {
@@ -268,7 +271,7 @@ func (m codeSnippetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case stateInputCode:
 		switch msg := msg.(type) {
-		case tea.KeyMsg:
+		case tea.KeyPressMsg:
 			switch msg.String() {
 			case "ctrl+s":
 				// Ctrl+S to finish input and show preview
@@ -469,7 +472,7 @@ func (m codeSnippetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case stateConfirmSend:
 		switch msg := msg.(type) {
-		case tea.KeyMsg:
+		case tea.KeyPressMsg:
 			switch msg.String() {
 			case "enter":
 				// Send the highlighted code as a message
@@ -501,7 +504,11 @@ func (m codeSnippetModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m codeSnippetModel) View() string {
+func (m codeSnippetModel) View() tea.View {
+	return tea.NewView(m.viewContent())
+}
+
+func (m codeSnippetModel) viewContent() string {
 	switch m.state {
 	case stateSelectLang:
 		return m.langList.View() + "\n" + m.styles.Time.Render("Press Enter to select language, Esc to cancel.")

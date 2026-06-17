@@ -14,11 +14,11 @@ import (
 	"github.com/Cod-e-Codes/marchat/config"
 	"github.com/Cod-e-Codes/marchat/plugin/manager"
 
-	"github.com/charmbracelet/bubbles/help"
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/table"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/help"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/table"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // Tab types for the admin panel
@@ -768,7 +768,7 @@ func (ap *AdminPanel) updateUserTable() {
 func RunAdminPanel(hub *Hub, db *sql.DB, pluginManager *manager.PluginManager, liveConfig *config.Config) error {
 	panel := NewAdminPanel(hub, db, pluginManager, liveConfig)
 
-	p := tea.NewProgram(panel, tea.WithAltScreen())
+	p := tea.NewProgram(panel)
 	_, err := p.Run()
 	return err
 }
@@ -776,7 +776,6 @@ func RunAdminPanel(hub *Hub, db *sql.DB, pluginManager *manager.PluginManager, l
 // Implement tea.Model interface
 func (ap *AdminPanel) Init() tea.Cmd {
 	return tea.Batch(
-		tea.EnterAltScreen,
 		tea.Tick(time.Second, func(t time.Time) tea.Msg {
 			return tickMsg(t)
 		}),
@@ -792,7 +791,16 @@ func (ap *AdminPanel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		ap.applyLayout(msg.Width, msg.Height)
 
-	case tea.KeyMsg:
+	case tea.MouseWheelMsg:
+		switch msg.Button {
+		case tea.MouseWheelDown:
+			ap.handleScroll(3)
+		case tea.MouseWheelUp:
+			ap.handleScroll(-3)
+		}
+		return ap, nil
+
+	case tea.KeyPressMsg:
 		switch {
 		case key.Matches(msg, ap.keys.Quit):
 			ap.quitting = true
@@ -986,6 +994,12 @@ func (ap *AdminPanel) handleScroll(direction int) {
 		if ap.systemScroll < 0 {
 			ap.systemScroll = 0
 		}
+	case tabUsers:
+		if direction > 0 {
+			ap.userTable.MoveDown(1)
+		} else {
+			ap.userTable.MoveUp(1)
+		}
 	case tabPlugins:
 		// Use table navigation for plugins
 		if direction > 0 {
@@ -1095,7 +1109,7 @@ func (ap *AdminPanel) applyLayout(width, height int) {
 	ap.height = height
 
 	contentWidth := ap.contentWidth()
-	ap.help.Width = contentWidth
+	ap.help.SetWidth(contentWidth)
 	ap.userTable.SetWidth(contentWidth)
 	ap.pluginTable.SetWidth(contentWidth)
 
@@ -1110,9 +1124,9 @@ func (ap *AdminPanel) applyLayout(width, height int) {
 	ap.pluginTable.SetHeight(usableHeight)
 }
 
-func (ap *AdminPanel) View() string {
+func (ap *AdminPanel) View() tea.View {
 	if ap.quitting {
-		return "Admin panel closed. Server continues running.\n"
+		return tea.NewView("Admin panel closed. Server continues running.\n")
 	}
 
 	availableWidth := ap.contentWidth()
@@ -1140,7 +1154,10 @@ func (ap *AdminPanel) View() string {
 		doc.WriteString(messageStyle.Width(availableWidth).Render(ap.message))
 	}
 
-	return mainBorder.Width(availableWidth + 8).Render(doc.String())
+	v := tea.NewView(mainBorder.Width(availableWidth + 8).Render(doc.String()))
+	v.AltScreen = true
+	v.MouseMode = tea.MouseModeCellMotion
+	return v
 }
 
 func (ap *AdminPanel) renderTabs() string {

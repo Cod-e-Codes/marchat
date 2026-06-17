@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 // Mock themeStyles for testing
@@ -102,7 +102,7 @@ func TestCodeSnippetLanguageSelection(t *testing.T) {
 	}
 
 	// Test Enter key to select language
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ := model.Update(enterMsg)
 
 	csModel, ok := updatedModel.(codeSnippetModel)
@@ -123,7 +123,7 @@ func TestCodeSnippetLanguageSelection(t *testing.T) {
 	var cancelled bool
 	model.onCancel = func() { cancelled = true }
 
-	escMsg := tea.KeyMsg{Type: tea.KeyEsc}
+	escMsg := tea.KeyPressMsg{Code: tea.KeyEsc}
 	model.Update(escMsg)
 
 	if !cancelled {
@@ -141,7 +141,7 @@ func TestCodeSnippetTextInput(t *testing.T) {
 	model.selected = "go"
 
 	// Test character input
-	charMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}}
+	charMsg := tea.KeyPressMsg{Code: 'h', Text: "h"}
 	updatedModel, _ := model.Update(charMsg)
 	csModel := updatedModel.(codeSnippetModel)
 
@@ -154,7 +154,7 @@ func TestCodeSnippetTextInput(t *testing.T) {
 	}
 
 	// Test Enter key (new line)
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ = csModel.Update(enterMsg)
 	csModel = updatedModel.(codeSnippetModel)
 
@@ -167,7 +167,7 @@ func TestCodeSnippetTextInput(t *testing.T) {
 	}
 
 	// Test backspace
-	backspaceMsg := tea.KeyMsg{Type: tea.KeyBackspace}
+	backspaceMsg := tea.KeyPressMsg{Code: tea.KeyBackspace}
 	updatedModel, _ = csModel.Update(backspaceMsg)
 	csModel = updatedModel.(codeSnippetModel)
 
@@ -188,7 +188,7 @@ func TestCodeSnippetTextSelection(t *testing.T) {
 	model.cursorY = 0
 
 	// Test shift+right selection
-	shiftRightMsg := tea.KeyMsg{Type: tea.KeyShiftRight}
+	shiftRightMsg := tea.KeyPressMsg{Code: tea.KeyRight, Mod: tea.ModShift}
 	updatedModel, _ := model.Update(shiftRightMsg)
 	model = updatedModel.(codeSnippetModel)
 
@@ -293,7 +293,7 @@ func TestCodeSnippetCursorMovement(t *testing.T) {
 	model.cursorY = 0
 
 	// Test right movement
-	rightMsg := tea.KeyMsg{Type: tea.KeyRight}
+	rightMsg := tea.KeyPressMsg{Code: tea.KeyRight}
 	updatedModel, _ := model.Update(rightMsg)
 	model = updatedModel.(codeSnippetModel)
 
@@ -302,7 +302,7 @@ func TestCodeSnippetCursorMovement(t *testing.T) {
 	}
 
 	// Test down movement
-	downMsg := tea.KeyMsg{Type: tea.KeyDown}
+	downMsg := tea.KeyPressMsg{Code: tea.KeyDown}
 	updatedModel, _ = model.Update(downMsg)
 	model = updatedModel.(codeSnippetModel)
 
@@ -311,7 +311,7 @@ func TestCodeSnippetCursorMovement(t *testing.T) {
 	}
 
 	// Test left movement
-	leftMsg := tea.KeyMsg{Type: tea.KeyLeft}
+	leftMsg := tea.KeyPressMsg{Code: tea.KeyLeft}
 	updatedModel, _ = model.Update(leftMsg)
 	model = updatedModel.(codeSnippetModel)
 
@@ -320,7 +320,7 @@ func TestCodeSnippetCursorMovement(t *testing.T) {
 	}
 
 	// Test up movement
-	upMsg := tea.KeyMsg{Type: tea.KeyUp}
+	upMsg := tea.KeyPressMsg{Code: tea.KeyUp}
 	updatedModel, _ = model.Update(upMsg)
 	model = updatedModel.(codeSnippetModel)
 
@@ -343,7 +343,7 @@ func TestCodeSnippetPreviewAndSend(t *testing.T) {
 	model.lines = []string{"package main", "func main() {}"}
 
 	// Test Ctrl+S to preview
-	ctrlSMsg := tea.KeyMsg{Type: tea.KeyCtrlS}
+	ctrlSMsg := tea.KeyPressMsg{Code: 's', Mod: tea.ModCtrl}
 	updatedModel, _ := model.Update(ctrlSMsg)
 	model = updatedModel.(codeSnippetModel)
 
@@ -356,7 +356,7 @@ func TestCodeSnippetPreviewAndSend(t *testing.T) {
 	}
 
 	// Test Enter to send
-	enterMsg := tea.KeyMsg{Type: tea.KeyEnter}
+	enterMsg := tea.KeyPressMsg{Code: tea.KeyEnter}
 	updatedModel, _ = model.Update(enterMsg)
 	model = updatedModel.(codeSnippetModel)
 
@@ -399,7 +399,7 @@ func TestCodeSnippetView(t *testing.T) {
 	model := newCodeSnippetModel(styles, 80, 24, func(string) {}, func() {})
 
 	// Test language selection view
-	view := model.View()
+	view := model.View().Content
 	if !strings.Contains(view, "Select Programming Language") {
 		t.Error("Expected view to contain language selection title")
 	}
@@ -408,7 +408,7 @@ func TestCodeSnippetView(t *testing.T) {
 	model.state = stateInputCode
 	model.selected = "go"
 	model.lines = []string{"package main"}
-	view = model.View()
+	view = model.View().Content
 
 	if !strings.Contains(view, "Language: go") {
 		t.Error("Expected view to show selected language")
@@ -419,7 +419,7 @@ func TestCodeSnippetView(t *testing.T) {
 	model.code = "package main"
 	model.selected = "go"
 	model.highlight = "highlighted code"
-	view = model.View()
+	view = model.View().Content
 
 	if !strings.Contains(view, "highlighted code") && !strings.Contains(view, "package main") && !strings.Contains(view, "Press Enter") {
 		t.Error("Expected view to show highlighted code or fallback content")
@@ -512,7 +512,7 @@ func TestCodeSnippetPreviewError(t *testing.T) {
 	model.highlight = "Error: invalid language"
 	model.state = stateConfirmSend
 
-	view := model.View()
+	view := model.View().Content
 	if !strings.Contains(view, "Error: invalid language") && !strings.Contains(view, "test code") {
 		t.Error("Expected error to be shown in view or fallback content")
 	}

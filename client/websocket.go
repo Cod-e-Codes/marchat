@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
+	tea "charm.land/bubbletea/v2"
 	"github.com/Cod-e-Codes/marchat/client/crypto"
 	"github.com/Cod-e-Codes/marchat/client/exthook"
 	"github.com/Cod-e-Codes/marchat/shared"
-	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gorilla/websocket"
 )
 
@@ -462,7 +462,7 @@ func (m *model) chatPanelOrigin() (x0, y0 int) {
 		if m.sending && strings.TrimSpace(bannerText) == "" {
 			bannerText = "[Sending...]"
 		}
-		fullW := chromeFullWidth(m.viewport.Width)
+		fullW := chromeFullWidth(m.viewport.Width())
 		shown := layoutBannerForStrip(bannerText, fullW)
 		y0 += strings.Count(shown, "\n") + 1
 	}
@@ -479,7 +479,7 @@ func (m *model) findURLAtClickPosition(clickX, clickY int) string {
 	x0, y0 := m.chatPanelOrigin()
 	relX := clickX - x0
 	relY := clickY - y0
-	if relX < 0 || relY < 0 || relX >= m.viewport.Width || relY >= m.viewport.Height {
+	if relX < 0 || relY < 0 || relX >= m.viewport.Width() || relY >= m.viewport.Height() {
 		return ""
 	}
 
@@ -489,7 +489,7 @@ func (m *model) findURLAtClickPosition(clickX, clickY int) string {
 	}
 	trimViewportViewLines(lines)
 
-	lineIdx := m.viewport.YOffset + relY
+	lineIdx := m.viewport.YOffset() + relY
 	if u := urlFromTranscriptIndex(m.transcriptLineURLs, lineIdx, relX, lines[relY]); u != "" {
 		return u
 	}
