@@ -69,7 +69,7 @@ func lineStyleFromInput(input lipgloss.Style) lipgloss.Style {
 func configureTextareaChrome(ta *textarea.Model, input lipgloss.Style) {
 	s := textarea.DefaultDarkStyles()
 	line := lineStyleFromInput(input)
-	faint := line.Copy().Faint(true)
+	faint := line.Faint(true)
 	for _, state := range []*textarea.StyleState{&s.Focused, &s.Blurred} {
 		state.Base = lipgloss.NewStyle()
 		state.Text = line

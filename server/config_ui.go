@@ -16,7 +16,6 @@ import (
 var (
 	serverFocusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B9D"))
 	serverBlurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
-	serverCursorStyle  = serverFocusedStyle
 	serverNoStyle      = lipgloss.NewStyle()
 	serverHelpStyle    = serverBlurredStyle
 	serverTitleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFEAA7")).Bold(true)

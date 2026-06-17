@@ -13,7 +13,6 @@ import (
 var (
 	focusedStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#FF6B9D"))
 	blurredStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#666666"))
-	cursorStyle  = focusedStyle
 	noStyle      = lipgloss.NewStyle()
 	helpStyle    = blurredStyle
 	titleStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("#FFEAA7")).Bold(true)
@@ -726,7 +725,8 @@ func (m ProfileSelectionModel) View() tea.View {
 		if m.cursor == len(m.profiles) {
 			b.WriteString(focusedStyle.Render("> " + newProfileLine))
 		} else {
-			b.WriteString("  " + newProfileLine)
+			b.WriteString("  ")
+			b.WriteString(newProfileLine)
 		}
 		b.WriteString("\n")
 	}
