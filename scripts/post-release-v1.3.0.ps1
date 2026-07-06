@@ -11,6 +11,47 @@ $Ver = '1.3.0'
 $Date = '2026-07-06'
 $RepoRoot = Split-Path -Parent $PSScriptRoot
 $ChocoDir = Join-Path $RepoRoot 'packaging\chocolatey'
+
+function ConvertTo-BashPath {
+    param(
+        [string]$WindowsPath,
+        [ValidateSet('GitBash', 'Wsl')]
+        [string]$Flavor = 'GitBash'
+    )
+    $full = [System.IO.Path]::GetFullPath($WindowsPath)
+    if ($full -notmatch '^([A-Za-z]):\\(.*)$') {
+        return ($full -replace '\\', '/')
+    }
+    $drive = $Matches[1].ToLower()
+    $rest = $Matches[2] -replace '\\', '/'
+    if ($Flavor -eq 'Wsl') {
+        return "/mnt/$drive/$rest"
+    }
+    return "/$drive/$rest"
+}
+
+function Resolve-RenderBash {
+    $gitBash = @(
+        "${env:ProgramFiles}\Git\bin\bash.exe",
+        "${env:ProgramFiles(x86)}\Git\bin\bash.exe"
+    ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
+
+    if ($gitBash) {
+        return @{ Exe = $gitBash; Flavor = 'GitBash' }
+    }
+
+    $bash = Get-Command bash -ErrorAction SilentlyContinue
+    if (-not $bash) {
+        return $null
+    }
+
+    $flavor = 'GitBash'
+    if ($bash.Source -match 'system32\\bash\.exe$') {
+        $flavor = 'Wsl'
+    }
+    return @{ Exe = $bash.Source; Flavor = $flavor }
+}
+
 $ZipUrl = "https://github.com/Cod-e-Codes/marchat/releases/download/$Tag/marchat-$Tag-windows-amd64.zip"
 $ZipPath = Join-Path $env:TEMP "marchat-$Tag-windows-amd64.zip"
 
@@ -43,13 +84,13 @@ if ($LASTEXITCODE -ne 0) { throw 'choco pack failed' }
 Pop-Location
 Write-Host "Built $(Join-Path $ChocoDir "marchat.$Ver.nupkg")" -ForegroundColor Green
 
-# Render other manifests (requires Git Bash or WSL)
-$bash = Get-Command bash -ErrorAction SilentlyContinue
-if ($bash) {
-    Write-Host "Running render-release-manifests.sh..." -ForegroundColor Cyan
-    $env:RELEASE_TAG = $Tag
-    $env:RELEASE_DATE_UTC = $Date
-    & bash (Join-Path $RepoRoot 'packaging\ci\render-release-manifests.sh')
+# Render other manifests (Git Bash preferred; WSL bash uses /mnt/c paths)
+$bashInfo = Resolve-RenderBash
+if ($bashInfo) {
+    Write-Host "Running render-release-manifests.sh via $($bashInfo.Exe)..." -ForegroundColor Cyan
+    $bashRepo = ConvertTo-BashPath $RepoRoot -Flavor $bashInfo.Flavor
+    $bashCmd = "cd '$bashRepo' && RELEASE_TAG='$Tag' RELEASE_DATE_UTC='$Date' bash ./packaging/ci/render-release-manifests.sh"
+    & $bashInfo.Exe -lc $bashCmd
     if ($LASTEXITCODE -ne 0) { throw 'render-release-manifests.sh failed' }
 
     Copy-Item (Join-Path $RepoRoot 'packaging-out\marchat.rb') (Join-Path $RepoRoot 'packaging\homebrew\marchat.rb') -Force
