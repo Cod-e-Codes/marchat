@@ -11,7 +11,7 @@ On **`main`** only; not part of the latest tagged release until you tag and publ
 - **Plugins**: **Fix:** serialized plugin stdin writes so chat fan-out and command RPC cannot corrupt IPC lines.
 - **Docs**: **README**, **TESTING**, **ARCHITECTURE**, and **PROTOCOL** for channel stamping, reconnect, wrapped URL limitation ([#103](https://github.com/Cod-e-Codes/marchat/issues/103)), SQLite-only `:backup`, and plugin IPC; agent skills under `.cursor/skills/`.
 - **Tooling**: Project Agent skills and `.cursor/rules/marchat.mdc`; `.gitignore` tracks shared rules and skills.
-- **Dependencies**: **charm.land/bubbletea/v2** v2.0.8, **charm.land/bubbles/v2** v2.1.0, **charm.land/lipgloss/v2** v2.0.5 (replaces Charm v1). **github.com/jackc/pgx/v5** v5.10.0, **golang.org/x/crypto** v0.53.0, **golang.org/x/term** v0.44.0, **modernc.org/sqlite** v1.53.0.
+- **Dependencies**: **charm.land/bubbletea/v2** v2.0.8, **charm.land/bubbles/v2** v2.1.0, **charm.land/lipgloss/v2** v2.0.5 (replaces Charm v1); **github.com/charmbracelet/colorprofile** v0.4.3, **github.com/charmbracelet/x/ansi** v0.11.7, **github.com/lucasb-eyer/go-colorful** v1.4.0, **github.com/mattn/go-runewidth** v0.0.24. **github.com/jackc/pgx/v5** v5.10.0, **golang.org/x/crypto** v0.53.0, **golang.org/x/term** v0.44.0, **modernc.org/sqlite** v1.53.0.
 
 ## v1.2.0
 
