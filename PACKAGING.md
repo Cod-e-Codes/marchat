@@ -58,7 +58,7 @@ Published tap: [homebrew-marchat](https://github.com/Cod-e-Codes/homebrew-marcha
 
 Upstream is [microsoft/winget-pkgs](https://github.com/microsoft/winget-pkgs). Maintainers use a fork, add `manifests/c/Cod-e-Codes/Marchat/<PackageVersion>/`, run `winget validate` on that folder, and open a PR. Package identifier: `Cod-e-Codes.Marchat`. The installer is a zip with `NestedInstallerType: portable` and two `PortableCommandAlias` entries for client and server. Microsoft may prompt first-time contributors to accept the CLA on the PR; follow the bot instructions there.
 
-Example template path in this repo: `packaging/winget/manifests/c/Cod-e-Codes/Marchat/1.2.0/` (duplicate the folder layout for new versions). Older **`1.0.0/`** and **`1.1.0/`** manifests may remain for reference; the current release templates target **v1.2.0** until the next bump.
+Example template path in this repo: `packaging/winget/manifests/c/Cod-e-Codes/Marchat/1.3.0/` (duplicate the folder layout for new versions). Older **`1.0.0/`**, **`1.1.0/`**, and **`1.2.0/`** manifests may remain for reference; the current release templates target **v1.3.0** until the next bump.
 
 **Checksums vs GitHub release timing:** Portable zip manifests embed SHA256. After you publish a release and the five platform zips exist on GitHub, run [`packaging/ci/render-release-manifests.sh`](packaging/ci/render-release-manifests.sh) with `RELEASE_TAG` set and copy `packaging-out/` into `packaging/` (and into your tap, bucket, winget fork, or AUR clone as needed) so local `winget validate`, `brew audit`, and `choco pack` match real bytes. The committed templates may carry placeholder hashes until that sync step.
 

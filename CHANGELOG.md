@@ -6,12 +6,17 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+## v1.3.0
+
+**Released 2026-07-06.** Since **[v1.2.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.2.0)**; compare [`v1.2.0...v1.3.0`](https://github.com/Cod-e-Codes/marchat/compare/v1.2.0...v1.3.0). Commits: **`git log v1.2.0..v1.3.0 --oneline`**.
+
 - **Client**: ANSI-aware word-wrap for chat bodies; reaction aliases `thumbsup` / `thumbsdown` and `:unreact`, `:thumbsup`, `:thumbsdown`; when E2E is on and server search returns no matches, a `System` line notes ciphertext-only matching. **Charm v2:** Bubble Tea, Bubbles, and Lip Gloss on `charm.land/*/v2` (`tea.View`, `KeyPressMsg`, bubbles setters). Long URLs wrap at path boundaries; wrapped segments keep hyperlink style and OSC 8 `Style.Hyperlink` hrefs (ASCII hyphens); mouse click-to-open fallback ([#103](https://github.com/Cod-e-Codes/marchat/issues/103)). **Fix:** composer chrome, multiline keys, placeholder cursor, and scroll-to-tail follow; mouse wheel routes to the active viewport; help/DB overlays suppress typing, URL clicks, and read-receipt flush until closed; ephemeral `System` feedback uses the banner; reconnect backoff advances on failure; transcript notices, reactions, and read receipts stay channel-scoped; E2E paths do not log plaintext.
 - **Server**: Replay up to 50 visible messages on every handshake (including reconnect). **Fix:** Postgres boolean SQL for search, pin toggle, and pinned listing; MySQL `parseTime=true` when unset; outbound messages stamped to the sender's channel; typing, reactions, and read receipts channel-scoped; `:backup` SQLite-only; admin TUI mouse scroll on tabs and tables; `:cleardb` clears `user_message_state`.
 - **Plugins**: **Fix:** serialized plugin stdin writes so chat fan-out and command RPC cannot corrupt IPC lines.
 - **Docs**: **README**, **TESTING**, **ARCHITECTURE**, and **PROTOCOL** for channel stamping, reconnect, wrapped URL limitation ([#103](https://github.com/Cod-e-Codes/marchat/issues/103)), SQLite-only `:backup`, and plugin IPC; agent skills under `.cursor/skills/`.
 - **Tooling**: Project Agent skills and `.cursor/rules/marchat.mdc`; `.gitignore` tracks shared rules and skills.
 - **Dependencies**: **charm.land/bubbletea/v2** v2.0.8, **charm.land/bubbles/v2** v2.1.0, **charm.land/lipgloss/v2** v2.0.5 (replaces Charm v1); **github.com/charmbracelet/colorprofile** v0.4.3, **github.com/charmbracelet/x/ansi** v0.11.7, **github.com/lucasb-eyer/go-colorful** v1.4.0, **github.com/mattn/go-runewidth** v0.0.24. **github.com/jackc/pgx/v5** v5.10.0, **golang.org/x/crypto** v0.53.0, **golang.org/x/term** v0.44.0, **modernc.org/sqlite** v1.53.0.
+- **Packaging**: Version strings and URLs for **v1.3.0** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.0** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.2.0
 
