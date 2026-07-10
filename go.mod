@@ -1,6 +1,6 @@
 module github.com/Cod-e-Codes/marchat
 
-go 1.25.11
+go 1.25.12
 
 require (
 	charm.land/bubbles/v2 v2.1.0

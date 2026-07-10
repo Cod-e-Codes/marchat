@@ -6,6 +6,8 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+- **Toolchain**: Go **1.25.12** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for reachable **GO-2026-5856** / **crypto/tls** ECH privacy leak and package-level **GO-2026-4970** / **os** symlink escape reported by **govulncheck** on **1.25.11**).
+
 ## v1.3.0
 
 **Released 2026-07-06.** Since **[v1.2.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.2.0)**; compare [`v1.2.0...v1.3.0`](https://github.com/Cod-e-Codes/marchat/compare/v1.2.0...v1.3.0). Commits: **`git log v1.2.0..v1.3.0 --oneline`**.

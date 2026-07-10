@@ -23,7 +23,7 @@ Thank you for your interest in contributing. This guide explains how to contribu
 
 ## Local checks (match CI)
 
-From the repo root, with Go 1.25.11+, `golangci-lint`, and `govulncheck` on your `PATH`:
+From the repo root, with Go 1.25.12+, `golangci-lint`, and `govulncheck` on your `PATH`:
 
 ```bash
 gofmt -w .
