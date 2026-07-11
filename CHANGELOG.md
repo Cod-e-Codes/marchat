@@ -7,6 +7,7 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 - **Toolchain**: Go **1.25.12** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for reachable **GO-2026-5856** / **crypto/tls** ECH privacy leak and package-level **GO-2026-4970** / **os** symlink escape reported by **govulncheck** on **1.25.11**).
+- **Dependencies**: **charm.land/bubbles/v2** v2.1.1 (textarea prompt styling fix); **golang.org/x/crypto** v0.54.0; **golang.org/x/term** v0.45.0 (transitive **golang.org/x/sys** v0.47.0, **golang.org/x/text** v0.40.0, **github.com/sahilm/fuzzy** v0.1.3).
 
 ## v1.3.0
 
