@@ -6,9 +6,14 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+## v1.3.1
+
+**Released 2026-07-14.** Since **[v1.3.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.0)**; compare [`v1.3.0...v1.3.1`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.0...v1.3.1). Commits: **`git log v1.3.0..v1.3.1 --oneline`**.
+
+- **Server**: **Fix:** handshake history replay sets `type: "text"` on channel messages so reconnect scrollback renders in the client (was omitted due to zero-value `omitempty`).
 - **Toolchain**: Go **1.25.12** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for reachable **GO-2026-5856** / **crypto/tls** ECH privacy leak and package-level **GO-2026-4970** / **os** symlink escape reported by **govulncheck** on **1.25.11**).
 - **Dependencies**: **charm.land/bubbles/v2** v2.1.1 (textarea prompt styling fix); **golang.org/x/crypto** v0.54.0; **golang.org/x/term** v0.45.0 (transitive **golang.org/x/sys** v0.47.0, **golang.org/x/text** v0.40.0, **github.com/sahilm/fuzzy** v0.1.3).
-- **Server**: **Fix:** handshake history replay sets `type: "text"` on channel messages so reconnect scrollback renders in the client (was omitted due to zero-value `omitempty`).
+- **Packaging**: Version strings and URLs for **v1.3.1** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.1** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.3.0
 

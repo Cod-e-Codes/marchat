@@ -1,12 +1,12 @@
 {
-  "version": "1.3.0",
+  "version": "1.3.1",
   "description": "Terminal chat with WebSockets, optional E2E encryption, and plugins",
   "homepage": "https://github.com/Cod-e-Codes/marchat",
   "license": "MIT",
   "architecture": {
     "64bit": {
-      "url": "https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.0/marchat-v1.3.0-windows-amd64.zip",
-      "hash": "3f7433af96d2aa13f394a0eacb30eb65186119526bc9561ad943e982d044e2d5"
+      "url": "https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.1/marchat-v1.3.1-windows-amd64.zip",
+      "hash": "0000000000000000000000000000000000000000000000000000000000000000"
     }
   },
   "bin": [
