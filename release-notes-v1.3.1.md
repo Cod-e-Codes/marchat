@@ -1,6 +1,7 @@
 ## v1.3.1
 
-*Released: 14 July 2026*
+*Released: 14 July 2026*  
+*Commit: 3088ebc*
 
 ### Server
 
