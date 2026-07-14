@@ -181,6 +181,12 @@ func TestGetRecentMessages(t *testing.T) {
 	if recentMessages[2].Content != "Third message" {
 		t.Errorf("Expected third message 'Third message', got '%s'", recentMessages[2].Content)
 	}
+
+	for i, msg := range recentMessages {
+		if msg.Type != shared.TextMessage {
+			t.Errorf("message %d: type = %q, want %q", i, msg.Type, shared.TextMessage)
+		}
+	}
 }
 
 func TestQueryVisibleMessagesForUserRespectsLimit(t *testing.T) {

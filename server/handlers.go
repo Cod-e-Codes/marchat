@@ -374,6 +374,7 @@ func scanMessagesFromRows(rows *sql.Rows) []shared.Message {
 		}
 		msg.Encrypted = isEncrypted
 		msg.Edited = edited
+		msg.Type = shared.TextMessage
 		if strings.TrimSpace(msg.Recipient) != "" {
 			msg.Type = shared.DirectMessage
 		}
