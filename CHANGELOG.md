@@ -6,8 +6,14 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
-- **Security**: Server overwrites client-supplied `sender` on text and file outbound paths (`stampSenderTimedOutbound`); rejects NUL bytes in persistable content before insert; does not broadcast when message persistence fails.
-- **Client**: Desktop notifications hardened: Windows toast XML built in Go with `xml.EscapeText` and shown via `powershell -EncodedCommand`; macOS `osascript` uses `strconv.Quote` string literals (no shell interpolation of wire content).
+## v1.3.2
+
+**Released 2026-07-15.** Since **[v1.3.1](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.1)**; compare [`v1.3.1...v1.3.2`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.1...v1.3.2). Commits: **`git log v1.3.1..v1.3.2 --oneline`**.
+
+- **Server**: **Security:** overwrites client-supplied `sender` on text and file outbound paths (`stampSenderTimedOutbound`); rejects NUL bytes in persistable content before insert; does not broadcast when message persistence fails.
+- **Client**: **Security:** desktop notifications hardened: Windows toast XML built in Go with `xml.EscapeText` and shown via `powershell -EncodedCommand`; macOS `osascript` uses `strconv.Quote` string literals (no shell interpolation of wire content).
+- **Docs**: **PROTOCOL**, **SECURITY**, **ARCHITECTURE**, and **TESTING** document server sender stamping and safe desktop notification paths for untrusted wire content.
+- **Packaging**: Version strings and URLs for **v1.3.2** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.2** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.3.1
 
