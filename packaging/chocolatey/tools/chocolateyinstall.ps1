@@ -3,7 +3,7 @@ $toolsDir = "$(Split-Path -Parent $MyInvocation.MyCommand.Definition)"
 
 $tag    = 'v1.3.2'
 $url    = "https://github.com/Cod-e-Codes/marchat/releases/download/$tag/marchat-$tag-windows-amd64.zip"
-$checksum = '0000000000000000000000000000000000000000000000000000000000000000'
+$checksum = 'adfd7ecf8646acf02336a12573417ade4c4b8565d83f3e427dee70f0cf8065df'
 
 $packageArgs = @{
   packageName   = $env:ChocolateyPackageName
