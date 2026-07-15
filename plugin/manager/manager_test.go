@@ -88,6 +88,7 @@ func TestNewPluginManager(t *testing.T) {
 
 	if manager == nil {
 		t.Fatal("NewPluginManager returned nil")
+		return
 	}
 
 	if manager.pluginDir != pluginDir {
@@ -138,6 +139,7 @@ func TestInstallPluginWithLocalFile(t *testing.T) {
 	storePlugin := store.ResolvePlugin(pluginName, "", "")
 	if storePlugin == nil {
 		t.Fatal("Plugin not found in store")
+		return
 	}
 	if storePlugin.Name != pluginName {
 		t.Errorf("Expected plugin name %s, got %s", pluginName, storePlugin.Name)
@@ -184,6 +186,7 @@ func TestInstallPluginWithHTTP(t *testing.T) {
 	storePlugin := manager.GetStore().ResolvePlugin(pluginName, "", "")
 	if storePlugin == nil {
 		t.Fatal("Plugin not found in store")
+		return
 	}
 	if storePlugin.Name != pluginName {
 		t.Errorf("Expected plugin name %q, got %s", pluginName, storePlugin.Name)
@@ -805,6 +808,7 @@ func TestGetMessageChannel(t *testing.T) {
 	channel := manager.GetMessageChannel()
 	if channel == nil {
 		t.Fatal("Message channel should not be nil")
+		return
 	}
 }
 
@@ -845,6 +849,7 @@ func TestRefreshStore(t *testing.T) {
 	store := manager.GetStore()
 	if store == nil {
 		t.Fatal("Store should not be nil")
+		return
 	}
 }
 
@@ -999,6 +1004,7 @@ func TestGetPluginManifest(t *testing.T) {
 	manifest = manager.GetPluginManifest(pluginName)
 	if manifest == nil {
 		t.Fatal("Expected manifest for existing plugin")
+		return
 	}
 
 	if manifest.Name != pluginName {

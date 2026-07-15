@@ -21,7 +21,7 @@ Bubble Tea + Lipgloss TUI on **Charm v2** (`charm.land/bubbletea/v2`, `bubbles/v
 - **Config**: `MARCHAT_CONFIG_DIR` / `ResolveClientConfigDir()`; keystore path resolution and migration in `client/config/config.go`.
 - **Chrome**: terminal-native labels; no decorative lock emoji in UI chrome (user content may include emoji).
 - **Metadata**: Alt+M or `:msginfo` toggles message id and encrypted flag per line (`render.go`).
-- **Notifications**: bell, desktop (Alt+N), `:notify-mode`, `:quiet`, `:focus` (`notification_manager.go`).
+- **Notifications**: bell, desktop (Alt+N), `:notify-mode`, `:quiet`, `:focus` (`notification_manager.go`, `notification_desktop.go`). Windows: Go-built toast XML + `powershell -EncodedCommand`; macOS: `strconv.Quote` for `osascript -e`; Linux: `notify-send` argv args.
 - **Pre-TUI output**: colorized stdout via `cli_output.go` unless `NO_COLOR`.
 
 ## Transcript rendering (`render.go`)
@@ -40,7 +40,7 @@ Bubble Tea + Lipgloss TUI on **Charm v2** (`charm.land/bubbletea/v2`, `bubbles/v
 - `client/render_test.go`: URL wrap, OSC 8 hyperlink markers (`\x1b]8;;`), underline on wrapped segments, system line severity, wrap width; URL click helpers (`buildTranscriptLineURLs`, `findURLAtTranscriptClick`) are headless fallback-path coverage.
 - `client/main_test.go`: DM/channel filters, unread, client system prune/sort, reconnect backoff, URL click hit/miss (single-line, headless), E2E search hint.
 - `client/scroll_input_test.go`: scroll target selection, help viewport wheel handling, overlay input capture, read-receipt scoping, viewport dimension helpers
-- `client/websocket_e2e_test.go`, `keystore_test.go`, `config_test.go`.
+- `client/websocket_e2e_test.go`, `keystore_test.go`, `config_test.go`, `notification_manager_test.go` (desktop notification escaping).
 - See `testing-marchat` skill.
 
 ## Protocol

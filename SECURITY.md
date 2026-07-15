@@ -69,6 +69,12 @@ Optional **`MARCHAT_CLIENT_HOOK_*`** settings run programs you choose on your ma
 
 When the client **auto-generates** a global E2E key, it does **not** print the full base64 key to stdout (only a Key ID). Distribute the key using **`MARCHAT_GLOBAL_E2E_KEY`**, **`keystore.dat`** plus passphrase, or another channel you treat as confidential; do not rely on terminal output for key material.
 
+### Server message identity and client desktop notifications
+
+The server **ignores** client-supplied `sender` on outbound and persisted chat paths; it stamps `sender` from the authenticated WebSocket session (same trust model as `channel` stamping). Clients must not rely on spoofing `sender` on the wire.
+
+When desktop notifications are enabled (**Alt+N** / desktop notify mode), the reference client shows toast text from chat messages. Untrusted wire `sender` and `content` must **not** be interpolated into shell scripts. Windows builds toast XML in Go (`xml.EscapeText`) and passes a fixed PowerShell script via **`-EncodedCommand`**; macOS uses **`strconv.Quote`** for **`osascript -e`** literals. Linux uses **`notify-send`** with argv-separated title and body.
+
 ### Indirect Go modules and vulnerability scanners
 
 Dependabot may flag **transitive** dependencies that do not expose reachable vulnerable APIs in marchat. For example, **CVE-2026-26958** ([GHSA-fw7p-63qq-7hpr](https://github.com/advisories/GHSA-fw7p-63qq-7hpr)) affects **`filippo.io/edwards25519`** before **v1.1.1** (`MultiScalarMult` receiver initialization). marchat does not use that API; the advisory notes many consumers (including typical **`github.com/go-sql-driver/mysql`** usage) are unaffected. The transitive module is at **v1.2.0** (via **`github.com/go-sql-driver/mysql`**). For reachability, run **`govulncheck ./...`** against your build.

@@ -18,6 +18,7 @@ func TestNewStore(t *testing.T) {
 
 	if store == nil {
 		t.Fatal("NewStore returned nil")
+		return
 	}
 
 	if store.registryURL != registryURL {
@@ -328,6 +329,7 @@ func TestResolvePlugin(t *testing.T) {
 	plugin := store.ResolvePlugin("test-plugin", "linux", "amd64")
 	if plugin == nil {
 		t.Fatal("Expected to find plugin with exact match")
+		return
 	}
 	if plugin.GoOS != "linux" || plugin.GoArch != "amd64" {
 		t.Errorf("Expected linux/amd64 plugin, got %s/%s", plugin.GoOS, plugin.GoArch)
@@ -337,6 +339,7 @@ func TestResolvePlugin(t *testing.T) {
 	plugin = store.ResolvePlugin("test-plugin", "windows", "arm64")
 	if plugin == nil {
 		t.Fatal("Expected to find plugin with OS match")
+		return
 	}
 	if plugin.GoOS != "windows" {
 		t.Errorf("Expected windows plugin, got %s", plugin.GoOS)
@@ -352,6 +355,7 @@ func TestResolvePlugin(t *testing.T) {
 	plugin = store.ResolvePlugin("other-plugin", "", "")
 	if plugin == nil {
 		t.Fatal("Expected to find plugin without platform info")
+		return
 	}
 	if plugin.Name != "other-plugin" {
 		t.Errorf("Expected 'other-plugin', got %s", plugin.Name)
@@ -375,6 +379,7 @@ func TestGetPlugin(t *testing.T) {
 	plugin := store.GetPlugin("test-plugin")
 	if plugin == nil {
 		t.Fatal("Expected to find plugin")
+		return
 	}
 	if plugin.Name != "test-plugin" {
 		t.Errorf("Expected 'test-plugin', got %s", plugin.Name)

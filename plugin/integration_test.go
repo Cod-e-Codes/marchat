@@ -138,6 +138,7 @@ func TestPluginSystemIntegration(t *testing.T) {
 	storePlugin := store.ResolvePlugin(pluginName, "", "")
 	if storePlugin == nil {
 		t.Fatal("Plugin not found in store")
+		return
 	}
 
 	if storePlugin.Name != pluginName {
@@ -183,6 +184,7 @@ func TestPluginSystemIntegration(t *testing.T) {
 	channel := manager.GetMessageChannel()
 	if channel == nil {
 		t.Fatal("Message channel should not be nil")
+		return
 	}
 }
 
@@ -210,6 +212,7 @@ func TestPluginHostIntegration(t *testing.T) {
 	channel := host.GetMessageChannel()
 	if channel == nil {
 		t.Fatal("Message channel should not be nil")
+		return
 	}
 
 	// Test 4: List plugins (should be empty initially)
@@ -297,6 +300,7 @@ func TestPluginStoreIntegration(t *testing.T) {
 	plugin := store.ResolvePlugin("store-test-1", "linux", "amd64")
 	if plugin == nil {
 		t.Fatal("Expected to find linux/amd64 plugin")
+		return
 	}
 	if plugin.GoOS != "linux" || plugin.GoArch != "amd64" {
 		t.Errorf("Expected linux/amd64 plugin, got %s/%s", plugin.GoOS, plugin.GoArch)

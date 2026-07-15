@@ -76,6 +76,7 @@ func TestClient_Initialization(t *testing.T) {
 
 	if client == nil {
 		t.Fatal("Client should not be nil")
+		return
 	}
 
 	if client.hub != hub {

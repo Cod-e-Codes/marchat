@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os/exec"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 )
@@ -227,10 +226,7 @@ func (nm *NotificationManager) sendDesktopNotification(title, message string) {
 
 		switch runtime.GOOS {
 		case "darwin":
-			// macOS osascript
-			script := fmt.Sprintf(`display notification "%s" with title "%s"`,
-				escapeForAppleScript(message),
-				escapeForAppleScript(title))
+			script := buildDarwinNotificationScript(title, message)
 			cmd = exec.Command("osascript", "-e", script)
 
 		case "linux":
@@ -242,28 +238,12 @@ func (nm *NotificationManager) sendDesktopNotification(title, message string) {
 				"-t", "5000") // 5 second timeout
 
 		case "windows":
-			// Windows PowerShell toast
-			script := fmt.Sprintf(`
-				[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null
-				[Windows.Data.Xml.Dom.XmlDocument, Windows.Data.Xml.Dom.XmlDocument, ContentType = WindowsRuntime] | Out-Null
-				$template = @"
-<toast>
-	<visual>
-		<binding template="ToastText02">
-			<text id="1">%s</text>
-			<text id="2">%s</text>
-		</binding>
-	</visual>
-</toast>
-"@
-				$xml = New-Object Windows.Data.Xml.Dom.XmlDocument
-				$xml.LoadXml($template)
-				$toast = New-Object Windows.UI.Notifications.ToastNotification $xml
-				[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier("%s").Show($toast)
-			`, escapeForPowerShell(title),
-				escapeForPowerShell(message),
-				escapeForPowerShell(nm.config.DesktopTitle))
-			cmd = exec.Command("powershell", "-Command", script)
+			encoded := windowsToastEncodedCommand(title, message, nm.config.DesktopTitle)
+			cmd = exec.Command("powershell",
+				"-NoProfile",
+				"-NonInteractive",
+				"-ExecutionPolicy", "Bypass",
+				"-EncodedCommand", encoded)
 		}
 
 		if cmd != nil {
@@ -380,17 +360,4 @@ func (nm *NotificationManager) SetQuietHours(enabled bool, start, end int) {
 	nm.config.QuietHoursEnabled = enabled
 	nm.config.QuietHoursStart = start
 	nm.config.QuietHoursEnd = end
-}
-
-// Helper functions for escaping strings
-
-func escapeForAppleScript(s string) string {
-	s = strings.ReplaceAll(s, `\`, `\\`)
-	s = strings.ReplaceAll(s, `"`, `\"`)
-	return s
-}
-
-func escapeForPowerShell(s string) string {
-	s = strings.ReplaceAll(s, `"`, `""`)
-	return s
 }

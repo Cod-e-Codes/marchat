@@ -16,6 +16,7 @@ func TestInitDBAndSchema(t *testing.T) {
 
 	if db == nil {
 		t.Fatalf("db is nil")
+		return
 	}
 
 	CreateSchema(db)

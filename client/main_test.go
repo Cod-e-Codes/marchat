@@ -186,6 +186,7 @@ func TestWsConnectedClearsTranscript(t *testing.T) {
 	next, cmd := m.Update(wsConnected{})
 	if cmd == nil {
 		t.Fatal("expected non-nil cmd from wsConnected")
+		return
 	}
 	m2, ok := next.(*model)
 	if !ok {
@@ -440,6 +441,7 @@ func TestNotificationManager(t *testing.T) {
 	nm := NewNotificationManager(config)
 	if nm == nil {
 		t.Fatal("NewNotificationManager() should not return nil")
+		return
 	}
 
 	// Test initial state

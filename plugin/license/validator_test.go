@@ -27,6 +27,7 @@ func TestNewLicenseValidator(t *testing.T) {
 		}
 		if validator == nil {
 			t.Fatal("Expected validator, got nil")
+			return
 		}
 		if validator.cacheDir != cacheDir {
 			t.Errorf("Expected cache dir %s, got %s", cacheDir, validator.cacheDir)
@@ -91,6 +92,7 @@ func TestValidateLicense(t *testing.T) {
 		}
 		if validatedLicense == nil {
 			t.Fatal("Expected license, got nil")
+			return
 		}
 		if validatedLicense.PluginName != "test-plugin" {
 			t.Errorf("Expected plugin name 'test-plugin', got %s", validatedLicense.PluginName)
@@ -211,6 +213,7 @@ func TestValidateCachedLicense(t *testing.T) {
 		}
 		if cachedLicense == nil {
 			t.Fatal("Expected license, got nil")
+			return
 		}
 		if cachedLicense.PluginName != "test-plugin" {
 			t.Errorf("Expected plugin name 'test-plugin', got %s", cachedLicense.PluginName)
@@ -283,6 +286,7 @@ func TestValidateCachedLicense(t *testing.T) {
 		_, err = validator.ValidateCachedLicense("tampered-plugin")
 		if err == nil {
 			t.Fatal("Expected error for tampered cached license, got nil")
+			return
 		}
 		if !contains(err.Error(), "invalid cached license signature") {
 			t.Errorf("Expected signature error, got: %v", err)
@@ -338,6 +342,7 @@ func TestValidateCachedLicense(t *testing.T) {
 		_, err = validator.ValidateCachedLicense("mismatch-plugin")
 		if err == nil {
 			t.Fatal("Expected plugin mismatch error, got nil")
+			return
 		}
 		if !contains(err.Error(), "cached license plugin mismatch") {
 			t.Errorf("Expected plugin mismatch error, got: %v", err)
@@ -479,6 +484,7 @@ func TestGenerateLicense(t *testing.T) {
 		}
 		if license == nil {
 			t.Fatal("Expected license, got nil")
+			return
 		}
 		if license.PluginName != "test-plugin" {
 			t.Errorf("Expected plugin name 'test-plugin', got %s", license.PluginName)

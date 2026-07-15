@@ -98,6 +98,7 @@ func TestPluginManagerDiscoverStartDisableEnable(t *testing.T) {
 	inst := m.GetPlugin(name)
 	if inst == nil {
 		t.Fatal("expected plugin discovered and loaded")
+		return
 	}
 	if inst.Process == nil {
 		t.Fatal("expected auto-started plugin process")

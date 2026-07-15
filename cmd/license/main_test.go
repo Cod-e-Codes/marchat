@@ -68,6 +68,7 @@ func TestValidateLicenseFunction(t *testing.T) {
 	}
 	if testLicense == nil {
 		t.Fatal("Generated license is nil")
+		return
 	}
 
 	// Write license to file

@@ -36,6 +36,7 @@ func TestEncryptDecryptMessage(t *testing.T) {
 
 	if encrypted == nil {
 		t.Fatal("Encrypted message should not be nil")
+		return
 	}
 
 	if !encrypted.IsEncrypted {
@@ -72,6 +73,7 @@ func TestEncryptDecryptTextMessage(t *testing.T) {
 
 	if encrypted == nil {
 		t.Fatal("Encrypted message should not be nil")
+		return
 	}
 
 	if encrypted.Sender != sender {
@@ -93,6 +95,7 @@ func TestEncryptDecryptTextMessage(t *testing.T) {
 
 	if decrypted == nil {
 		t.Fatal("Decrypted message should not be nil")
+		return
 	}
 
 	if decrypted.Sender != sender {
@@ -112,6 +115,7 @@ func TestEncryptMessageNilSessionKey(t *testing.T) {
 	_, err := EncryptMessage(nil, []byte("hello"))
 	if err == nil {
 		t.Fatal("expected error for nil session key")
+		return
 	}
 	if err.Error() != "session key is nil" {
 		t.Errorf("unexpected error: %v", err)
@@ -124,11 +128,13 @@ func TestDecryptMessageNilArgs(t *testing.T) {
 	_, err := DecryptMessage(sessionKey, nil)
 	if err == nil {
 		t.Fatal("expected error for nil encrypted message")
+		return
 	}
 
 	_, err = DecryptMessage(nil, &EncryptedMessage{IsEncrypted: true})
 	if err == nil {
 		t.Fatal("expected error for nil session key")
+		return
 	}
 }
 

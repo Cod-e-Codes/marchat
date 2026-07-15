@@ -188,7 +188,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
 ## Channels
 
 - Every connection is placed in the `general` channel after a successful handshake.
-- Channel names are carried on messages via the optional `channel` field. For outbound traffic from authenticated clients (text, files, edits, typing, reactions, read receipts, and similar), the server **stamps** `channel` from the sender's current hub membership and **ignores** client-supplied channel values, so clients cannot inject messages into rooms they have not joined. When `channel` is set on a non-system message, the server routes that message only to clients currently joined to that channel.
+- Channel names are carried on messages via the optional `channel` field. For outbound traffic from authenticated clients (text, files, edits, typing, reactions, read receipts, and similar), the server **stamps** `channel` from the sender's current hub membership and **ignores** client-supplied channel values, so clients cannot inject messages into rooms they have not joined. The server also **overwrites** inbound `sender` from the authenticated WebSocket session on all outbound and persisted message types (same trust model as `channel`). When `channel` is set on a non-system message, the server routes that message only to clients currently joined to that channel.
 - Clients switch channels by sending `type`: `join_channel` with `channel` set to the target name. Sending `join_channel` while already in another channel leaves the previous channel first.
 - Clients return to `general` with `type`: `leave_channel` (no fields required beyond the message envelope). If the client is already in `general`, the server performs no channel change.
 

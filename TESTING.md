@@ -54,6 +54,7 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `client/render_test.go` | Message transcript rendering | URL wrap breakpoints, URL span markers, OSC 8 hyperlinks and underline on wrapped segments, continuation indent not underlined, system line severity, negative-ID transcript notice classification, headless URL click/index helpers (`buildTranscriptLineURLs`, `findURLAtTranscriptClick`; see [Manual testing gaps](#manual-testing-gaps)) |
 | `client/scroll_input_test.go` | Scroll routing | Active viewport selection, help viewport wheel scroll, overlay input capture, read-receipt scoping to chat viewport, content height helper |
 | `client/main_test.go` | Client main functionality | Message rendering, user lists, URL handling (single-line click miss vs hit, headless), encryption functions, flag validation, `wsConnected` transcript reset on reconnect, reconnect backoff doubling, `TestMessageIncrementsUnread`, client System prune/sort (`TestPruneEphemeralSystemMessages`, `TestPruneKeepsTranscriptSystemNotices`, `TestSortMessagesPersistedBeforeClientSystem`), reaction wire channel |
+| `client/notification_manager_test.go` | Desktop notification security | Toast XML escaping, PowerShell `-EncodedCommand` script shape, macOS `strconv.Quote` for `osascript` |
 | `client/websocket_sanitize_test.go` | WebSocket URL / TLS hints | Sanitization helpers for display and connection hints |
 | `client/websocket_e2e_test.go` | E2E DM and channel wire helpers | Encrypted outbound message shape, DM send wire format, decrypt roundtrip |
 | `client/exthook/exthook_test.go` | Client hook helpers | Executable validation, hook JSON shaping, path rules |
@@ -74,6 +75,8 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `server/message_state_test.go` | Durable reactions | Reaction persistence and replay helpers |
 | `server/config_test.go` | Server configuration | Server configuration logic and validation |
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations, unknown admin command system reply (`TestHandleCommandUnknownAdminSendsSystemReply`), channel stamping (`TestStampClientChannelOverwritesSpoofedChannel`), non-admin unknown vs admin-only command replies |
+| `server/client_sender_spoof_test.go` | Sender identity enforcement | Integration tests that wire `sender` is ignored on text/file paths (`stampSenderTimedOutbound`) |
+| `server/client_nullbyte_test.go` | NUL content validation | `contentContainsNUL`, SQLite NUL insert baseline, integration reject-no-broadcast |
 | `server/health_test.go` | Server health monitoring | Health checks, system metrics, HTTP endpoints, concurrent access |
 | `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, extended fields (channel, encrypted, message_id, recipient, edited), JSON serialization, omitempty validation, backwards-compat unknown-field handling |
 | `plugin/sdk/stdio_test.go` | Plugin SDK stdio | `HandlePluginRequest` / `RunIO` (init, message, command, shutdown), EOF handling |

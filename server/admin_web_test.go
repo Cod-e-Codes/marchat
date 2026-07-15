@@ -94,6 +94,7 @@ func TestAdminWeb_LoginSessionAndProtectedRoutes(t *testing.T) {
 	_ = resp.Body.Close()
 	if sessionCookie == nil {
 		t.Fatalf("expected admin_session cookie after login")
+		return
 	}
 
 	// 3) Session check should pass

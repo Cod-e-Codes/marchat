@@ -18,6 +18,7 @@ func TestNewPluginHost(t *testing.T) {
 
 	if host == nil {
 		t.Fatal("NewPluginHost returned nil")
+		return
 	}
 
 	if host.pluginDir != pluginDir {
@@ -249,6 +250,7 @@ func TestSendMessage(t *testing.T) {
 	channel := host.GetMessageChannel()
 	if channel == nil {
 		t.Fatal("Message channel should not be nil")
+		return
 	}
 }
 
@@ -284,6 +286,7 @@ func TestGetMessageChannel(t *testing.T) {
 	channel := host.GetMessageChannel()
 	if channel == nil {
 		t.Fatal("Message channel should not be nil")
+		return
 	}
 
 	// Channel should be readable

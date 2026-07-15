@@ -31,6 +31,7 @@ func TestAdminPanel_InitAndRefresh(t *testing.T) {
 
 	if panel == nil {
 		t.Fatalf("panel is nil")
+		return
 	}
 	// basic invariants after NewAdminPanel -> refreshData called
 	if panel.systemInfo.ServerStatus == "" {

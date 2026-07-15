@@ -23,6 +23,7 @@ func TestNewHub(t *testing.T) {
 
 	if hub == nil {
 		t.Fatal("NewHub returned nil")
+		return
 	}
 
 	if hub.clients == nil {

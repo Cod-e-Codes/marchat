@@ -6,6 +6,9 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+- **Security**: Server overwrites client-supplied `sender` on text and file outbound paths (`stampSenderTimedOutbound`); rejects NUL bytes in persistable content before insert; does not broadcast when message persistence fails.
+- **Client**: Desktop notifications hardened: Windows toast XML built in Go with `xml.EscapeText` and shown via `powershell -EncodedCommand`; macOS `osascript` uses `strconv.Quote` string literals (no shell interpolation of wire content).
+
 ## v1.3.1
 
 **Released 2026-07-14.** Since **[v1.3.0](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.0)**; compare [`v1.3.0...v1.3.1`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.0...v1.3.1). Commits: **`git log v1.3.0..v1.3.1 --oneline`**.

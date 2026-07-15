@@ -107,12 +107,21 @@ func (c *Client) readPump() {
 				log.Printf("Rejected file from %s: too large (%d bytes)", c.username, msg.File.Size)
 				continue
 			}
-			c.stampTimedOutbound(&msg)
+			c.stampSenderTimedOutbound(&msg)
 			c.hub.broadcast <- msg
 			continue
 		}
 
 		if msg.Type == shared.EditMessageType && msg.MessageID > 0 {
+			if contentContainsNUL(msg.Content) {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: invalid character in content",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
 			if err := EditMessage(c.db, msg.MessageID, c.username, msg.Content, msg.Encrypted); err != nil {
 				c.send <- shared.Message{
 					Sender:    "System",
@@ -162,12 +171,28 @@ func (c *Client) readPump() {
 		}
 
 		if msg.Type == shared.DirectMessage && msg.Recipient != "" {
-			c.stampSenderTimedOutbound(&msg)
-			if msgID, err := InsertMessage(c.db, msg); err != nil {
-				log.Printf("Failed to persist DM from %s to %s: %v", c.username, msg.Recipient, err)
-			} else {
-				msg.MessageID = msgID
+			if contentContainsNUL(msg.Content) {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: invalid character in content",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
 			}
+			c.stampSenderTimedOutbound(&msg)
+			msgID, err := InsertMessage(c.db, msg)
+			if err != nil {
+				log.Printf("Failed to persist DM from %s to %s: %v", c.username, msg.Recipient, err)
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: could not save message",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
+			msg.MessageID = msgID
 			c.hub.broadcastDM(msg)
 			continue
 		}
@@ -319,13 +344,29 @@ func (c *Client) readPump() {
 			c.handleCommand(msg.Content)
 			continue
 		}
-		c.stampTimedOutbound(&msg)
-		if msg.Type == "" || msg.Type == shared.TextMessage {
-			if msgID, err := InsertMessage(c.db, msg); err != nil {
-				log.Printf("Failed to persist message from %s: %v", c.username, err)
-			} else {
-				msg.MessageID = msgID
+		if contentContainsNUL(msg.Content) {
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   "Message not sent: invalid character in content",
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
 			}
+			continue
+		}
+		c.stampSenderTimedOutbound(&msg)
+		if msg.Type == "" || msg.Type == shared.TextMessage {
+			msgID, err := InsertMessage(c.db, msg)
+			if err != nil {
+				log.Printf("Failed to persist message from %s: %v", c.username, err)
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: could not save message",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
+			msg.MessageID = msgID
 		}
 		c.hub.broadcast <- msg
 	}
@@ -415,6 +456,7 @@ func (c *Client) stampTimedOutbound(msg *shared.Message) {
 	c.stampClientChannel(msg)
 }
 
+// stampSenderTimedOutbound sets sender from the authenticated session; inbound wire sender is never trusted.
 func (c *Client) stampSenderTimedOutbound(msg *shared.Message) {
 	msg.Sender = c.username
 	c.stampTimedOutbound(msg)

@@ -93,7 +93,7 @@ Prefer this repo (`go.mod`, `ARCHITECTURE.md`, `PROTOCOL.md`, skills) as source 
 
 ### Server
 - **Startup**: validated before serve - at least one admin, non-empty admin key, valid listen port; **admin names** trimmed, lowercased, case-insensitive **dedupe** (`cmd/server`, extracted validation helpers)
-- **Hub**: per-channel routing, DMs, typing/read receipts/reactions; outbound client messages channel-stamped from membership (`stampClientChannel`); **reserved usernames** so handshake cannot double-book a name before registration
+- **Hub**: per-channel routing, DMs, typing/read receipts/reactions; outbound client messages channel-stamped from membership (`stampClientChannel`); outbound `sender` stamped from authenticated session (`stampSenderTimedOutbound`); **reserved usernames** so handshake cannot double-book a name before registration
 - **WebSocket**: **serialized writes** per connection (avoid concurrent write + control-frame panics)
 - **SQLite**: **WAL** enabled when backend is SQLite; in-process `:backup` uses **VACUUM INTO** (SQLite only; quote paths safely when SQL embeds paths). Postgres/MySQL use native backup tools.
 - **Web admin** (`server/admin_web.go`, `server/admin_web.html`): session cookies; **`MARCHAT_SESSION_SECRET`** preferred, **`MARCHAT_JWT_SECRET`** deprecated alias; `config.GenerateSessionSecret()` when unset; **login rate limiting** per IP; **CSRF** on mutating routes

@@ -50,6 +50,7 @@ func TestKeyStoreInitialize(t *testing.T) {
 	globalKey := ks.GetGlobalKey()
 	if globalKey == nil {
 		t.Fatal("Expected global key to be created")
+		return
 	}
 
 	if len(globalKey.Key) != 32 {
@@ -90,6 +91,7 @@ func TestKeyStoreLoad(t *testing.T) {
 	originalGlobalKey := ks1.GetGlobalKey()
 	if originalGlobalKey == nil {
 		t.Fatal("Expected original key to be created")
+		return
 	}
 
 	// Now test loading it
@@ -102,6 +104,7 @@ func TestKeyStoreLoad(t *testing.T) {
 	loadedKey := ks2.GetGlobalKey()
 	if loadedKey == nil {
 		t.Fatal("Expected loaded key to be available")
+		return
 	}
 
 	// Keys should match

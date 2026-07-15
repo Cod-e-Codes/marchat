@@ -44,6 +44,7 @@ func TestNewHealthChecker(t *testing.T) {
 
 	if hc == nil {
 		t.Fatal("HealthChecker should not be nil")
+		return
 	}
 
 	if hc.startTime.IsZero() {
@@ -72,6 +73,7 @@ func TestHealthChecker_CheckHealth(t *testing.T) {
 
 	if health == nil {
 		t.Fatal("Health check should not return nil")
+		return
 	}
 
 	if health.Version != "test-version" {

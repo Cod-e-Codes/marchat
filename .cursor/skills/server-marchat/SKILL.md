@@ -23,6 +23,7 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 
 - Per-channel routing, DMs, typing, read receipts, reactions.
 - Outbound client messages are channel-stamped from hub membership (`stampClientChannel`); client-supplied `channel` values are ignored for routing.
+- All outbound/persist paths stamp `sender` from the authenticated session (`stampSenderTimedOutbound`); NUL bytes in persistable `content` are rejected before insert.
 - Reserved usernames during handshake (no double-book before registration).
 - Serialized writes per connection (`client.go`).
 - Read-pump rate limits: constants shared with `loadverify_ratelimit_test.go`.
