@@ -6,6 +6,8 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+- **Dependencies**: **modernc.org/sqlite** v1.54.0 (SQLite 3.53.3; **modernc.org/libc** v1.74.1).
+
 ## v1.3.2
 
 **Released 2026-07-15.** Since **[v1.3.1](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.1)**; compare [`v1.3.1...v1.3.2`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.1...v1.3.2). Commits: **`git log v1.3.1..v1.3.2 --oneline`**.
