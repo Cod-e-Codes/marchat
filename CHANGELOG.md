@@ -6,7 +6,7 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
-- **Dependencies**: **modernc.org/sqlite** v1.54.0 (SQLite 3.53.3; **modernc.org/libc** v1.74.1).
+- **Dependencies**: **modernc.org/sqlite** v1.54.0 (SQLite 3.53.3; **modernc.org/libc** v1.74.1); **github.com/mattn/go-runewidth** v0.0.27.
 
 ## v1.3.2
 
