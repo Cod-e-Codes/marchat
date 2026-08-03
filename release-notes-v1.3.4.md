@@ -1,7 +1,7 @@
 ## v1.3.4
 
 *Released: 3 August 2026*  
-*Commit: TBD*
+*Commit: e76adb9*
 
 ### Server
 
