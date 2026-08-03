@@ -6,8 +6,13 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+## v1.3.4
+
+**Released 2026-08-03.** Since **[v1.3.3](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.3)**; compare [`v1.3.3...v1.3.4`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.3...v1.3.4). Commits: **`git log v1.3.3..v1.3.4 --oneline`**.
+
 - **Server**: **Fix:** oversized file uploads that fit under the WebSocket DoS read ceiling (**32 MiB**) are rejected with a System message and a live connection (app-layer size check); `SetReadLimit` uses that ceiling above policy wire size so gorilla does not close with empty **1009** before the reply can flush. Residual over-ceiling reads still log `ErrReadLimit` without enqueueing a System message ([#114](https://github.com/Cod-e-Codes/marchat/issues/114) follow-up).
 - **Docs**: **PROTOCOL** / **TESTING** / **README** document DoS ceiling vs policy reject; main-module coverage refreshed to **46.3%**.
+- **Packaging**: Version strings and URLs for **v1.3.4** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.4** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.3.3
 

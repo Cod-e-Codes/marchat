@@ -6,6 +6,7 @@
 ### Server
 
 - **File uploads**: **Fix** oversized file WebSocket messages use explicit read-limit handling with correct rejection logging; read limit accounts for base64 JSON wire size; rejects declared `size` and actual payload length above the limit; sends a System reply when the connection is still writable ([#114](https://github.com/Cod-e-Codes/marchat/issues/114))
+> **Note:** v1.3.3 improved rejection logging and the client **1009** banner, but a System chat reply for wire-oversized uploads often did not reach clients (gorilla closes with empty **1009** before the reply can flush). Upgrade to **[v1.3.4](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.4)** for the client-facing System message fix.
 
 ### Client
 
@@ -50,3 +51,13 @@
 - **Client / server**: restart after upgrade; no database schema changes in this release.
 - **Operators on v1.3.2**: upgrade server and client together if file uploads are used; plugin installs benefit from archive extraction hardening.
 - **Packaging maintainers**: run **`scripts/post-release-v1.3.3.ps1`** or **`packaging/ci/render-release-manifests.sh`** after zips publish to refresh SHA256 in **`packaging/`** and downstream manifests.
+
+## Docker Image
+
+A multi-architecture Docker image (linux/amd64, linux/arm64) is available on Docker Hub:
+
+```bash
+docker pull codecodesxyz/marchat:v1.3.3
+# or use latest tag
+docker pull codecodesxyz/marchat:latest
+```

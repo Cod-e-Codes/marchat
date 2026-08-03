@@ -8,7 +8,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
-VERSION="v1.3.3"
+VERSION="v1.3.4"
 BUILD_TIME="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 GIT_COMMIT="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
 
