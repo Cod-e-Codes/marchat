@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -19,7 +20,32 @@ const (
 	rateLimitMessages = 20               // max messages per rate window
 	rateLimitWindow   = 5 * time.Second  // sliding window duration
 	rateLimitCooldown = 10 * time.Second // cooldown after exceeding limit
+
+	// ChaCha20-Poly1305 wire overhead when file bytes are E2E encrypted (nonce + tag).
+	e2eFileWireOverhead = 28
+	// JSON field names, sender, filename, timestamps, and braces beyond base64 payload.
+	fileMessageJSONOverhead = 512
 )
+
+// fileMessageReadLimit returns the maximum WebSocket message size for an allowed file
+// message on the wire (base64-encoded JSON payload plus framing overhead).
+func fileMessageReadLimit(maxFileBytes int64) int64 {
+	if maxFileBytes <= 0 {
+		maxFileBytes = 1024 * 1024
+	}
+	payload := maxFileBytes + int64(e2eFileWireOverhead)
+	base64Len := ((payload + 2) / 3) * 4
+	return base64Len + int64(fileMessageJSONOverhead)
+}
+
+func fileTooLargeSystemMessage(maxBytes int64) shared.Message {
+	return shared.Message{
+		Sender:    "System",
+		Content:   fmt.Sprintf("File not sent: exceeds maximum size limit (%d bytes)", maxBytes),
+		CreatedAt: time.Now(),
+		Type:      shared.TextMessage,
+	}
+}
 
 type Client struct {
 	hub                  *Hub
@@ -40,12 +66,8 @@ func (c *Client) readPump() {
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
-	// Allow up to configured max file size (+ small overhead for JSON framing)
-	limit := int64(1024*1024) + 512
-	if c.maxFileBytes > 0 {
-		limit = c.maxFileBytes + 512
-	}
-	c.conn.SetReadLimit(limit)
+	// Cap wire size to the largest allowed file message (base64 JSON, not raw bytes).
+	c.conn.SetReadLimit(fileMessageReadLimit(c.maxFileBytes))
 	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
 		log.Printf("SetReadDeadline error: %v", err)
 	}
@@ -64,6 +86,15 @@ func (c *Client) readPump() {
 		var msg shared.Message
 		err := c.conn.ReadJSON(&msg)
 		if err != nil {
+			if errors.Is(err, websocket.ErrReadLimit) {
+				maxBytes := c.maxFileBytes
+				if maxBytes <= 0 {
+					maxBytes = 1024 * 1024
+				}
+				log.Printf("Rejected oversized message from %s: read limit exceeded (max file %d bytes)", c.username, maxBytes)
+				c.send <- fileTooLargeSystemMessage(maxBytes)
+				break
+			}
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) {
 				log.Printf("Client %s disconnected unexpectedly: %v", c.username, err)
 			} else {
@@ -103,8 +134,9 @@ func (c *Client) readPump() {
 			if maxBytes <= 0 {
 				maxBytes = 1024 * 1024
 			}
-			if msg.File.Size > maxBytes {
-				log.Printf("Rejected file from %s: too large (%d bytes)", c.username, msg.File.Size)
+			if msg.File.Size > maxBytes || int64(len(msg.File.Data)) > maxBytes {
+				log.Printf("Rejected file from %s: too large (declared %d bytes, payload %d bytes)", c.username, msg.File.Size, len(msg.File.Data))
+				c.send <- fileTooLargeSystemMessage(maxBytes)
 				continue
 			}
 			c.stampSenderTimedOutbound(&msg)

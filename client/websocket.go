@@ -352,6 +352,10 @@ func (m *model) connectWebSocket(serverURL string) error {
 					log.Printf("WebSocket closed normally")
 					return
 				}
+				if websocket.IsCloseError(readErr, websocket.CloseMessageTooBig) {
+					m.deliverWSMsg(wsErr{fmt.Errorf("file exceeds server size limit")})
+					return
+				}
 				re := readErr.Error()
 				if strings.Contains(strings.ToLower(re), "username already taken") ||
 					strings.Contains(strings.ToLower(re), "username is already taken") ||

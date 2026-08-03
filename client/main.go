@@ -1170,7 +1170,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case wsErr:
 		m.connected = false
-		m.banner = "[WARN] Connection lost. Reconnecting..."
+		if strings.Contains(strings.ToLower(v.error.Error()), "file exceeds server size limit") {
+			m.banner = "[ERROR] File exceeds server size limit"
+		} else {
+			m.banner = "[WARN] Connection lost. Reconnecting..."
+		}
 		m.closeWebSocket()
 		delay := m.reconnectDelay
 		if delay < reconnectMaxDelay {

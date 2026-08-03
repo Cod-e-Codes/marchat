@@ -121,10 +121,7 @@ func TestClient_ReadPump_ConnectionSettings(t *testing.T) {
 	}
 
 	// Test that we can set read limits and deadlines
-	limit := int64(1024*1024) + 512
-	if client.maxFileBytes > 0 {
-		limit = client.maxFileBytes + 512
-	}
+	limit := fileMessageReadLimit(client.maxFileBytes)
 
 	client.conn.SetReadLimit(limit)
 

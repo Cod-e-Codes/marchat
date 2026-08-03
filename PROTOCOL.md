@@ -95,7 +95,7 @@ Optional fields (`recipient`, `reaction`, etc.) are omitted from JSON when unset
 }
 ```
 
-Maximum file size is configurable (default 1MB). Files exceeding this size are rejected.
+Maximum file size is configurable (default 1MB). Files exceeding this size are rejected with a System message when the WebSocket message is still readable; wire payloads above the server's read limit close the connection with close code **1009** (message too big).
 Configure via environment variables on the server:
 
 - `MARCHAT_MAX_FILE_BYTES`: exact byte limit (takes precedence)

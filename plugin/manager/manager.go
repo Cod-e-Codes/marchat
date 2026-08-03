@@ -554,7 +554,7 @@ func replacePluginDir(pluginPath, stagingDir string) error {
 	return nil
 }
 
-func archiveFilePath(root, name string) (string, error) {
+func validateArchiveEntryName(name string) (string, error) {
 	original := name
 	name = strings.ReplaceAll(name, `\`, "/")
 	if name == "" || strings.HasPrefix(name, "/") {
@@ -571,13 +571,36 @@ func archiveFilePath(root, name string) (string, error) {
 	if clean == "." {
 		return "", fmt.Errorf("unsafe file path in archive: %s", original)
 	}
+	if !filepath.IsLocal(filepath.FromSlash(clean)) {
+		return "", fmt.Errorf("unsafe file path in archive: %s", original)
+	}
+	return clean, nil
+}
+
+func archiveFilePath(root, name string) (string, error) {
+	clean, err := validateArchiveEntryName(name)
+	if err != nil {
+		return "", err
+	}
 
 	target := filepath.Join(root, filepath.FromSlash(clean))
 	rel, err := filepath.Rel(root, target)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("unsafe file path in archive: %s", original)
+		return "", fmt.Errorf("unsafe file path in archive: %s", name)
 	}
 	return target, nil
+}
+
+func archiveEntryOSPath(clean string) string {
+	return filepath.FromSlash(clean)
+}
+
+func archiveParentDir(entryName string) string {
+	parent := path.Dir(entryName)
+	if parent == "." || parent == "/" {
+		return ""
+	}
+	return archiveEntryOSPath(parent)
 }
 
 func archiveEntryBaseName(name string) string {
@@ -595,25 +618,34 @@ func (pm *PluginManager) extractZip(file *os.File, destDir, pluginName string) e
 		return fmt.Errorf("failed to open zip file: %w", err)
 	}
 
+	root, err := os.OpenRoot(destDir)
+	if err != nil {
+		return fmt.Errorf("failed to open extraction directory: %w", err)
+	}
+	defer root.Close()
+
 	for _, file := range zipReader.File {
-		filePath, err := archiveFilePath(destDir, file.Name)
+		entryName, err := validateArchiveEntryName(file.Name)
 		if err != nil {
 			return err
 		}
+		entryPath := archiveEntryOSPath(entryName)
 		if file.FileInfo().IsDir() {
-			if err := os.MkdirAll(filePath, 0755); err != nil {
+			if err := root.MkdirAll(entryPath, 0755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-			return fmt.Errorf("failed to create parent directory: %w", err)
+		if parent := archiveParentDir(entryName); parent != "" {
+			if err := root.MkdirAll(parent, 0755); err != nil {
+				return fmt.Errorf("failed to create parent directory: %w", err)
+			}
 		}
-		if err := extractZipFile(file, filePath); err != nil {
+		if err := extractZipFile(root, file, entryPath); err != nil {
 			return err
 		}
 		if archiveEntryBaseName(file.Name) == pluginName {
-			if err := os.Chmod(filePath, 0755); err != nil {
+			if err := root.Chmod(entryPath, 0755); err != nil {
 				return fmt.Errorf("failed to make executable: %w", err)
 			}
 		}
@@ -621,14 +653,14 @@ func (pm *PluginManager) extractZip(file *os.File, destDir, pluginName string) e
 	return nil
 }
 
-func extractZipFile(file *zip.File, dst string) error {
+func extractZipFile(root *os.Root, file *zip.File, entryPath string) error {
 	src, err := file.Open()
 	if err != nil {
 		return fmt.Errorf("failed to open file in zip: %w", err)
 	}
 	defer src.Close()
 
-	out, err := os.Create(dst)
+	out, err := root.Create(entryPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}
@@ -648,6 +680,12 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, destDir, pluginName stri
 	}
 	defer gzReader.Close()
 
+	root, err := os.OpenRoot(destDir)
+	if err != nil {
+		return fmt.Errorf("failed to open extraction directory: %w", err)
+	}
+	defer root.Close()
+
 	tarReader := tar.NewReader(gzReader)
 	for {
 		header, err := tarReader.Next()
@@ -658,24 +696,27 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, destDir, pluginName stri
 			return fmt.Errorf("failed to read tar header: %w", err)
 		}
 
-		filePath, err := archiveFilePath(destDir, header.Name)
+		entryName, err := validateArchiveEntryName(header.Name)
 		if err != nil {
 			return err
 		}
+		entryPath := archiveEntryOSPath(entryName)
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(filePath, 0755); err != nil {
+			if err := root.MkdirAll(entryPath, 0755); err != nil {
 				return fmt.Errorf("failed to create directory: %w", err)
 			}
 		case tar.TypeReg:
-			if err := os.MkdirAll(filepath.Dir(filePath), 0755); err != nil {
-				return fmt.Errorf("failed to create parent directory: %w", err)
+			if parent := archiveParentDir(entryName); parent != "" {
+				if err := root.MkdirAll(parent, 0755); err != nil {
+					return fmt.Errorf("failed to create parent directory: %w", err)
+				}
 			}
-			if err := extractTarFile(tarReader, filePath); err != nil {
+			if err := extractTarFile(root, tarReader, entryPath); err != nil {
 				return err
 			}
 			if archiveEntryBaseName(header.Name) == pluginName {
-				if err := os.Chmod(filePath, 0755); err != nil {
+				if err := root.Chmod(entryPath, 0755); err != nil {
 					return fmt.Errorf("failed to make executable: %w", err)
 				}
 			}
@@ -684,8 +725,8 @@ func (pm *PluginManager) extractTarGz(reader io.Reader, destDir, pluginName stri
 	return nil
 }
 
-func extractTarFile(reader io.Reader, dst string) error {
-	out, err := os.Create(dst)
+func extractTarFile(root *os.Root, reader io.Reader, entryPath string) error {
+	out, err := root.Create(entryPath)
 	if err != nil {
 		return fmt.Errorf("failed to create file: %w", err)
 	}

@@ -28,7 +28,7 @@ JSON IPC over stdin/stdout. Packages: `plugin/sdk`, `plugin/host`, `plugin/manag
 ## Manager
 
 - State in `plugin_state.json` under server data directory.
-- Install: SHA-256 checksum, size limits, zip-slip checks, staging rollback, execute bit on binary by exact name.
+- Install: SHA-256 checksum, size limits, zip-slip checks (`validateArchiveEntryName`, `filepath.IsLocal`, `os.OpenRoot` scoped writes), staging rollback, execute bit on binary by exact name.
 - `file://` URLs: `plugin/fileurl` (Linux/Windows).
 - Non-admin users may run chat commands when manifest `AdminOnly: false`.
 

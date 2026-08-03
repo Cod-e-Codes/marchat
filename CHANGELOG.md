@@ -7,6 +7,9 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 - **Dependencies**: **modernc.org/sqlite** v1.55.0 (SQLite 3.53.3; **modernc.org/libc** v1.74.1); **github.com/mattn/go-runewidth** v0.0.27.
+- **Server**: **Fix:** oversized file WebSocket messages hit explicit read-limit handling with correct rejection logging and a System reply when the connection is still writable; read limit accounts for base64 JSON wire size (not raw bytes only); rejects declared `size` and actual payload length above the limit.
+- **Client**: **Fix:** WebSocket close **1009** (message too big) shows a file-size error instead of a generic reconnect warning.
+- **Plugins**: Archive extraction uses **`os.OpenRoot`** scoped writes and **`filepath.IsLocal`** entry validation so zip-slip static analysis and runtime checks align.
 
 ## v1.3.2
 
