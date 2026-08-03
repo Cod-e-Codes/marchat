@@ -6,10 +6,16 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
-- **Dependencies**: **modernc.org/sqlite** v1.55.0 (SQLite 3.53.3; **modernc.org/libc** v1.74.1); **github.com/mattn/go-runewidth** v0.0.27.
-- **Server**: **Fix:** oversized file WebSocket messages hit explicit read-limit handling with correct rejection logging and a System reply when the connection is still writable; read limit accounts for base64 JSON wire size (not raw bytes only); rejects declared `size` and actual payload length above the limit.
+## v1.3.3
+
+**Released 2026-08-03.** Since **[v1.3.2](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.2)**; compare [`v1.3.2...v1.3.3`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.2...v1.3.3). Commits: **`git log v1.3.2..v1.3.3 --oneline`**.
+
+- **Server**: **Fix:** oversized file WebSocket messages hit explicit read-limit handling with correct rejection logging and a System reply when the connection is still writable; read limit accounts for base64 JSON wire size (not raw bytes only); rejects declared `size` and actual payload length above the limit ([#114](https://github.com/Cod-e-Codes/marchat/issues/114)).
 - **Client**: **Fix:** WebSocket close **1009** (message too big) shows a file-size error instead of a generic reconnect warning.
-- **Plugins**: Archive extraction uses **`os.OpenRoot`** scoped writes and **`filepath.IsLocal`** entry validation so zip-slip static analysis and runtime checks align.
+- **Plugins**: Archive extraction uses **`os.OpenRoot`** scoped writes and **`filepath.IsLocal`** entry validation so zip-slip static analysis and runtime checks align (CodeQL **go/zipslip**).
+- **Docs**: **PROTOCOL** and **TESTING** note file rejection behavior and refreshed coverage (**46.4%** main module).
+- **Dependencies**: **modernc.org/sqlite** v1.55.0 (SQLite 3.53.3; **modernc.org/libc** v1.74.1); **github.com/mattn/go-runewidth** v0.0.27.
+- **Packaging**: Version strings and URLs for **v1.3.3** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.3** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.3.2
 
