@@ -26,7 +26,7 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 - All outbound/persist paths stamp `sender` from the authenticated session (`stampSenderTimedOutbound`); NUL bytes in persistable `content` are rejected before insert.
 - Reserved usernames during handshake (no double-book before registration).
 - Serialized writes per connection (`client.go`).
-- File uploads: `SetReadLimit` uses `fileMessageReadLimit` (base64 JSON wire size for allowed max file bytes); `ErrReadLimit` and declared/payload size checks send a System reply and log rejection (not a normal disconnect).
+- File uploads: `SetReadLimit` uses `websocketReadLimit` (max of policy `fileMessageReadLimit` wire size and a **32 MiB** DoS ceiling) so modest oversize is fully read; declared/payload checks send a System reply and `continue`. `ErrReadLimit` (above the ceiling) logs rejection only - gorilla already sent empty close **1009**, so a System enqueue cannot flush.
 - Read-pump rate limits: constants shared with `loadverify_ratelimit_test.go`.
 - Handshake replay: up to 50 **visible** recent messages (SQL limit after DM/public filter).
 

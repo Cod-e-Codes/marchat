@@ -25,6 +25,12 @@ const (
 	e2eFileWireOverhead = 28
 	// JSON field names, sender, filename, timestamps, and braces beyond base64 payload.
 	fileMessageJSONOverhead = 512
+
+	// Absolute WebSocket message ceiling. Policy max-file wire size uses
+	// fileMessageReadLimit; this higher DoS cap lets modestly oversized file
+	// messages be fully read so the app layer can reply with a System message
+	// instead of gorilla's empty close 1009 (ErrReadLimit).
+	maxWebSocketMessageBytes int64 = 32 << 20
 )
 
 // fileMessageReadLimit returns the maximum WebSocket message size for an allowed file
@@ -36,6 +42,19 @@ func fileMessageReadLimit(maxFileBytes int64) int64 {
 	payload := maxFileBytes + int64(e2eFileWireOverhead)
 	base64Len := ((payload + 2) / 3) * 4
 	return base64Len + int64(fileMessageJSONOverhead)
+}
+
+// websocketReadLimit is the SetReadLimit value: at least the policy wire size for
+// the largest allowed file, and at least maxWebSocketMessageBytes so typical
+// oversize uploads are rejected after parse with a System reply (connection stays
+// open). Operators with MARCHAT_MAX_FILE_BYTES large enough that policy wire size
+// exceeds the DoS ceiling still get a limit that admits max allowed files.
+func websocketReadLimit(maxFileBytes int64) int64 {
+	policy := fileMessageReadLimit(maxFileBytes)
+	if policy > maxWebSocketMessageBytes {
+		return policy
+	}
+	return maxWebSocketMessageBytes
 }
 
 func fileTooLargeSystemMessage(maxBytes int64) shared.Message {
@@ -66,8 +85,9 @@ func (c *Client) readPump() {
 		c.hub.unregister <- c
 		c.conn.Close()
 	}()
-	// Cap wire size to the largest allowed file message (base64 JSON, not raw bytes).
-	c.conn.SetReadLimit(fileMessageReadLimit(c.maxFileBytes))
+	// Cap wire size with DoS headroom above policy so modest oversize is readable
+	// and rejected with a System message; gorilla ErrReadLimit still applies above this.
+	c.conn.SetReadLimit(websocketReadLimit(c.maxFileBytes))
 	if err := c.conn.SetReadDeadline(time.Now().Add(pongWait)); err != nil {
 		log.Printf("SetReadDeadline error: %v", err)
 	}
@@ -91,8 +111,9 @@ func (c *Client) readPump() {
 				if maxBytes <= 0 {
 					maxBytes = 1024 * 1024
 				}
+				// gorilla already sent close 1009 with an empty reason; a System
+				// enqueue cannot be flushed (write fails with "close sent").
 				log.Printf("Rejected oversized message from %s: read limit exceeded (max file %d bytes)", c.username, maxBytes)
-				c.send <- fileTooLargeSystemMessage(maxBytes)
 				break
 			}
 			if websocket.IsUnexpectedCloseError(err, websocket.CloseAbnormalClosure) {

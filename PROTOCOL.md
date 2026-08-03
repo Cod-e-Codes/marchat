@@ -95,8 +95,7 @@ Optional fields (`recipient`, `reaction`, etc.) are omitted from JSON when unset
 }
 ```
 
-Maximum file size is configurable (default 1MB). Files exceeding this size are rejected with a System message when the WebSocket message is still readable; wire payloads above the server's read limit close the connection with close code **1009** (message too big).
-Configure via environment variables on the server:
+Maximum file size is configurable (default 1MB). Oversized files (declared `size` or actual payload above the limit) are rejected with a System message and the connection stays open when the WebSocket message fits under the server's absolute read ceiling (**32 MiB**, or the policy wire size of the configured max file if larger). That ceiling is intentionally above the policy max-file wire size so typical oversize uploads are fully readable and get the System reply instead of an empty close. Wire payloads above the absolute read ceiling close the connection with close code **1009** (message too big); the marchat client maps **1009** to a file-size error. Configure via environment variables on the server:
 
 - `MARCHAT_MAX_FILE_BYTES`: exact byte limit (takes precedence)
 - `MARCHAT_MAX_FILE_MB`: size in megabytes

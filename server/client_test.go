@@ -121,7 +121,7 @@ func TestClient_ReadPump_ConnectionSettings(t *testing.T) {
 	}
 
 	// Test that we can set read limits and deadlines
-	limit := fileMessageReadLimit(client.maxFileBytes)
+	limit := websocketReadLimit(client.maxFileBytes)
 
 	client.conn.SetReadLimit(limit)
 
