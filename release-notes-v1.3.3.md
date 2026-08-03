@@ -1,7 +1,7 @@
 ## v1.3.3
 
 *Released: 3 August 2026*  
-*Commit: f3205d9*
+*Commit: 0e8a2e0*
 
 ### Server
 
@@ -19,6 +19,10 @@
 
 - **modernc.org/sqlite** v1.55.0 (SQLite 3.53.3; **modernc.org/libc** v1.74.1)
 - **github.com/mattn/go-runewidth** v0.0.27
+
+### Documentation
+
+- **PROTOCOL** and **TESTING** document file rejection behavior; main-module coverage refreshed to **46.4%**
 
 ### Version and packaging
 
