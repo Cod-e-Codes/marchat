@@ -620,6 +620,8 @@ func (w *WebAdminServer) handleUserAction(rw http.ResponseWriter, r *http.Reques
 				message = "You cannot kick yourself"
 			} else if errors.Is(err, ErrKickPermanentlyBanned) {
 				message = fmt.Sprintf("Cannot kick '%s': user is permanently banned", req.Username)
+			} else if errors.Is(err, ErrKickNotConnected) {
+				message = fmt.Sprintf("Cannot kick '%s': user is not connected", req.Username)
 			} else {
 				message = fmt.Sprintf("Failed to kick '%s': %v", req.Username, err)
 			}

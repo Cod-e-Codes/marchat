@@ -29,7 +29,7 @@ For Cursor, dependencies, or platform behavior not defined in this repo, verify 
 
 Update domain skills when shipped behavior changes. Recent fixes on `main` (or in flight):
 
-- Reconnect backoff advances on failure (not reset each `Init()`); channel stamping on server outbound messages
+- Kick/ban self-target rejection and online-only kick (`ErrKickNotConnected` for offline targets; `BanUser` offline-capable)
 - Client transcript notices: negative `message_id` classified by content; scoped to active channel
 - URL click: OSC 8 hyperlinks on wrapped segments (Lip Gloss v2); manual click fallback remains unreliable for wrapped long URLs; copy/paste when needed ([#103](https://github.com/Cod-e-Codes/marchat/issues/103))
 - Charm v2: `charm.land/*/v2`, `tea.View` + `KeyPressMsg`, overlay scroll/input routing in `scroll_input.go`

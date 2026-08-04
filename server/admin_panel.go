@@ -1656,6 +1656,8 @@ func (ap *AdminPanel) kickUser(username string) tea.Cmd {
 				msg = "ERROR: You cannot kick yourself"
 			} else if errors.Is(err, ErrKickPermanentlyBanned) {
 				msg = fmt.Sprintf("ERROR: Cannot kick '%s': user is permanently banned", username)
+			} else if errors.Is(err, ErrKickNotConnected) {
+				msg = fmt.Sprintf("ERROR: Cannot kick '%s': user is not connected", username)
 			}
 			return actionMsg{success: false, message: msg}
 		}

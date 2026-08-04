@@ -310,7 +310,7 @@ Run **`./marchat-client -doctor`** or **`./marchat-server -doctor`** for a text 
 | Command | Description | Hotkey |
 |---------|-------------|--------|
 | `:ban <user>` | Permanent ban | `Ctrl+B` (with user selected) |
-| `:kick <user>` | 24h temporary ban | `Ctrl+K` (with user selected) |
+| `:kick <user>` | Disconnect online user + 24h temp ban | `Ctrl+K` (with user selected) |
 | `:unban <user>` | Remove permanent ban | `Ctrl+Shift+B` |
 | `:allow <user>` | Override kick early | `Ctrl+Shift+A` |
 | `:forcedisconnect <user>` | Force disconnect user | `Ctrl+F` (with user selected) |
@@ -652,12 +652,13 @@ See [PLUGIN_ECOSYSTEM.md](PLUGIN_ECOSYSTEM.md) for the development guide and [ma
 
 ## Moderation System
 
-**Temporary Kicks (24 hours):**
-- `:kick <username>` or `Ctrl+K` for temporary discipline
+**Temporary Kicks (24 hours, online only):**
+- `:kick <username>` or `Ctrl+K` disconnects a connected user and applies a 24h temporary ban
+- Fails when the user is not connected (use `:ban` for offline moderation)
 - Auto-allowed after 24 hours, or override early with `:allow`
 - Ideal for cooling-off periods
 
-**Permanent Bans (indefinite):**
+**Permanent Bans (offline-capable):**
 - `:ban <username>` or `Ctrl+B` for serious violations
 - Remains until manual `:unban` or `Ctrl+Shift+B`
 - Ideal for persistent troublemakers

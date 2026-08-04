@@ -62,7 +62,7 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `cmd/server/main_test.go` | Server main function and startup | Flag parsing, configuration validation, TLS setup, admin normalization, `validateStartupConfig`, deprecated flags |
 | `cmd/server/subprocess_doctor_test.go` | Server binary smoke | `go run ./cmd/server -doctor` / `-doctor-json` subprocess (covers `main` early exits) |
 | `server/handlers_test.go` | Server-side request handling | Database operations, message insertion, visible handshake replay (`GetRecentMessagesForUser`), reconnect replay, DM limit under DM noise, IP extraction |
-| `server/hub_test.go` | WebSocket hub management | User bans, kicks, connection management, non-blocking send verification |
+| `server/hub_test.go` | WebSocket hub management | User bans, online-only kicks, connection management, non-blocking send verification |
 | `server/loadverify_ratelimit_test.go` | WebSocket read-pump rate limit | Window, burst (20), and cooldown behavior (same constants as `client.go`) |
 | `server/loadverify_bench_test.go` | Hub broadcast benchmarks (optional) | Channel vs system-wide fan-out, parallel senders, JSON marshal baseline; see [Optional hub load benchmarks](#optional-hub-load-benchmarks-server) |
 | `server/integration_test.go` | End-to-end workflows | Message flow, ban flow, WebSocket handshake replay on reconnect (`TestIntegrationWebSocketHandshakeReplayOnReconnect`), concurrent operations |

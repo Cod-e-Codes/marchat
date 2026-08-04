@@ -113,7 +113,8 @@ func TestIntegrationUserBanFlow(t *testing.T) {
 		t.Error("User should not be banned after UnbanUser")
 	}
 
-	// Test kick flow
+	// Test kick flow (requires connected user)
+	registerTestClient(hub, username)
 	if err := hub.KickUser(username, adminUsername); err != nil {
 		t.Fatalf("KickUser returned unexpected error: %v", err)
 	}

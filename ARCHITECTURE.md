@@ -103,7 +103,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - Direct message routing between specific users
 - Message editing, deletion, pinning, and search
 - Typing indicator, reaction, and read receipt broadcasting (channel-scoped when `channel` is set after stamping)
-- User management including ban, kick, and allow operations (ban/kick state is committed under `banMutex`, then the lock is released before the actual disconnect to avoid holding the mutex across a channel send). `KickUser` and `BanUser` return errors; self-targets are rejected case-insensitively before any ban state is written, and callers (chat commands, admin TUI, web admin) claim success only when `err == nil`
+- User management including ban, kick, and allow operations (ban/kick state is committed under `banMutex`, then the lock is released before the actual disconnect to avoid holding the mutex across a channel send). `KickUser` and `BanUser` return errors; self-targets are rejected case-insensitively before any ban state is written, and callers (chat commands, admin TUI, web admin) claim success only when `err == nil`. `KickUser` is online-only (disconnect plus 24h temporary ban when the target has an active connection); offline moderation uses `BanUser` / `:ban`
 - Plugin command execution and management
 - Database backup via `:backup` and admin panels: **SQLite only** (`VACUUM INTO` with quoted paths). Postgres and MySQL deployments receive a clear error directing operators to native backup tools for `MARCHAT_DB_PATH`.
 - System metrics collection and health monitoring

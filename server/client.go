@@ -644,6 +644,8 @@ func (c *Client) handleCommand(command string) {
 				content = "You cannot kick yourself."
 			} else if errors.Is(err, ErrKickPermanentlyBanned) {
 				content = "Cannot kick '" + targetUsername + "': user is permanently banned."
+			} else if errors.Is(err, ErrKickNotConnected) {
+				content = "Cannot kick '" + targetUsername + "': user is not connected."
 			}
 			c.send <- shared.Message{
 				Sender:    "System",

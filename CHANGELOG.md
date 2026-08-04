@@ -7,6 +7,7 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 - **Server**: **Fix:** `:kick` / `:ban` (and admin TUI / web user actions) reject self-targets case-insensitively and return clear errors instead of disconnecting the admin and writing a 24h ban; `KickUser` / `BanUser` return errors so callers claim success only on `nil`; kicking an already permanently banned user returns an error without claiming success ([#115](https://github.com/Cod-e-Codes/marchat/issues/115)).
+- **Server**: **Fix:** `:kick` (and admin TUI / web kick actions) are online-only: `KickUser` requires an active WebSocket connection, disconnects the target, and applies a 24h temporary ban; offline or never-connected users return `ErrKickNotConnected` with no `tempKicks` entry or `ban_history` row; `:ban` / `BanUser` remain offline-capable ([#116](https://github.com/Cod-e-Codes/marchat/issues/116)).
 
 ## v1.3.4
 
