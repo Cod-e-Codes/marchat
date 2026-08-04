@@ -175,6 +175,15 @@ func (c *Client) readPump() {
 				}
 				continue
 			}
+			if plaintextContentEmpty(msg.Content, msg.Encrypted) {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: empty content",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
 			if err := EditMessage(c.db, msg.MessageID, c.username, msg.Content, msg.Encrypted); err != nil {
 				c.send <- shared.Message{
 					Sender:    "System",
@@ -228,6 +237,15 @@ func (c *Client) readPump() {
 				c.send <- shared.Message{
 					Sender:    "System",
 					Content:   "Message not sent: invalid character in content",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
+			if plaintextContentEmpty(msg.Content, msg.Encrypted) {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: empty content",
 					CreatedAt: time.Now(),
 					Type:      shared.TextMessage,
 				}
@@ -401,6 +419,15 @@ func (c *Client) readPump() {
 			c.send <- shared.Message{
 				Sender:    "System",
 				Content:   "Message not sent: invalid character in content",
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			continue
+		}
+		if plaintextContentEmpty(msg.Content, msg.Encrypted) {
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   "Message not sent: empty content",
 				CreatedAt: time.Now(),
 				Type:      shared.TextMessage,
 			}

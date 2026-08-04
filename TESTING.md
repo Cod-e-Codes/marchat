@@ -78,6 +78,8 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `server/client_sender_spoof_test.go` | Sender identity enforcement | Integration tests that wire `sender` is ignored on text/file paths (`stampSenderTimedOutbound`) |
 | `server/client_file_limit_test.go` | File size limits | `fileMessageReadLimit` / `websocketReadLimit` (32 MiB DoS ceiling); System reply before close for modest wire oversize; connection stays usable after reject |
 | `server/client_nullbyte_test.go` | NUL content validation | `contentContainsNUL`, SQLite NUL insert baseline, integration reject-no-broadcast |
+| `server/message_validate_test.go` | Plaintext empty helper | `plaintextContentEmpty` table-driven cases (empty, whitespace, encrypted opaque) |
+| `server/client_empty_content_test.go` | Empty plaintext rejection | Integration reject for text/DM/edit; encrypted opaque accept; command path still works |
 | `server/health_test.go` | Server health monitoring | Health checks, system metrics, HTTP endpoints, concurrent access |
 | `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, extended fields (channel, encrypted, message_id, recipient, edited), JSON serialization, omitempty validation, backwards-compat unknown-field handling |
 | `plugin/sdk/stdio_test.go` | Plugin SDK stdio | `HandlePluginRequest` / `RunIO` (init, message, command, shutdown), EOF handling |
