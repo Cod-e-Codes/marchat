@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"net/http"
@@ -594,9 +595,17 @@ func (w *WebAdminServer) handleUserAction(rw http.ResponseWriter, r *http.Reques
 
 	switch req.Action {
 	case "ban":
-		w.hub.BanUser(req.Username, "web-admin")
-		message = fmt.Sprintf("User '%s' has been banned", req.Username)
-		success = true
+		if err := w.hub.BanUser(req.Username, "web-admin"); err != nil {
+			success = false
+			if errors.Is(err, ErrAdminSelfTarget) {
+				message = "You cannot ban yourself"
+			} else {
+				message = fmt.Sprintf("Failed to ban '%s': %v", req.Username, err)
+			}
+		} else {
+			message = fmt.Sprintf("User '%s' has been banned", req.Username)
+			success = true
+		}
 	case "unban":
 		success = w.hub.UnbanUser(req.Username, "web-admin")
 		if success {
@@ -605,9 +614,19 @@ func (w *WebAdminServer) handleUserAction(rw http.ResponseWriter, r *http.Reques
 			message = fmt.Sprintf("User '%s' was not found in ban list", req.Username)
 		}
 	case "kick":
-		w.hub.KickUser(req.Username, "web-admin")
-		message = fmt.Sprintf("User '%s' has been kicked (24h)", req.Username)
-		success = true
+		if err := w.hub.KickUser(req.Username, "web-admin"); err != nil {
+			success = false
+			if errors.Is(err, ErrAdminSelfTarget) {
+				message = "You cannot kick yourself"
+			} else if errors.Is(err, ErrKickPermanentlyBanned) {
+				message = fmt.Sprintf("Cannot kick '%s': user is permanently banned", req.Username)
+			} else {
+				message = fmt.Sprintf("Failed to kick '%s': %v", req.Username, err)
+			}
+		} else {
+			message = fmt.Sprintf("User '%s' has been kicked (24h)", req.Username)
+			success = true
+		}
 	case "allow":
 		success = w.hub.AllowUser(req.Username, "web-admin")
 		if success {

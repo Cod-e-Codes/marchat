@@ -638,7 +638,21 @@ func (c *Client) handleCommand(command string) {
 			}
 			return
 		}
-		c.hub.KickUser(targetUsername, c.username)
+		if err := c.hub.KickUser(targetUsername, c.username); err != nil {
+			content := "Failed to kick user: " + err.Error()
+			if errors.Is(err, ErrAdminSelfTarget) {
+				content = "You cannot kick yourself."
+			} else if errors.Is(err, ErrKickPermanentlyBanned) {
+				content = "Cannot kick '" + targetUsername + "': user is permanently banned."
+			}
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   content,
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			return
+		}
 		c.send <- shared.Message{
 			Sender:    "System",
 			Content:   "User '" + targetUsername + "' has been kicked (24 hour temporary ban).",
@@ -666,7 +680,19 @@ func (c *Client) handleCommand(command string) {
 			}
 			return
 		}
-		c.hub.BanUser(targetUsername, c.username)
+		if err := c.hub.BanUser(targetUsername, c.username); err != nil {
+			content := "Failed to ban user: " + err.Error()
+			if errors.Is(err, ErrAdminSelfTarget) {
+				content = "You cannot ban yourself."
+			}
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   content,
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			return
+		}
 		c.send <- shared.Message{
 			Sender:    "System",
 			Content:   "User '" + targetUsername + "' has been permanently banned.",

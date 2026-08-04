@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"errors"
 	"sort"
 	"strings"
 	"testing"
@@ -79,7 +80,9 @@ func TestHubBanUser(t *testing.T) {
 	adminUsername := "admin"
 
 	// Test banning a user
-	hub.BanUser(username, adminUsername)
+	if err := hub.BanUser(username, adminUsername); err != nil {
+		t.Fatalf("BanUser returned unexpected error: %v", err)
+	}
 
 	// Check if user is banned
 	if !hub.IsUserBanned(username) {
@@ -114,7 +117,9 @@ func TestHubUnbanUser(t *testing.T) {
 	adminUsername := "admin"
 
 	// First ban the user
-	hub.BanUser(username, adminUsername)
+	if err := hub.BanUser(username, adminUsername); err != nil {
+		t.Fatalf("BanUser returned unexpected error: %v", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("User should be banned")
 	}
@@ -153,7 +158,9 @@ func TestHubKickUser(t *testing.T) {
 	adminUsername := "admin"
 
 	// Test kicking a user
-	hub.KickUser(username, adminUsername)
+	if err := hub.KickUser(username, adminUsername); err != nil {
+		t.Fatalf("KickUser returned unexpected error: %v", err)
+	}
 
 	// Check if user is kicked (temporarily banned)
 	if !hub.IsUserBanned(username) {
@@ -163,6 +170,102 @@ func TestHubKickUser(t *testing.T) {
 	// Check case insensitive
 	if !hub.IsUserBanned(strings.ToUpper(username)) {
 		t.Error("Kick should be case insensitive")
+	}
+
+	// Offline kick still creates a 24h temporary ban entry
+	hub.banMutex.RLock()
+	kickExpiry, exists := hub.tempKicks[strings.ToLower(username)]
+	hub.banMutex.RUnlock()
+	if !exists {
+		t.Fatal("KickUser should write tempKicks even when user is offline")
+	}
+	until := time.Until(kickExpiry)
+	if until < 23*time.Hour || until > 24*time.Hour {
+		t.Errorf("kick expiry should be about 24h from now, got remaining %v", until)
+	}
+}
+
+func TestHubRejectsSelfKickAndBan(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	adminUsername := "Alice"
+
+	cases := []string{"Alice", "alice", "ALICE", "aLiCe"}
+	for _, target := range cases {
+		err := hub.KickUser(target, adminUsername)
+		if !errors.Is(err, ErrAdminSelfTarget) {
+			t.Fatalf("KickUser(%q, %q): got %v, want ErrAdminSelfTarget", target, adminUsername, err)
+		}
+		hub.banMutex.RLock()
+		_, inTemp := hub.tempKicks[strings.ToLower(target)]
+		_, inBans := hub.bans[strings.ToLower(target)]
+		hub.banMutex.RUnlock()
+		if inTemp {
+			t.Fatalf("self-kick %q must not write tempKicks", target)
+		}
+		if inBans {
+			t.Fatalf("self-kick %q must not write permanent bans", target)
+		}
+		if hub.IsUserBanned(target) {
+			t.Fatalf("self-kick %q must leave user unbanned", target)
+		}
+
+		err = hub.BanUser(target, adminUsername)
+		if !errors.Is(err, ErrAdminSelfTarget) {
+			t.Fatalf("BanUser(%q, %q): got %v, want ErrAdminSelfTarget", target, adminUsername, err)
+		}
+		hub.banMutex.RLock()
+		_, inTemp = hub.tempKicks[strings.ToLower(target)]
+		_, inBans = hub.bans[strings.ToLower(target)]
+		hub.banMutex.RUnlock()
+		if inTemp {
+			t.Fatalf("self-ban %q must not write tempKicks", target)
+		}
+		if inBans {
+			t.Fatalf("self-ban %q must not write permanent bans", target)
+		}
+		if hub.IsUserBanned(target) {
+			t.Fatalf("self-ban %q must leave user unbanned", target)
+		}
+	}
+}
+
+func TestHubKickPermanentlyBannedReturnsError(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	username := "banneduser"
+	adminUsername := "admin"
+
+	if err := hub.BanUser(username, adminUsername); err != nil {
+		t.Fatalf("BanUser returned unexpected error: %v", err)
+	}
+
+	err = hub.KickUser(username, adminUsername)
+	if !errors.Is(err, ErrKickPermanentlyBanned) {
+		t.Fatalf("KickUser of permanently banned user: got %v, want ErrKickPermanentlyBanned", err)
+	}
+
+	hub.banMutex.RLock()
+	_, inTemp := hub.tempKicks[strings.ToLower(username)]
+	_, inBans := hub.bans[strings.ToLower(username)]
+	hub.banMutex.RUnlock()
+	if inTemp {
+		t.Error("kick of permanently banned user must not write tempKicks")
+	}
+	if !inBans {
+		t.Error("permanent ban must remain after failed kick")
 	}
 }
 
@@ -182,7 +285,9 @@ func TestHubAllowUser(t *testing.T) {
 	adminUsername := "admin"
 
 	// First kick the user
-	hub.KickUser(username, adminUsername)
+	if err := hub.KickUser(username, adminUsername); err != nil {
+		t.Fatalf("KickUser returned unexpected error: %v", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("User should be kicked")
 	}
@@ -221,19 +326,26 @@ func TestHubBanOverridesKick(t *testing.T) {
 	adminUsername := "admin"
 
 	// First kick the user
-	hub.KickUser(username, adminUsername)
+	if err := hub.KickUser(username, adminUsername); err != nil {
+		t.Fatalf("KickUser returned unexpected error: %v", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("User should be kicked")
 	}
 
 	// Now ban the user (should override kick)
-	hub.BanUser(username, adminUsername)
+	if err := hub.BanUser(username, adminUsername); err != nil {
+		t.Fatalf("BanUser returned unexpected error: %v", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("User should be banned")
 	}
 
 	// Try to kick a permanently banned user (should not work)
-	hub.KickUser(username, adminUsername)
+	err = hub.KickUser(username, adminUsername)
+	if !errors.Is(err, ErrKickPermanentlyBanned) {
+		t.Fatalf("KickUser of permanently banned user: got %v, want ErrKickPermanentlyBanned", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("Permanently banned user should remain banned")
 	}
@@ -255,7 +367,9 @@ func TestHubCleanupExpiredBans(t *testing.T) {
 	adminUsername := "admin"
 
 	// Kick a user (24 hour temporary ban)
-	hub.KickUser(username, adminUsername)
+	if err := hub.KickUser(username, adminUsername); err != nil {
+		t.Fatalf("KickUser returned unexpected error: %v", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("User should be kicked")
 	}
@@ -331,7 +445,9 @@ func TestHubBanCaseInsensitive(t *testing.T) {
 	adminUsername := "admin"
 
 	// Ban user with mixed case
-	hub.BanUser(username, adminUsername)
+	if err := hub.BanUser(username, adminUsername); err != nil {
+		t.Fatalf("BanUser returned unexpected error: %v", err)
+	}
 
 	// Test various case combinations
 	testCases := []string{
@@ -365,7 +481,9 @@ func TestHubMultipleBansAndKicks(t *testing.T) {
 
 	// Ban multiple users
 	for _, user := range users {
-		hub.BanUser(user, adminUsername)
+		if err := hub.BanUser(user, adminUsername); err != nil {
+			t.Fatalf("BanUser(%s) returned unexpected error: %v", user, err)
+		}
 	}
 
 	// Check all users are banned
@@ -412,19 +530,25 @@ func TestHubConcurrentBanOperations(t *testing.T) {
 	// Test concurrent ban/unban operations
 	done := make(chan bool, 2)
 
-	// Goroutine 1: Ban and unban user
+	// Goroutine 1: Ban, kick, and unban/allow user
 	go func() {
 		for i := 0; i < 100; i++ {
-			hub.BanUser(username, adminUsername)
+			_ = hub.BanUser(username, adminUsername)
+			_ = hub.KickUser(username, adminUsername)
 			hub.UnbanUser(username, adminUsername)
+			hub.AllowUser(username, adminUsername)
 		}
 		done <- true
 	}()
 
-	// Goroutine 2: Check if user is banned
+	// Goroutine 2: Check if user is banned and alternate kick/ban
 	go func() {
 		for i := 0; i < 100; i++ {
 			hub.IsUserBanned(username)
+			_ = hub.KickUser(username+"2", adminUsername)
+			_ = hub.BanUser(username+"3", adminUsername)
+			hub.UnbanUser(username+"3", adminUsername)
+			hub.AllowUser(username+"2", adminUsername)
 		}
 		done <- true
 	}()
@@ -434,7 +558,7 @@ func TestHubConcurrentBanOperations(t *testing.T) {
 	<-done
 
 	// Final state should be consistent
-	// The user should not be banned after the unban in the first goroutine
+	// The user should not be banned after the unban/allow in the first goroutine
 	if hub.IsUserBanned(username) {
 		t.Error("User should not be banned after concurrent operations")
 	}
@@ -487,7 +611,7 @@ func TestKickUserNonBlocking(t *testing.T) {
 	client := &Client{
 		username: "victim",
 		send:     make(chan interface{}, 1),
-		conn:     nil, // conn.Close will be skipped via nil check in test
+		conn:     nil, // nil-safe Close in kickUser
 	}
 	client.send <- "filler"
 
@@ -495,14 +619,12 @@ func TestKickUserNonBlocking(t *testing.T) {
 	hub.clients[client] = true
 	hub.clientsMutex.Unlock()
 
-	// kickUser must not block even though the buffer is full.
+	// kickUser must not block even though the buffer is full, and must not
+	// panic when conn is nil.
 	done := make(chan struct{})
 	go func() {
-		defer func() {
-			_ = recover() // conn is nil in test; tolerate nil pointer in conn.Close
-			close(done)
-		}()
 		hub.kickUser("victim", "test")
+		close(done)
 	}()
 
 	select {

@@ -6,6 +6,8 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+- **Server**: **Fix:** `:kick` / `:ban` (and admin TUI / web user actions) reject self-targets case-insensitively and return clear errors instead of disconnecting the admin and writing a 24h ban; `KickUser` / `BanUser` return errors so callers claim success only on `nil`; kicking an already permanently banned user returns an error without claiming success ([#115](https://github.com/Cod-e-Codes/marchat/issues/115)).
+
 ## v1.3.4
 
 **Released 2026-08-03.** Since **[v1.3.3](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.3)**; compare [`v1.3.3...v1.3.4`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.3...v1.3.4). Commits: **`git log v1.3.3..v1.3.4 --oneline`**.
