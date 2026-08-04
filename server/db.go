@@ -12,6 +12,11 @@ import (
 	_ "modernc.org/sqlite"
 )
 
+// sqliteConnPragmas are applied on every new SQLite connection via the DSN
+// (modernc.org/sqlite v1.55.0 shorthands + _pragma). One-shot PRAGMA Exec after
+// Open only affects the connection that ran it, so these must live in the DSN.
+const sqliteConnPragmas = "_busy_timeout=5000&_journal_mode=WAL&_synchronous=NORMAL&_pragma=cache_size(10000)&_pragma=temp_store(MEMORY)"
+
 func detectDriver(conn string) (string, DBDialect, string) {
 	v := strings.TrimSpace(conn)
 	switch {
@@ -41,6 +46,56 @@ func prepareMySQLDSN(dsn string) (string, error) {
 	return cfg.FormatDSN(), nil
 }
 
+// appendSQLiteDSNPragmas joins per-connection PRAGMA query params onto a SQLite
+// path or DSN, using & when a query string is already present.
+func appendSQLiteDSNPragmas(path string) string {
+	if strings.Contains(path, "?") {
+		return path + "&" + sqliteConnPragmas
+	}
+	return path + "?" + sqliteConnPragmas
+}
+
+// isSQLiteMemoryDSN reports whether the SQLite DSN is an in-memory database
+// where WAL may not stick (PRAGMA journal_mode often remains "memory").
+func isSQLiteMemoryDSN(dsn string) bool {
+	base := dsn
+	if i := strings.Index(dsn, "?"); i >= 0 {
+		base = dsn[:i]
+	}
+	base = strings.TrimSpace(base)
+	if base == ":memory:" || strings.EqualFold(base, "file::memory:") {
+		return true
+	}
+	q := ""
+	if i := strings.Index(dsn, "?"); i >= 0 {
+		q = strings.ToLower(dsn[i+1:])
+	}
+	return strings.Contains(q, "mode=memory")
+}
+
+func verifySQLitePragmas(db *sql.DB, dsn string) error {
+	var busyTimeout int
+	if err := db.QueryRow("PRAGMA busy_timeout;").Scan(&busyTimeout); err != nil {
+		return fmt.Errorf("verify PRAGMA busy_timeout: %w", err)
+	}
+	if busyTimeout <= 0 {
+		return fmt.Errorf("PRAGMA busy_timeout = %d, want > 0", busyTimeout)
+	}
+
+	if isSQLiteMemoryDSN(dsn) {
+		return nil
+	}
+
+	var journalMode string
+	if err := db.QueryRow("PRAGMA journal_mode;").Scan(&journalMode); err != nil {
+		return fmt.Errorf("verify PRAGMA journal_mode: %w", err)
+	}
+	if !strings.EqualFold(journalMode, "wal") {
+		return fmt.Errorf("PRAGMA journal_mode = %q, want wal", journalMode)
+	}
+	return nil
+}
+
 func InitDB(conn string) (*sql.DB, error) {
 	driver, dialect, dsn := detectDriver(conn)
 	if dialect == DialectMySQL {
@@ -49,6 +104,10 @@ func InitDB(conn string) (*sql.DB, error) {
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if dialect == DialectSQLite {
+		dsn = appendSQLiteDSNPragmas(dsn)
 	}
 
 	db, err := sql.Open(driver, dsn)
@@ -65,36 +124,16 @@ func InitDB(conn string) (*sql.DB, error) {
 	setDBDialect(db, dialect)
 
 	if dialect == DialectSQLite {
-		// Enable WAL mode for better concurrency and performance
-		_, err = db.Exec("PRAGMA journal_mode=WAL;")
-		if err != nil {
-			log.Printf("Warning: Could not enable WAL mode: %v", err)
-		} else {
-			// Verify WAL mode was actually enabled
-			var journalMode string
-			err = db.QueryRow("PRAGMA journal_mode;").Scan(&journalMode)
-			if err != nil {
-				log.Printf("Warning: Could not verify journal mode: %v", err)
-			} else {
-				log.Printf("Database journal mode set to %s for improved concurrency", journalMode)
-			}
-		}
+		// Single connection: SQLite does not benefit from a multi-conn pool and
+		// concurrent writers on separate connections race for the write lock.
+		db.SetMaxOpenConns(1)
+		db.SetMaxIdleConns(1)
 
-		// Set additional performance optimizations
-		_, err = db.Exec("PRAGMA synchronous=NORMAL;")
-		if err != nil {
-			log.Printf("Warning: Could not set synchronous mode: %v", err)
+		if err := verifySQLitePragmas(db, dsn); err != nil {
+			db.Close()
+			return nil, fmt.Errorf("sqlite pragma verification failed: %w", err)
 		}
-
-		_, err = db.Exec("PRAGMA cache_size=10000;")
-		if err != nil {
-			log.Printf("Warning: Could not set cache size: %v", err)
-		}
-
-		_, err = db.Exec("PRAGMA temp_store=MEMORY;")
-		if err != nil {
-			log.Printf("Warning: Could not set temp store: %v", err)
-		}
+		log.Printf("SQLite connected with per-connection pragmas (busy_timeout, WAL for file DBs) and MaxOpenConns=1")
 	}
 
 	return db, nil

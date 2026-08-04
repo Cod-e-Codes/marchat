@@ -261,7 +261,7 @@ Client: WebSocket Receive → Decrypt → Display
   - MySQL DSN (`mysql:` / `mysql://`)
 - Schema creation and upsert/insert-ignore SQL are dialect-aware; message query helpers in `server/db_dialect.go` emit Postgres `TRUE`/`FALSE` or SQLite/MySQL `1`/`0` for boolean columns as needed.
 - Placeholder rebinding keeps shared query callsites portable across backends.
-- SQLite-specific optimizations (for example WAL mode) are applied only when the selected backend is SQLite.
+- SQLite-specific optimizations are applied only when the selected backend is SQLite: per-connection DSN pragmas (`_busy_timeout`, `_journal_mode=WAL`, `_synchronous`, cache/temp store) plus `SetMaxOpenConns(1)` / `SetMaxIdleConns(1)`. Do not rely on one-shot `PRAGMA` `Exec` after `Open` for settings that must stick on every pooled connection.
 - Durable state includes:
   - message history
   - reactions
@@ -372,14 +372,15 @@ CREATE TABLE read_receipts (
 ### Key Features
 
 - **Backend Selection**: `MARCHAT_DB_PATH` chooses SQLite/PostgreSQL/MySQL at runtime
-- **WAL Mode (SQLite only)**: Write-Ahead Logging for better concurrency and crash recovery when SQLite is selected
+- **WAL Mode (SQLite only)**: Write-Ahead Logging via DSN `_journal_mode=WAL` on every connection (file-backed DBs); verified after open. In-memory DSNs require `busy_timeout` only (WAL may not stick).
+- **SQLite pool**: `MaxOpenConns(1)` and `MaxIdleConns(1)` so writers share one connection; Postgres/MySQL keep driver/pool defaults
 - **SQLite Database Files**: `marchat.db` (main), `marchat.db-wal` (write-ahead log), `marchat.db-shm` (shared memory)
 - **Message ID Tracking**: Sequential message IDs for user state management
 - **Encryption Support**: Binary storage for encrypted message data
 - **Performance Indexes**: Optimized queries for message retrieval and user state
 - **Message Cap**: Automatic cleanup maintaining 1000 most recent messages
 - **Ban History**: Comprehensive tracking of user moderation actions
-- **Performance Tuning**: Backend-aware optimizations (SQLite pragmas when SQLite is selected)
+- **Performance Tuning**: SQLite DSN per-connection pragmas and single-conn pool when SQLite is selected; Postgres/MySQL unchanged
 
 ## Administrative Interfaces
 
@@ -455,12 +456,13 @@ The web-based interface (`admin_web.html`, embedded via `go:embed`) provides the
 
 ### Database Optimization
 
-- **WAL Mode (SQLite only)**: Write-Ahead Logging enabled for improved concurrency and performance
+- **WAL Mode (SQLite only)**: Write-Ahead Logging via per-connection DSN pragmas (not one-shot `PRAGMA` after open)
+- **SQLite single-conn pool**: `MaxOpenConns(1)` / `MaxIdleConns(1)` with `_busy_timeout=5000` to avoid `SQLITE_BUSY` under concurrent WebSocket writers
 - **Indexed Queries**: Performance indexes on frequently queried columns
 - **Batch Operations**: Efficient bulk message operations
 - **Connection Reuse**: Persistent database connections
 - **Query Optimization**: Prepared statements for common operations
-- **Performance Tuning**: SQLite-specific pragmas are applied only on SQLite; Postgres/MySQL use driver/backend defaults
+- **Performance Tuning**: SQLite DSN pragmas + single-conn pool only on SQLite; Postgres/MySQL use driver/backend defaults
 - **Backup Considerations**: SQLite WAL mode creates additional files; backups may miss recent uncommitted data if taken while server is running
 
 ## Development Patterns

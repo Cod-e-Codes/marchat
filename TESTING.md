@@ -69,9 +69,9 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `server/admin_web_test.go` | Admin web interface | HTTP endpoints, authentication, admin panel functionality |
 | `server/config_ui_test.go` | Server configuration UI | Configuration management, environment handling |
 | `server/admin_panel_test.go` | Admin panel functionality | Admin-specific operations and controls |
-| `server/db_test.go` | Database operations | Database initialization, schema setup |
+| `server/db_test.go` | Database operations | `InitDB` SQLite DSN pragmas (`busy_timeout`, WAL), `:memory:`, query-join `&`, single-conn pool, short concurrent inserts, schema smoke |
 | `server/db_dialect_test.go` | SQL dialect helpers | DSN detection, Postgres placeholder rebinding, boolean SQL literals, MySQL DSN via `mysql.Config` |
-| `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables, visible handshake replay query, search and pin SQL (env-gated) |
+| `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables, pool not forced to 1, visible handshake replay query, search and pin SQL (env-gated) |
 | `server/message_state_test.go` | Durable reactions | Reaction persistence and replay helpers |
 | `server/config_test.go` | Server configuration | Server configuration logic and validation |
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations, unknown admin command system reply (`TestHandleCommandUnknownAdminSendsSystemReply`), channel stamping (`TestStampClientChannelOverwritesSpoofedChannel`), non-admin unknown vs admin-only command replies |

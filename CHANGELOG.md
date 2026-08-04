@@ -9,6 +9,7 @@ On **`main`** only; not part of the latest tagged release until you tag and publ
 - **Server**: **Fix:** `:kick` / `:ban` (and admin TUI / web user actions) reject self-targets case-insensitively and return clear errors instead of disconnecting the admin and writing a 24h ban; `KickUser` / `BanUser` return errors so callers claim success only on `nil`; kicking an already permanently banned user returns an error without claiming success ([#115](https://github.com/Cod-e-Codes/marchat/issues/115)).
 - **Server**: **Fix:** `:kick` (and admin TUI / web kick actions) are online-only: `KickUser` requires an active WebSocket connection, disconnects the target, and applies a 24h temporary ban; offline or never-connected users return `ErrKickNotConnected` with no `tempKicks` entry or `ban_history` row; `:ban` / `BanUser` remain offline-capable ([#116](https://github.com/Cod-e-Codes/marchat/issues/116)).
 - **Server**: **Fix:** reject empty or whitespace-only plaintext on `text`, `dm`, and `edit` when `encrypted` is false (System reply, no persist/broadcast); encrypted opaque `content` is not treated as empty ([#117](https://github.com/Cod-e-Codes/marchat/issues/117)).
+- **Server**: **Fix:** SQLite `InitDB` applies `busy_timeout` / WAL / related pragmas via the DSN on every connection and sets `MaxOpenConns(1)` / `MaxIdleConns(1)`, so concurrent inserts no longer fail with `SQLITE_BUSY` from one-shot `PRAGMA` + the default `database/sql` pool ([#118](https://github.com/Cod-e-Codes/marchat/issues/118)).
 
 ## v1.3.4
 
