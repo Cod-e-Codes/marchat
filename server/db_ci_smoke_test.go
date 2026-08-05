@@ -27,6 +27,10 @@ func TestPostgresInitDBAndSchemaSmoke(t *testing.T) {
 	if getDBDialect(db) != DialectPostgres {
 		t.Fatalf("dialect = %v, want postgres", getDBDialect(db))
 	}
+	// SQLite-only: InitDB must not force MaxOpenConns(1) on remote backends.
+	if db.Stats().MaxOpenConnections == 1 {
+		t.Fatal("postgres MaxOpenConnections unexpectedly 1 (SQLite-only pool limit)")
+	}
 
 	CreateSchema(db)
 	assertCISmokeTables(t, db, "postgres")
@@ -47,6 +51,10 @@ func TestMySQLInitDBAndSchemaSmoke(t *testing.T) {
 
 	if getDBDialect(db) != DialectMySQL {
 		t.Fatalf("dialect = %v, want mysql", getDBDialect(db))
+	}
+	// SQLite-only: InitDB must not force MaxOpenConns(1) on remote backends.
+	if db.Stats().MaxOpenConnections == 1 {
+		t.Fatal("mysql MaxOpenConnections unexpectedly 1 (SQLite-only pool limit)")
 	}
 
 	CreateSchema(db)

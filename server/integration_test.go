@@ -91,7 +91,9 @@ func TestIntegrationUserBanFlow(t *testing.T) {
 	}
 
 	// Ban the user
-	hub.BanUser(username, adminUsername)
+	if err := hub.BanUser(username, adminUsername); err != nil {
+		t.Fatalf("BanUser returned unexpected error: %v", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("User should be banned after BanUser")
 	}
@@ -111,8 +113,11 @@ func TestIntegrationUserBanFlow(t *testing.T) {
 		t.Error("User should not be banned after UnbanUser")
 	}
 
-	// Test kick flow
-	hub.KickUser(username, adminUsername)
+	// Test kick flow (requires connected user)
+	registerTestClient(hub, username)
+	if err := hub.KickUser(username, adminUsername); err != nil {
+		t.Fatalf("KickUser returned unexpected error: %v", err)
+	}
 	if !hub.IsUserBanned(username) {
 		t.Error("User should be kicked after KickUser")
 	}
@@ -392,8 +397,10 @@ func TestIntegrationConcurrentOperations(t *testing.T) {
 		go func(id int) {
 			defer banWg.Done()
 			username := fmt.Sprintf("user%d", id)
-			hub.BanUser(username, "admin")
+			_ = hub.BanUser(username, "admin")
 			hub.UnbanUser(username, "admin")
+			_ = hub.KickUser(username, "admin")
+			hub.AllowUser(username, "admin")
 		}(i)
 	}
 

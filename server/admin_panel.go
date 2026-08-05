@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"log"
 	"os"
@@ -1617,7 +1618,13 @@ func (ap *AdminPanel) adminUsername() string {
 
 func (ap *AdminPanel) banUser(username string) tea.Cmd {
 	return func() tea.Msg {
-		ap.hub.BanUser(username, ap.adminUsername())
+		if err := ap.hub.BanUser(username, ap.adminUsername()); err != nil {
+			msg := fmt.Sprintf("ERROR: Failed to ban '%s': %v", username, err)
+			if errors.Is(err, ErrAdminSelfTarget) {
+				msg = "ERROR: You cannot ban yourself"
+			}
+			return actionMsg{success: false, message: msg}
+		}
 		return actionMsg{
 			success: true,
 			message: fmt.Sprintf("User '%s' has been banned", username),
@@ -1643,7 +1650,17 @@ func (ap *AdminPanel) unbanUser(username string) tea.Cmd {
 
 func (ap *AdminPanel) kickUser(username string) tea.Cmd {
 	return func() tea.Msg {
-		ap.hub.KickUser(username, ap.adminUsername())
+		if err := ap.hub.KickUser(username, ap.adminUsername()); err != nil {
+			msg := fmt.Sprintf("ERROR: Failed to kick '%s': %v", username, err)
+			if errors.Is(err, ErrAdminSelfTarget) {
+				msg = "ERROR: You cannot kick yourself"
+			} else if errors.Is(err, ErrKickPermanentlyBanned) {
+				msg = fmt.Sprintf("ERROR: Cannot kick '%s': user is permanently banned", username)
+			} else if errors.Is(err, ErrKickNotConnected) {
+				msg = fmt.Sprintf("ERROR: Cannot kick '%s': user is not connected", username)
+			}
+			return actionMsg{success: false, message: msg}
+		}
 		return actionMsg{
 			success: true,
 			message: fmt.Sprintf("User '%s' has been kicked (24h)", username),

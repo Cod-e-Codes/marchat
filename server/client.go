@@ -175,6 +175,15 @@ func (c *Client) readPump() {
 				}
 				continue
 			}
+			if plaintextContentEmpty(msg.Content, msg.Encrypted) {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: empty content",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
 			if err := EditMessage(c.db, msg.MessageID, c.username, msg.Content, msg.Encrypted); err != nil {
 				c.send <- shared.Message{
 					Sender:    "System",
@@ -228,6 +237,15 @@ func (c *Client) readPump() {
 				c.send <- shared.Message{
 					Sender:    "System",
 					Content:   "Message not sent: invalid character in content",
+					CreatedAt: time.Now(),
+					Type:      shared.TextMessage,
+				}
+				continue
+			}
+			if plaintextContentEmpty(msg.Content, msg.Encrypted) {
+				c.send <- shared.Message{
+					Sender:    "System",
+					Content:   "Message not sent: empty content",
 					CreatedAt: time.Now(),
 					Type:      shared.TextMessage,
 				}
@@ -401,6 +419,15 @@ func (c *Client) readPump() {
 			c.send <- shared.Message{
 				Sender:    "System",
 				Content:   "Message not sent: invalid character in content",
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			continue
+		}
+		if plaintextContentEmpty(msg.Content, msg.Encrypted) {
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   "Message not sent: empty content",
 				CreatedAt: time.Now(),
 				Type:      shared.TextMessage,
 			}
@@ -638,7 +665,23 @@ func (c *Client) handleCommand(command string) {
 			}
 			return
 		}
-		c.hub.KickUser(targetUsername, c.username)
+		if err := c.hub.KickUser(targetUsername, c.username); err != nil {
+			content := "Failed to kick user: " + err.Error()
+			if errors.Is(err, ErrAdminSelfTarget) {
+				content = "You cannot kick yourself."
+			} else if errors.Is(err, ErrKickPermanentlyBanned) {
+				content = "Cannot kick '" + targetUsername + "': user is permanently banned."
+			} else if errors.Is(err, ErrKickNotConnected) {
+				content = "Cannot kick '" + targetUsername + "': user is not connected."
+			}
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   content,
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			return
+		}
 		c.send <- shared.Message{
 			Sender:    "System",
 			Content:   "User '" + targetUsername + "' has been kicked (24 hour temporary ban).",
@@ -666,7 +709,19 @@ func (c *Client) handleCommand(command string) {
 			}
 			return
 		}
-		c.hub.BanUser(targetUsername, c.username)
+		if err := c.hub.BanUser(targetUsername, c.username); err != nil {
+			content := "Failed to ban user: " + err.Error()
+			if errors.Is(err, ErrAdminSelfTarget) {
+				content = "You cannot ban yourself."
+			}
+			c.send <- shared.Message{
+				Sender:    "System",
+				Content:   content,
+				CreatedAt: time.Now(),
+				Type:      shared.TextMessage,
+			}
+			return
+		}
 		c.send <- shared.Message{
 			Sender:    "System",
 			Content:   "User '" + targetUsername + "' has been permanently banned.",

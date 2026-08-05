@@ -7,3 +7,12 @@ import "strings"
 func contentContainsNUL(s string) bool {
 	return strings.Contains(s, "\x00")
 }
+
+// plaintextContentEmpty reports whether unencrypted text/dm/edit content is empty or
+// whitespace-only. Encrypted payloads are opaque and are never treated as empty here.
+func plaintextContentEmpty(content string, encrypted bool) bool {
+	if encrypted {
+		return false
+	}
+	return strings.TrimSpace(content) == ""
+}

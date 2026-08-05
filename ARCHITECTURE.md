@@ -90,7 +90,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 #### Core Structures
 
 - **`Hub`**: Central message routing system managing client connections, message broadcasting, channel management, and user state; tracks reserved usernames so handshake cannot double-book the same name before a client is registered. All sends to `client.send` use non-blocking `select/default` to prevent deadlocks when a client's write buffer is full; stalled clients are dropped or the message is logged and skipped. **Text** messages fan out to plugins in a **separate goroutine** so plugin IPC never blocks the hub’s broadcast loop.
-- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer. Outbound client messages are channel-stamped from hub membership (`stampClientChannel`) so spoofed `channel` values cannot cross rooms; `sender` is stamped from the authenticated session (`stampSenderTimedOutbound`) on persist and broadcast paths. NUL bytes in persistable `content` are rejected before insert (Postgres rejects NUL in TEXT; SQLite accepts it). Failed inserts reply to the sender and are not broadcast. `handleCommand` sends `Unknown command` to non-admins for unrecognized `:` tokens; built-in admin-only commands still return an admin-privilege notice. Admins get `Unknown command` for unrecognized built-ins.
+- **`Client`**: Individual WebSocket connection handler with read/write pumps and command processing. The `writePump` goroutine is started **before** history replay on connect so the send channel always has a consumer. Outbound client messages are channel-stamped from hub membership (`stampClientChannel`) so spoofed `channel` values cannot cross rooms; `sender` is stamped from the authenticated session (`stampSenderTimedOutbound`) on persist and broadcast paths. NUL bytes in persistable `content` are rejected before insert (Postgres rejects NUL in TEXT; SQLite accepts it). Empty or whitespace-only plaintext on `text`, `dm`, and `edit` is rejected when `encrypted` is false (System reply; no insert or broadcast); when `encrypted` is true the server treats `content` as opaque and does not apply the empty-plaintext check. Failed inserts reply to the sender and are not broadcast. `handleCommand` sends `Unknown command` to non-admins for unrecognized `:` tokens; built-in admin-only commands still return an admin-privilege notice. Admins get `Unknown command` for unrecognized built-ins.
 - **`AdminPanel`**: Terminal-based administrative interface for server management
 - **`WebAdminServer`**: Web-based administrative interface with session authentication
 - **`HealthChecker`**: System health monitoring with metrics collection
@@ -103,7 +103,7 @@ The server is a standalone HTTP/WebSocket server application that provides real-
 - Direct message routing between specific users
 - Message editing, deletion, pinning, and search
 - Typing indicator, reaction, and read receipt broadcasting (channel-scoped when `channel` is set after stamping)
-- User management including ban, kick, and allow operations (ban/kick state is committed under `banMutex`, then the lock is released before the actual disconnect to avoid holding the mutex across a channel send)
+- User management including ban, kick, and allow operations (ban/kick state is committed under `banMutex`, then the lock is released before the actual disconnect to avoid holding the mutex across a channel send). `KickUser` and `BanUser` return errors; self-targets are rejected case-insensitively before any ban state is written, and callers (chat commands, admin TUI, web admin) claim success only when `err == nil`. `KickUser` is online-only (disconnect plus 24h temporary ban when the target has an active connection); offline moderation uses `BanUser` / `:ban`
 - Plugin command execution and management
 - Database backup via `:backup` and admin panels: **SQLite only** (`VACUUM INTO` with quoted paths). Postgres and MySQL deployments receive a clear error directing operators to native backup tools for `MARCHAT_DB_PATH`.
 - System metrics collection and health monitoring
@@ -261,7 +261,7 @@ Client: WebSocket Receive → Decrypt → Display
   - MySQL DSN (`mysql:` / `mysql://`)
 - Schema creation and upsert/insert-ignore SQL are dialect-aware; message query helpers in `server/db_dialect.go` emit Postgres `TRUE`/`FALSE` or SQLite/MySQL `1`/`0` for boolean columns as needed.
 - Placeholder rebinding keeps shared query callsites portable across backends.
-- SQLite-specific optimizations (for example WAL mode) are applied only when the selected backend is SQLite.
+- SQLite-specific optimizations are applied only when the selected backend is SQLite: per-connection DSN pragmas (`_busy_timeout`, `_journal_mode=WAL`, `_synchronous`, cache/temp store) plus `SetMaxOpenConns(1)` / `SetMaxIdleConns(1)`. Do not rely on one-shot `PRAGMA` `Exec` after `Open` for settings that must stick on every pooled connection.
 - Durable state includes:
   - message history
   - reactions
@@ -372,14 +372,15 @@ CREATE TABLE read_receipts (
 ### Key Features
 
 - **Backend Selection**: `MARCHAT_DB_PATH` chooses SQLite/PostgreSQL/MySQL at runtime
-- **WAL Mode (SQLite only)**: Write-Ahead Logging for better concurrency and crash recovery when SQLite is selected
+- **WAL Mode (SQLite only)**: Write-Ahead Logging via DSN `_journal_mode=WAL` on every connection (file-backed DBs); verified after open. In-memory DSNs require `busy_timeout` only (WAL may not stick).
+- **SQLite pool**: `MaxOpenConns(1)` and `MaxIdleConns(1)` so writers share one connection; Postgres/MySQL keep driver/pool defaults
 - **SQLite Database Files**: `marchat.db` (main), `marchat.db-wal` (write-ahead log), `marchat.db-shm` (shared memory)
 - **Message ID Tracking**: Sequential message IDs for user state management
 - **Encryption Support**: Binary storage for encrypted message data
 - **Performance Indexes**: Optimized queries for message retrieval and user state
 - **Message Cap**: Automatic cleanup maintaining 1000 most recent messages
 - **Ban History**: Comprehensive tracking of user moderation actions
-- **Performance Tuning**: Backend-aware optimizations (SQLite pragmas when SQLite is selected)
+- **Performance Tuning**: SQLite DSN per-connection pragmas and single-conn pool when SQLite is selected; Postgres/MySQL unchanged
 
 ## Administrative Interfaces
 
@@ -455,12 +456,13 @@ The web-based interface (`admin_web.html`, embedded via `go:embed`) provides the
 
 ### Database Optimization
 
-- **WAL Mode (SQLite only)**: Write-Ahead Logging enabled for improved concurrency and performance
+- **WAL Mode (SQLite only)**: Write-Ahead Logging via per-connection DSN pragmas (not one-shot `PRAGMA` after open)
+- **SQLite single-conn pool**: `MaxOpenConns(1)` / `MaxIdleConns(1)` with `_busy_timeout=5000` to avoid `SQLITE_BUSY` under concurrent WebSocket writers
 - **Indexed Queries**: Performance indexes on frequently queried columns
 - **Batch Operations**: Efficient bulk message operations
 - **Connection Reuse**: Persistent database connections
 - **Query Optimization**: Prepared statements for common operations
-- **Performance Tuning**: SQLite-specific pragmas are applied only on SQLite; Postgres/MySQL use driver/backend defaults
+- **Performance Tuning**: SQLite DSN pragmas + single-conn pool only on SQLite; Postgres/MySQL use driver/backend defaults
 - **Backup Considerations**: SQLite WAL mode creates additional files; backups may miss recent uncommitted data if taken while server is running
 
 ## Development Patterns

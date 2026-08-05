@@ -23,7 +23,7 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 
 - Per-channel routing, DMs, typing, read receipts, reactions.
 - Outbound client messages are channel-stamped from hub membership (`stampClientChannel`); client-supplied `channel` values are ignored for routing.
-- All outbound/persist paths stamp `sender` from the authenticated session (`stampSenderTimedOutbound`); NUL bytes in persistable `content` are rejected before insert.
+- All outbound/persist paths stamp `sender` from the authenticated session (`stampSenderTimedOutbound`); NUL bytes in persistable `content` are rejected before insert; empty or whitespace-only plaintext on `text` / `dm` / `edit` is rejected when `encrypted` is false (encrypted opaque ciphertext is never treated as empty).
 - Reserved usernames during handshake (no double-book before registration).
 - Serialized writes per connection (`client.go`).
 - File uploads: `SetReadLimit` uses `websocketReadLimit` (max of policy `fileMessageReadLimit` wire size and a **32 MiB** DoS ceiling) so modest oversize is fully read; declared/payload checks send a System reply and `continue`. `ErrReadLimit` (above the ceiling) logs rejection only - gorilla already sent empty close **1009**, so a System enqueue cannot flush.
@@ -32,8 +32,8 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 
 ## Admin
 
-- TUI: `admin_panel.go`, `config_ui.go` (Charm v2: `tea.View`, `KeyPressMsg`, bubbles setters). Admin panel enables `MouseModeCellMotion` and routes `MouseWheelMsg` for scrollable tabs and user/plugin tables.
-- Web: `admin_web.go`, `admin_web.html`; `MARCHAT_SESSION_SECRET` (preferred), `MARCHAT_JWT_SECRET` deprecated; CSRF on mutating routes; login rate limit per IP.
+- TUI: `admin_panel.go`, `config_ui.go` (Charm v2: `tea.View`, `KeyPressMsg`, bubbles setters). Admin panel enables `MouseModeCellMotion` and routes `MouseWheelMsg` for scrollable tabs and user/plugin tables. Kick/ban cmds claim success only when hub `KickUser`/`BanUser` return nil (self-target, not-connected kick, and permanently-banned kick errors map to failed action messages). `KickUser` is online-only; offline kicks return `ErrKickNotConnected`.
+- Web: `admin_web.go`, `admin_web.html`; `MARCHAT_SESSION_SECRET` (preferred), `MARCHAT_JWT_SECRET` deprecated; CSRF on mutating routes; login rate limit per IP. User kick/ban actions return `success: false` with a message when the hub rejects the target.
 - Trusted proxies: `MARCHAT_TRUSTED_PROXIES` for forwarded client IP.
 
 ## Security

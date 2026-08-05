@@ -62,22 +62,24 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `cmd/server/main_test.go` | Server main function and startup | Flag parsing, configuration validation, TLS setup, admin normalization, `validateStartupConfig`, deprecated flags |
 | `cmd/server/subprocess_doctor_test.go` | Server binary smoke | `go run ./cmd/server -doctor` / `-doctor-json` subprocess (covers `main` early exits) |
 | `server/handlers_test.go` | Server-side request handling | Database operations, message insertion, visible handshake replay (`GetRecentMessagesForUser`), reconnect replay, DM limit under DM noise, IP extraction |
-| `server/hub_test.go` | WebSocket hub management | User bans, kicks, connection management, non-blocking send verification |
+| `server/hub_test.go` | WebSocket hub management | User bans, online-only kicks, connection management, non-blocking send verification |
 | `server/loadverify_ratelimit_test.go` | WebSocket read-pump rate limit | Window, burst (20), and cooldown behavior (same constants as `client.go`) |
 | `server/loadverify_bench_test.go` | Hub broadcast benchmarks (optional) | Channel vs system-wide fan-out, parallel senders, JSON marshal baseline; see [Optional hub load benchmarks](#optional-hub-load-benchmarks-server) |
 | `server/integration_test.go` | End-to-end workflows | Message flow, ban flow, WebSocket handshake replay on reconnect (`TestIntegrationWebSocketHandshakeReplayOnReconnect`), concurrent operations |
 | `server/admin_web_test.go` | Admin web interface | HTTP endpoints, authentication, admin panel functionality |
 | `server/config_ui_test.go` | Server configuration UI | Configuration management, environment handling |
 | `server/admin_panel_test.go` | Admin panel functionality | Admin-specific operations and controls |
-| `server/db_test.go` | Database operations | Database initialization, schema setup |
+| `server/db_test.go` | Database operations | `InitDB` SQLite DSN pragmas (`busy_timeout`, WAL), `:memory:`, query-join `&`, single-conn pool, short concurrent inserts, schema smoke |
 | `server/db_dialect_test.go` | SQL dialect helpers | DSN detection, Postgres placeholder rebinding, boolean SQL literals, MySQL DSN via `mysql.Config` |
-| `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables, visible handshake replay query, search and pin SQL (env-gated) |
+| `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables, pool not forced to 1, visible handshake replay query, search and pin SQL (env-gated) |
 | `server/message_state_test.go` | Durable reactions | Reaction persistence and replay helpers |
 | `server/config_test.go` | Server configuration | Server configuration logic and validation |
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations, unknown admin command system reply (`TestHandleCommandUnknownAdminSendsSystemReply`), channel stamping (`TestStampClientChannelOverwritesSpoofedChannel`), non-admin unknown vs admin-only command replies |
 | `server/client_sender_spoof_test.go` | Sender identity enforcement | Integration tests that wire `sender` is ignored on text/file paths (`stampSenderTimedOutbound`) |
 | `server/client_file_limit_test.go` | File size limits | `fileMessageReadLimit` / `websocketReadLimit` (32 MiB DoS ceiling); System reply before close for modest wire oversize; connection stays usable after reject |
 | `server/client_nullbyte_test.go` | NUL content validation | `contentContainsNUL`, SQLite NUL insert baseline, integration reject-no-broadcast |
+| `server/message_validate_test.go` | Plaintext empty helper | `plaintextContentEmpty` table-driven cases (empty, whitespace, encrypted opaque) |
+| `server/client_empty_content_test.go` | Empty plaintext rejection | Integration reject for text/DM/edit; encrypted opaque accept; command path still works |
 | `server/health_test.go` | Server health monitoring | Health checks, system metrics, HTTP endpoints, concurrent access |
 | `plugin/sdk/plugin_test.go` | Plugin SDK | Message types, extended fields (channel, encrypted, message_id, recipient, edited), JSON serialization, omitempty validation, backwards-compat unknown-field handling |
 | `plugin/sdk/stdio_test.go` | Plugin SDK stdio | `HandlePluginRequest` / `RunIO` (init, message, command, shutdown), EOF handling |

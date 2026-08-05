@@ -74,7 +74,7 @@ Optional fields (`recipient`, `reaction`, etc.) are omitted from JSON when unset
 #### Fields
 
 - `sender` (string): Username of the sender.
-- `content` (string): Message text. Empty if type is `file`. For `search`, carries the query string.
+- `content` (string): Message text. Empty if type is `file`. For `search`, carries the query string. For unencrypted `text`, `dm`, and `edit`, the server rejects empty or whitespace-only `content` with a private System `text` reply (connection stays open; nothing is persisted or broadcast). When `encrypted` is `true`, `content` is opaque ciphertext and is not checked for emptiness.
 - `created_at` (string): RFC3339 timestamp.
 - `type` (string): Core types include `"text"`, `"file"`, and `"admin_command"`. See [Extended Message Types](#extended-message-types) for additional values.
 - `file` (object, optional): Present only when `type` is `"file"`.
@@ -175,6 +175,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
   - Broadcasts updated user list.
 - On message send:
   - Persists eligible messages to the configured SQL backend selected by `MARCHAT_DB_PATH` (SQLite path, PostgreSQL DSN, or MySQL DSN).
+  - Rejects unencrypted `text` / `dm` / `edit` with empty or whitespace-only `content` (System reply to sender; no persist or broadcast). Encrypted payloads are not emptiness-checked.
   - Delivers to all connected clients **or** only to members of a channel when `channel` is non-empty and `sender` is not `System` (see [Channels](#channels)). Direct messages use a separate path (sender and recipient only).
 - Reactions, read receipts, and last channel per user may be persisted server-side and replayed to reconnecting clients.
 - DM unread counters and DM thread hide/archive state are client-side UI state in the reference TUI, not server protocol fields. The reference client stores this local state under its client config directory. Opening a DM thread marks that thread read immediately in the reference client.

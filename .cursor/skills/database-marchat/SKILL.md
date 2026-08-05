@@ -20,7 +20,13 @@ Runtime backend via `MARCHAT_DB_PATH`: SQLite (default), PostgreSQL, or MySQL. D
 
 - Parameterized queries only; no string-concatenated user input.
 - Every schema or query change must work on all three dialects (or use `db_dialect.go` helpers).
-- SQLite: WAL when backend is SQLite; quote paths safely in `VACUUM INTO` and similar.
+- SQLite (`InitDB` only):
+  - Put connection pragmas in the DSN so every pooled connection gets them (`_busy_timeout=5000`, `_journal_mode=WAL`, `_synchronous=NORMAL`, plus `_pragma` for cache/temp). Join with `?` or `&` if the path already has a query (`appendSQLiteDSNPragmas`).
+  - After `Ping`, set `SetMaxOpenConns(1)` and `SetMaxIdleConns(1)`. Do **not** leave the default multi-connection `database/sql` pool on SQLite.
+  - Do **not** rely on one-shot `Exec("PRAGMA ...")` after open for settings that must stick on every connection (that was the #118 `SQLITE_BUSY` failure mode).
+  - Verify after open: `busy_timeout > 0`; for file-backed DBs, `journal_mode` is `wal`. In-memory (`:memory:` / `mode=memory`) requires busy_timeout only.
+  - Quote paths safely in `VACUUM INTO` and similar.
+- Postgres/MySQL: leave pool defaults alone (do not force `MaxOpenConns(1)`).
 - MySQL: DSN via `mysql:` or `mysql://`; `mysql.Config` with `parseTime=true`; indexed text rules for search.
 - Postgres: boolean columns need dialect boolean literals, not `= 0` / `= 1`.
 
@@ -32,8 +38,8 @@ Include messages plus durable state: reactions, read receipts, `user_message_sta
 
 | Level | Where |
 |-------|--------|
-| Unit / integration | In-memory or temp SQLite in `server/*_test.go` |
-| CI smoke | `server/db_ci_smoke_test.go` with `MARCHAT_CI_POSTGRES_URL`, `MARCHAT_CI_MYSQL_URL` |
+| Unit / integration | In-memory or temp SQLite in `server/*_test.go` (`db_test.go` covers DSN join, file WAL, `:memory:`, concurrent inserts) |
+| CI smoke | `server/db_ci_smoke_test.go` with `MARCHAT_CI_POSTGRES_URL`, `MARCHAT_CI_MYSQL_URL` (also asserts pool is not forced to 1) |
 | Handlers | Visible replay SQL (`GetRecentMessagesForUser`), search, pin toggle |
 
 Locally, CI smoke tests skip without env vars. See `testing-marchat` skill.

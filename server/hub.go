@@ -2,6 +2,7 @@ package server
 
 import (
 	"database/sql"
+	"errors"
 	"log"
 	"strings"
 	"sync"
@@ -9,6 +10,17 @@ import (
 
 	"github.com/Cod-e-Codes/marchat/plugin/manager"
 	"github.com/Cod-e-Codes/marchat/shared"
+)
+
+// Sentinel errors for KickUser / BanUser so callers can map clear replies
+// and claim success only when err == nil.
+var (
+	// ErrAdminSelfTarget is returned when an admin tries to kick or ban themselves.
+	ErrAdminSelfTarget = errors.New("cannot kick or ban yourself")
+	// ErrKickPermanentlyBanned is returned when KickUser targets a permanently banned user.
+	ErrKickPermanentlyBanned = errors.New("cannot kick a permanently banned user")
+	// ErrKickNotConnected is returned when KickUser targets a user with no active connection.
+	ErrKickNotConnected = errors.New("user is not connected")
 )
 
 type Hub struct {
@@ -84,7 +96,13 @@ func (h *Hub) ReleaseUsername(username string) {
 // The ban state is recorded under banMutex, then the lock is released before
 // kicking the connected client so that a blocked send channel cannot hold
 // banMutex and stall all other ban/kick callers.
-func (h *Hub) BanUser(username string, adminUsername string) {
+// Returns ErrAdminSelfTarget when username matches adminUsername (case-insensitive).
+// Offline bans are still allowed when the target is a different user.
+func (h *Hub) BanUser(username string, adminUsername string) error {
+	if strings.EqualFold(username, adminUsername) {
+		return ErrAdminSelfTarget
+	}
+
 	h.banMutex.Lock()
 
 	lowerUsername := strings.ToLower(username)
@@ -119,6 +137,7 @@ func (h *Hub) BanUser(username string, adminUsername string) {
 	h.banMutex.Unlock()
 
 	h.kickUser(username, "You have been permanently banned by an administrator")
+	return nil
 }
 
 // UnbanUser removes a user from the ban list
@@ -180,8 +199,34 @@ func (h *Hub) IsUserBanned(username string) bool {
 	return false
 }
 
-// kickUser forcibly disconnects a user by username.
+// disconnectClient forcibly disconnects a connected client.
 // Uses a non-blocking send so the caller never stalls on a full channel.
+func (h *Hub) disconnectClient(target *Client, reason string) {
+	if target == nil {
+		return
+	}
+
+	username := target.username
+	log.Printf("[ADMIN] Kicking user '%s' (IP: %s) - Reason: %s", username, target.ipAddr, reason)
+
+	kickMsg := shared.Message{
+		Sender:    "System",
+		Content:   "You have been kicked by an administrator: " + reason,
+		CreatedAt: time.Now(),
+		Type:      shared.TextMessage,
+	}
+	select {
+	case target.send <- kickMsg:
+	default:
+		log.Printf("[ADMIN] Could not deliver kick message to %s (send buffer full)", username)
+	}
+
+	if target.conn != nil {
+		target.conn.Close()
+	}
+}
+
+// kickUser forcibly disconnects a user by username.
 func (h *Hub) kickUser(username string, reason string) {
 	h.clientsMutex.RLock()
 	var target *Client
@@ -198,27 +243,37 @@ func (h *Hub) kickUser(username string, reason string) {
 		return
 	}
 
-	log.Printf("[ADMIN] Kicking user '%s' (IP: %s) - Reason: %s", username, target.ipAddr, reason)
-
-	kickMsg := shared.Message{
-		Sender:    "System",
-		Content:   "You have been kicked by an administrator: " + reason,
-		CreatedAt: time.Now(),
-		Type:      shared.TextMessage,
-	}
-	select {
-	case target.send <- kickMsg:
-	default:
-		log.Printf("[ADMIN] Could not deliver kick message to %s (send buffer full)", username)
-	}
-
-	target.conn.Close()
+	h.disconnectClient(target, reason)
 }
 
-// KickUser temporarily bans a user for 24 hours.
-// Like BanUser, the lock is released before the actual disconnect to avoid
-// holding banMutex across a potentially blocking channel send.
-func (h *Hub) KickUser(username string, adminUsername string) {
+// KickUser disconnects a connected user and temporarily bans them for 24 hours.
+// The target must have an active WebSocket connection; offline users are not
+// kicked or temp-banned (use BanUser for offline moderation).
+// Like BanUser, banMutex is released before the disconnect to avoid holding the
+// lock across a potentially blocking channel send.
+// Returns ErrAdminSelfTarget when username matches adminUsername (case-insensitive),
+// checked before any tempKicks write. Returns ErrKickNotConnected when the user is
+// not connected. Returns ErrKickPermanentlyBanned when the target is already
+// permanently banned.
+func (h *Hub) KickUser(username string, adminUsername string) error {
+	if strings.EqualFold(username, adminUsername) {
+		return ErrAdminSelfTarget
+	}
+
+	h.clientsMutex.RLock()
+	var target *Client
+	for client := range h.clients {
+		if strings.EqualFold(client.username, username) {
+			target = client
+			break
+		}
+	}
+	h.clientsMutex.RUnlock()
+
+	if target == nil {
+		return ErrKickNotConnected
+	}
+
 	h.banMutex.Lock()
 
 	lowerUsername := strings.ToLower(username)
@@ -227,7 +282,7 @@ func (h *Hub) KickUser(username string, adminUsername string) {
 	if _, isPermanentlyBanned := h.bans[lowerUsername]; isPermanentlyBanned {
 		h.banMutex.Unlock()
 		log.Printf("[ADMIN] Cannot kick '%s' - user is permanently banned", username)
-		return
+		return ErrKickPermanentlyBanned
 	}
 
 	// Add to temporary kicks for 24 hours
@@ -257,7 +312,8 @@ func (h *Hub) KickUser(username string, adminUsername string) {
 
 	h.banMutex.Unlock()
 
-	h.kickUser(username, "You have been kicked by an administrator (24 hour temporary ban)")
+	h.disconnectClient(target, "You have been kicked by an administrator (24 hour temporary ban)")
+	return nil
 }
 
 // AllowUser removes a user from temporary kick list (override early)
