@@ -146,6 +146,11 @@ func TestDispatchInboundRoutesNoPanic(t *testing.T) {
 			Type: shared.EditMessageType, Content: "orphan edit",
 		}},
 		{name: "file_nil_meta", msg: shared.Message{Type: shared.FileMessageType}},
+		{name: "reaction_nil_meta", msg: shared.Message{Type: shared.ReactionMessage}},
+		{name: "dm_empty_recipient", msg: shared.Message{
+			Type: shared.DirectMessage, Content: "orphan dm",
+		}},
+		{name: "join_empty_channel", msg: shared.Message{Type: shared.JoinChannelType}},
 	}
 
 	for _, tc := range cases {

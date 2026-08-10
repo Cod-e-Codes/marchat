@@ -26,7 +26,7 @@ var (
 
 // Hub coordinates WebSocket clients, channels, and moderation state.
 //
-// Lock ordering (when more than one mutex is needed in the same call path):
+// Hub mutex and blocking-operation rules (not a strict total lock order):
 //  1. Never hold banMutex across disconnectClient or any potentially blocking
 //     send on client.send (BanUser / KickUser release banMutex first).
 //  2. clientsMutex then banMutex is OK only as separate critical sections
@@ -93,18 +93,21 @@ func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) (*Hub, error) {
 }
 
 // loadModerationState restores active bans and unexpired temp kicks from ban_history.
-// Open rows (unbanned_at IS NULL) with NULL expires_at are permanent bans.
-// Open rows with expires_at in the future are temp kicks; expired rows are skipped.
+// Writers keep at most one open row per username (close-then-insert). For legacy
+// duplicates, the latest open row by id wins (ORDER BY id DESC, first seen).
+// NULL expires_at = permanent ban; future expires_at = temp kick; past = skip.
 func (h *Hub) loadModerationState() error {
 	rows, err := dbQuery(h.db, `
 		SELECT username, expires_at FROM ban_history
-		WHERE unbanned_at IS NULL`)
+		WHERE unbanned_at IS NULL
+		ORDER BY id DESC`)
 	if err != nil {
 		return fmt.Errorf("load moderation state: %w", err)
 	}
 	defer rows.Close()
 
 	now := time.Now()
+	seen := make(map[string]struct{})
 	h.banMutex.Lock()
 	defer h.banMutex.Unlock()
 
@@ -115,13 +118,19 @@ func (h *Hub) loadModerationState() error {
 			return fmt.Errorf("scan moderation row: %w", err)
 		}
 		lower := strings.ToLower(username)
+		if _, already := seen[lower]; already {
+			continue
+		}
+		seen[lower] = struct{}{}
 		if !expiresAt.Valid {
 			// Permanent ban (or pre-upgrade open row treated as permanent).
 			h.bans[lower] = struct{}{}
+			delete(h.tempKicks, lower)
 			continue
 		}
 		if now.Before(expiresAt.Time) {
 			h.tempKicks[lower] = expiresAt.Time
+			delete(h.bans, lower)
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -166,31 +175,23 @@ func (h *Hub) BanUser(username string, adminUsername string) error {
 
 	lowerUsername := strings.ToLower(username)
 
-	// Remove from temporary kicks if present
-	delete(h.tempKicks, lowerUsername)
+	// Persist first when a DB is configured so a successful BanUser survives restart.
+	if h.getDB() != nil {
+		if err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, nil); err != nil {
+			h.banMutex.Unlock()
+			return fmt.Errorf("persist ban: %w", err)
+		}
+		if err := clearUserMessageState(h.getDB(), lowerUsername); err != nil {
+			log.Printf("Warning: failed to clear message state for banned user %s: %v", username, err)
+		}
+	}
 
-	// Add to permanent bans (no expiry)
+	delete(h.tempKicks, lowerUsername)
 	h.bans[lowerUsername] = struct{}{}
 	AdminLogger.Info("User permanently banned", map[string]interface{}{
 		"banned_user": username,
 		"admin":       adminUsername,
 	})
-
-	// Record ban event in database (NULL expires_at = permanent)
-	if h.getDB() != nil {
-		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, nil)
-		if err != nil {
-			log.Printf("Warning: failed to record ban event for user %s: %v", username, err)
-		}
-	}
-
-	// Clear per-user last_seen bookkeeping on ban (ban gaps use ban_history, not this table).
-	if h.getDB() != nil {
-		err := clearUserMessageState(h.getDB(), lowerUsername)
-		if err != nil {
-			log.Printf("Warning: failed to clear message state for banned user %s: %v", username, err)
-		}
-	}
 
 	h.banMutex.Unlock()
 
@@ -205,27 +206,21 @@ func (h *Hub) UnbanUser(username string, adminUsername string) bool {
 
 	lowerUsername := strings.ToLower(username)
 	if _, exists := h.bans[lowerUsername]; exists {
+		if h.getDB() != nil {
+			if err := recordUnbanEvent(h.getDB(), lowerUsername); err != nil {
+				log.Printf("Warning: failed to record unban event for user %s: %v", username, err)
+				return false
+			}
+			if err := clearUserMessageState(h.getDB(), lowerUsername); err != nil {
+				log.Printf("Warning: failed to clear message state for unbanned user %s: %v", username, err)
+			}
+		}
+
 		delete(h.bans, lowerUsername)
 		AdminLogger.Info("User unbanned", map[string]interface{}{
 			"unbanned_user": username,
 			"admin":         adminUsername,
 		})
-
-		// Record unban event in database
-		if h.getDB() != nil {
-			err := recordUnbanEvent(h.getDB(), lowerUsername)
-			if err != nil {
-				log.Printf("Warning: failed to record unban event for user %s: %v", username, err)
-			}
-		}
-
-		// Clear per-user last_seen bookkeeping on unban.
-		if h.getDB() != nil {
-			err := clearUserMessageState(h.getDB(), lowerUsername)
-			if err != nil {
-				log.Printf("Warning: failed to clear message state for unbanned user %s: %v", username, err)
-			}
-		}
 
 		return true
 	}
@@ -349,31 +344,26 @@ func (h *Hub) KickUser(username string, adminUsername string) error {
 		return ErrKickPermanentlyBanned
 	}
 
-	// Add to temporary kicks for 24 hours
 	kickExpiry := time.Now().Add(24 * time.Hour)
+
+	// Persist first when a DB is configured so a successful KickUser survives restart.
+	if h.getDB() != nil {
+		exp := kickExpiry
+		if err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, &exp); err != nil {
+			h.banMutex.Unlock()
+			return fmt.Errorf("persist kick: %w", err)
+		}
+		if err := clearUserMessageState(h.getDB(), lowerUsername); err != nil {
+			log.Printf("Warning: failed to clear message state for kicked user %s: %v", username, err)
+		}
+	}
+
 	h.tempKicks[lowerUsername] = kickExpiry
 	AdminLogger.Info("User kicked", map[string]interface{}{
 		"kicked_user": username,
 		"admin":       adminUsername,
 		"until":       kickExpiry.Format("2006-01-02 15:04:05"),
 	})
-
-	// Record kick event in database with 24h expiry
-	if h.getDB() != nil {
-		exp := kickExpiry
-		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, &exp)
-		if err != nil {
-			log.Printf("Warning: failed to record kick event for user %s: %v", username, err)
-		}
-	}
-
-	// Clear per-user last_seen bookkeeping on kick (ban gaps use ban_history, not this table).
-	if h.getDB() != nil {
-		err := clearUserMessageState(h.getDB(), lowerUsername)
-		if err != nil {
-			log.Printf("Warning: failed to clear message state for kicked user %s: %v", username, err)
-		}
-	}
 
 	h.banMutex.Unlock()
 
@@ -390,17 +380,15 @@ func (h *Hub) AllowUser(username string, adminUsername string) bool {
 
 	// Check if user is in temporary kick list
 	if _, exists := h.tempKicks[lowerUsername]; exists {
-		delete(h.tempKicks, lowerUsername)
-		log.Printf("[ADMIN] User '%s' allowed back by '%s' (kick override)", username, adminUsername)
-
-		// Record unban event in database
 		if h.getDB() != nil {
-			err := recordUnbanEvent(h.getDB(), lowerUsername)
-			if err != nil {
+			if err := recordUnbanEvent(h.getDB(), lowerUsername); err != nil {
 				log.Printf("Warning: failed to record allow event for user %s: %v", username, err)
+				return false
 			}
 		}
 
+		delete(h.tempKicks, lowerUsername)
+		log.Printf("[ADMIN] User '%s' allowed back by '%s' (kick override)", username, adminUsername)
 		return true
 	}
 

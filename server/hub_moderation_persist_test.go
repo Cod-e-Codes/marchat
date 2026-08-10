@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"net/http/httptest"
 	"path/filepath"
 	"strings"
@@ -126,6 +127,105 @@ func TestExpiredTempKickNotLoadedOnRestart(t *testing.T) {
 	hub := mustNewHub(t, tdir, tdir, "", db2)
 	if hub.IsUserBanned("carol") {
 		t.Fatal("expired temp kick must not reject after restart")
+	}
+}
+
+func countOpenBanRows(t *testing.T, db *sql.DB, username string) int {
+	t.Helper()
+	var n int
+	if err := dbQueryRow(db, `SELECT COUNT(*) FROM ban_history WHERE username = ? AND unbanned_at IS NULL`, strings.ToLower(username)).Scan(&n); err != nil {
+		t.Fatalf("count open ban rows: %v", err)
+	}
+	return n
+}
+
+func TestKickThenBanLeavesSingleOpenRow(t *testing.T) {
+	tdir := t.TempDir()
+	dbPath := filepath.Join(tdir, "moderation.db")
+	db, err := InitDB(dbPath)
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	CreateSchema(db)
+
+	hub := mustNewHub(t, tdir, tdir, "", db)
+	registerTestClient(hub, "bob")
+	if err := hub.KickUser("bob", "admin"); err != nil {
+		t.Fatalf("KickUser: %v", err)
+	}
+	if n := countOpenBanRows(t, db, "bob"); n != 1 {
+		t.Fatalf("after kick open rows = %d, want 1", n)
+	}
+
+	if err := hub.BanUser("bob", "admin"); err != nil {
+		t.Fatalf("BanUser: %v", err)
+	}
+	if n := countOpenBanRows(t, db, "bob"); n != 1 {
+		t.Fatalf("after kick+ban open rows = %d, want 1", n)
+	}
+
+	var expires sql.NullTime
+	if err := dbQueryRow(db, `SELECT expires_at FROM ban_history WHERE username = ? AND unbanned_at IS NULL`, "bob").Scan(&expires); err != nil {
+		t.Fatalf("scan open row: %v", err)
+	}
+	if expires.Valid {
+		t.Fatal("open row after permanent ban should have NULL expires_at")
+	}
+
+	if err := db.Close(); err != nil {
+		t.Fatalf("close: %v", err)
+	}
+	db2, err := InitDB(dbPath)
+	if err != nil {
+		t.Fatalf("reopen: %v", err)
+	}
+	defer db2.Close()
+	CreateSchema(db2)
+	hub2 := mustNewHub(t, tdir, tdir, "", db2)
+
+	if !hub2.IsUserBanned("bob") {
+		t.Fatal("bob should be permanently banned after restart")
+	}
+	hub2.banMutex.RLock()
+	_, permanent := hub2.bans["bob"]
+	_, kicked := hub2.tempKicks["bob"]
+	hub2.banMutex.RUnlock()
+	if !permanent {
+		t.Fatal("expected bans map entry after kick-then-ban restart")
+	}
+	if kicked {
+		t.Fatal("tempKicks must not be set when latest open row is permanent")
+	}
+}
+
+func TestLoadModerationStateLatestOpenRowWins(t *testing.T) {
+	tdir := t.TempDir()
+	db, err := InitDB(filepath.Join(tdir, "legacy.db"))
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	kickExpiry := time.Now().Add(12 * time.Hour)
+	// Legacy duplicate open rows: older permanent, newer kick (without close-before-insert).
+	if _, err := dbExec(db, `INSERT INTO ban_history (username, banned_by, expires_at) VALUES (?, ?, ?)`, "legacy", "admin", nil); err != nil {
+		t.Fatalf("insert permanent: %v", err)
+	}
+	if _, err := dbExec(db, `INSERT INTO ban_history (username, banned_by, expires_at) VALUES (?, ?, ?)`, "legacy", "admin", kickExpiry); err != nil {
+		t.Fatalf("insert kick: %v", err)
+	}
+
+	hub := mustNewHub(t, tdir, tdir, "", db)
+	hub.banMutex.RLock()
+	_, permanent := hub.bans["legacy"]
+	loadedExpiry, kicked := hub.tempKicks["legacy"]
+	hub.banMutex.RUnlock()
+	if permanent {
+		t.Fatal("latest open row is temp kick; bans must be empty")
+	}
+	if !kicked || !time.Now().Before(loadedExpiry) {
+		t.Fatalf("expected temp kick from latest open row, kicked=%v expiry=%v", kicked, loadedExpiry)
 	}
 }
 

@@ -317,20 +317,32 @@ func clearUserMessageState(db *sql.DB, username string) error {
 
 // recordBanEvent records a ban or kick in ban_history.
 // expiresAt nil means a permanent ban; non-nil is the temporary kick expiry.
+// Any previously open rows for the username are closed first so at most one
+// open (unbanned_at IS NULL) row remains - the current moderation state.
 func recordBanEvent(db *sql.DB, username, bannedBy string, expiresAt *time.Time) error {
-	_, err := dbExec(db, `INSERT INTO ban_history (username, banned_by, expires_at) VALUES (?, ?, ?)`, username, bannedBy, expiresAt)
+	tx, err := db.Begin()
 	if err != nil {
-		log.Printf("Warning: failed to record ban event for user %s: %v", username, err)
+		return fmt.Errorf("begin ban_history tx: %w", err)
 	}
-	return err
+	defer func() { _ = tx.Rollback() }()
+
+	closeQ := rebindQuery(db, `UPDATE ban_history SET unbanned_at = CURRENT_TIMESTAMP WHERE username = ? AND unbanned_at IS NULL`)
+	if _, err := tx.Exec(closeQ, username); err != nil {
+		return fmt.Errorf("close open ban_history rows: %w", err)
+	}
+	insertQ := rebindQuery(db, `INSERT INTO ban_history (username, banned_by, expires_at) VALUES (?, ?, ?)`)
+	if _, err := tx.Exec(insertQ, username, bannedBy, expiresAt); err != nil {
+		return fmt.Errorf("insert ban_history row: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit ban_history tx: %w", err)
+	}
+	return nil
 }
 
-// recordUnbanEvent records an unban event in the ban_history table
+// recordUnbanEvent closes all open ban_history rows for username.
 func recordUnbanEvent(db *sql.DB, username string) error {
 	_, err := dbExec(db, `UPDATE ban_history SET unbanned_at = CURRENT_TIMESTAMP WHERE username = ? AND unbanned_at IS NULL`, username)
-	if err != nil {
-		log.Printf("Warning: failed to record unban event for user %s: %v", username, err)
-	}
 	return err
 }
 
