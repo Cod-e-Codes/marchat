@@ -7,7 +7,9 @@ description: >-
 paths:
   - "server/db.go"
   - "server/db_dialect.go"
+  - "server/migrate.go"
   - "server/db_*_test.go"
+  - "server/migrate_test.go"
   - "server/handlers.go"
   - "server/message_state.go"
 ---
@@ -46,10 +48,11 @@ Locally, CI smoke tests skip without env vars. See `testing-marchat` skill.
 
 ## Schema change workflow
 
-1. Update `CreateSchema` / migrations in `db.go` with dialect branches.
-2. Add or extend `db_dialect_test.go` for new SQL fragments.
-3. Run `go test ./server/...`.
-4. Document env or migration notes in `ARCHITECTURE.md` / `CHANGELOG.md` if user-visible.
+1. Add a new migration step in `server/migrate.go` (`applyMigrationV2`, etc.) and bump `currentSchemaVersion`; extend `verifySchema` when new required tables or columns ship.
+2. `MigrateSchema` runs ordered migrations, records `schema_version`, and verifies required tables (including `ban_history.expires_at`). `CreateSchema` in the same file is a thin `log.Fatal` wrapper for tests.
+3. Add or extend `db_dialect_test.go` for new SQL fragments.
+4. Run `go test ./server/...`.
+5. Document env or migration notes in `ARCHITECTURE.md` / `CHANGELOG.md` if user-visible.
 
 ## Backup
 
