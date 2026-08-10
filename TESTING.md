@@ -470,7 +470,7 @@ go test -v -race ./...
 
 ### Local validation (PowerShell)
 
-From the repo root, with `golangci-lint` and `govulncheck` on `PATH` (install with `go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest` and `go install golang.org/x/vuln/cmd/govulncheck@latest`):
+From the repo root, with `golangci-lint` and `govulncheck` on `PATH` (match CI pins in `.github/workflows/go.yml`: `go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2` and `go install golang.org/x/vuln/cmd/govulncheck@v1.6.0`):
 
 ```powershell
 $env:GOTOOLCHAIN = "auto"
