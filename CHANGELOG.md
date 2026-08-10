@@ -15,7 +15,7 @@ On **`main`** only; not part of the latest tagged release until you tag and publ
 - **Server**: Connected-user lookups (`KickUser`, `kickUser`, `ForceDisconnectUser`, `broadcastDM`) use an O(1) `clientsByUsername` map under `clientsMutex`.
 - **Dependencies**: **modernc.org/sqlite** v1.56.0 (journal-rollback corruption fix; **modernc.org/libc** v1.74.4); **github.com/lucasb-eyer/go-colorful** v1.4.1.
 - **Toolchain**: Go **1.25.13** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for the 6 reachable findings **govulncheck** reported on **1.25.12**).
-- **CI**: **`govulncheck ./...`** without **`-show verbose`** (default symbol scan; unreachable module advisories stay informational). Pin **golangci-lint** v2.12.2 and **govulncheck** v1.6.0 (no `@latest`) in the main and nested-module jobs.
+- **CI**: **`govulncheck ./...`** without **`-show verbose`** (default symbol scan; unreachable module advisories stay informational). Pin **golangci-lint** v2.12.2 and **govulncheck** v1.6.0 (no `@latest`) in the main and nested-module jobs; add `.golangci.yml` (v2) enabling govet/ineffassign/staticcheck SA* checks.
 
 ## v1.3.4
 
