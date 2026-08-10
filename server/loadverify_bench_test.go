@@ -57,7 +57,10 @@ func setupLoadverifyHub(b *testing.B, total, inChannel int) *Hub {
 	}
 	b.Cleanup(func() { db.Close() })
 	CreateSchema(db)
-	hub := NewHub("", "", "", db)
+	hub, err := NewHub("", "", "", db)
+	if err != nil {
+		b.Fatalf("NewHub: %v", err)
+	}
 	go hub.Run()
 	time.Sleep(20 * time.Millisecond)
 

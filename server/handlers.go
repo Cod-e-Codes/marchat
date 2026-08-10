@@ -194,12 +194,37 @@ func CreateSchema(db *sql.DB) {
 		username ` + keyedTextType + ` NOT NULL,
 		banned_at ` + dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		unbanned_at ` + dateTimeType + `,
-		banned_by ` + keyedTextType + ` NOT NULL
+		banned_by ` + keyedTextType + ` NOT NULL,
+		expires_at ` + dateTimeType + `
 	);`
 
 	_, err = dbExec(db, banHistorySchema)
 	if err != nil {
 		log.Printf("Warning: failed to create ban_history table: %v", err)
+	}
+
+	// Add expires_at for ban_history created before this column existed.
+	// NULL expires_at = permanent ban; non-NULL = temporary kick expiry.
+	{
+		var expiresExists int
+		switch dialect {
+		case DialectPostgres:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'ban_history' AND column_name = ?`, "expires_at").Scan(&expiresExists)
+		case DialectMySQL:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'ban_history' AND column_name = ?`, "expires_at").Scan(&expiresExists)
+		default:
+			err = dbQueryRow(db, `SELECT COUNT(*) FROM pragma_table_info('ban_history') WHERE name=?`, "expires_at").Scan(&expiresExists)
+		}
+		if err != nil {
+			log.Printf("Warning: failed to check for ban_history.expires_at column: %v", err)
+		} else if expiresExists == 0 {
+			_, err = dbExec(db, `ALTER TABLE ban_history ADD COLUMN expires_at `+dateTimeType)
+			if err != nil {
+				log.Printf("Warning: failed to add ban_history.expires_at column: %v", err)
+			} else {
+				log.Printf("Added expires_at column to ban_history table")
+			}
+		}
 	}
 
 	// Create indexes for performance (MySQL needs a prefix length when indexing LONGTEXT)
@@ -516,9 +541,10 @@ func clearUserMessageState(db *sql.DB, username string) error {
 	return err
 }
 
-// recordBanEvent records a ban event in the ban_history table
-func recordBanEvent(db *sql.DB, username, bannedBy string) error {
-	_, err := dbExec(db, `INSERT INTO ban_history (username, banned_by) VALUES (?, ?)`, username, bannedBy)
+// recordBanEvent records a ban or kick in ban_history.
+// expiresAt nil means a permanent ban; non-nil is the temporary kick expiry.
+func recordBanEvent(db *sql.DB, username, bannedBy string, expiresAt *time.Time) error {
+	_, err := dbExec(db, `INSERT INTO ban_history (username, banned_by, expires_at) VALUES (?, ?, ?)`, username, bannedBy, expiresAt)
 	if err != nil {
 		log.Printf("Warning: failed to record ban event for user %s: %v", username, err)
 	}

@@ -29,7 +29,7 @@ func TestIntegrationMessageFlow(t *testing.T) {
 	CreateSchema(db)
 
 	// Create hub (for future use in tests)
-	_ = NewHub("./plugins", "./data", "http://registry.example.com", db)
+	_ = mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	// Test message insertion and retrieval
 	now := time.Now()
@@ -80,7 +80,7 @@ func TestIntegrationUserBanFlow(t *testing.T) {
 	CreateSchema(db)
 
 	// Create hub
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "troublemaker"
 	adminUsername := "admin"
@@ -282,7 +282,7 @@ func TestIntegrationWebSocketHandshakeReplayOnReconnect(t *testing.T) {
 	}
 
 	tdir := t.TempDir()
-	hub := NewHub(tdir, tdir, "", db)
+	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
 	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, filepath.Join(tdir, "test.db"))
@@ -355,7 +355,7 @@ func TestIntegrationConcurrentOperations(t *testing.T) {
 	CreateSchema(db)
 
 	// Create hub
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	// Test concurrent message insertions with proper synchronization
 	var wg sync.WaitGroup

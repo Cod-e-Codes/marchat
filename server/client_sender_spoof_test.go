@@ -24,7 +24,7 @@ func setupSpoofTestHub(t *testing.T) (*sql.DB, string, func()) {
 	}
 	CreateSchema(db)
 
-	hub := NewHub(tdir, tdir, "", db)
+	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
 	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, dbPath)

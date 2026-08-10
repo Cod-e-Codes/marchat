@@ -23,6 +23,15 @@ func registerTestClient(hub *Hub, username string) *Client {
 	return client
 }
 
+func mustNewHub(t *testing.T, pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
+	t.Helper()
+	h, err := NewHub(pluginDir, dataDir, registryURL, db)
+	if err != nil {
+		t.Fatalf("NewHub: %v", err)
+	}
+	return h
+}
+
 func countBanHistoryRows(db *sql.DB, username string) (int, error) {
 	var count int
 	err := db.QueryRow(`SELECT COUNT(*) FROM ban_history WHERE username = ?`, strings.ToLower(username)).Scan(&count)
@@ -37,7 +46,9 @@ func TestNewHub(t *testing.T) {
 	}
 	defer db.Close()
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	CreateSchema(db)
+
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	if hub == nil {
 		t.Fatal("NewHub returned nil")
@@ -91,7 +102,7 @@ func TestHubBanUser(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -128,7 +139,7 @@ func TestHubUnbanUser(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -168,7 +179,7 @@ func TestHubKickUser(t *testing.T) {
 
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -214,7 +225,7 @@ func TestHubKickUserOfflineReturnsError(t *testing.T) {
 	defer db.Close()
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 	username := "offlineuser"
 	adminUsername := "admin"
 
@@ -251,7 +262,7 @@ func TestHubKickUserCaseInsensitiveOnlineMatch(t *testing.T) {
 	defer db.Close()
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 	registerTestClient(hub, "TestUser")
 	adminUsername := "admin"
 
@@ -271,7 +282,7 @@ func TestHubRejectsSelfKickAndBan(t *testing.T) {
 	defer db.Close()
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 	adminUsername := "Alice"
 
 	cases := []string{"Alice", "alice", "ALICE", "aLiCe"}
@@ -322,7 +333,7 @@ func TestHubKickPermanentlyBannedReturnsError(t *testing.T) {
 	defer db.Close()
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 	username := "banneduser"
 	adminUsername := "admin"
 	registerTestClient(hub, username)
@@ -358,7 +369,7 @@ func TestHubAllowUser(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -400,7 +411,7 @@ func TestHubBanOverridesKick(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -442,7 +453,7 @@ func TestHubCleanupExpiredBans(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -477,7 +488,9 @@ func TestHubForceDisconnectUser(t *testing.T) {
 	}
 	defer db.Close()
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	CreateSchema(db)
+
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -499,7 +512,9 @@ func TestHubGetPluginManager(t *testing.T) {
 	}
 	defer db.Close()
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	CreateSchema(db)
+
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	pluginManager := hub.GetPluginManager()
 	if pluginManager == nil {
@@ -521,7 +536,7 @@ func TestHubBanCaseInsensitive(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "TestUser"
 	adminUsername := "admin"
@@ -556,7 +571,7 @@ func TestHubMultipleBansAndKicks(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	adminUsername := "admin"
 	users := []string{"user1", "user2", "user3"}
@@ -604,7 +619,7 @@ func TestHubConcurrentBanOperations(t *testing.T) {
 	// Create schema for database operations
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	username := "testuser"
 	adminUsername := "admin"
@@ -649,7 +664,7 @@ func TestHubConcurrentBanOperations(t *testing.T) {
 }
 
 func TestBroadcastUserListNonBlocking(t *testing.T) {
-	hub := NewHub("", "", "", nil)
+	hub := mustNewHub(t, "", "", "", nil)
 
 	// Create a client with a tiny send buffer that we intentionally fill.
 	stalled := &Client{username: "stalled", send: make(chan interface{}, 1)}
@@ -689,7 +704,7 @@ func TestKickUserNonBlocking(t *testing.T) {
 	defer db.Close()
 	CreateSchema(db)
 
-	hub := NewHub("./plugins", "./data", "http://registry.example.com", db)
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
 
 	// Create a client with a full send buffer.
 	client := &Client{
@@ -719,7 +734,7 @@ func TestKickUserNonBlocking(t *testing.T) {
 }
 
 func TestChannelManagement(t *testing.T) {
-	hub := NewHub("", "", "", nil)
+	hub := mustNewHub(t, "", "", "", nil)
 
 	client := &Client{username: "testuser", send: make(chan interface{}, 10)}
 
@@ -814,7 +829,7 @@ func TestChannelManagement(t *testing.T) {
 }
 
 func TestBroadcastDM(t *testing.T) {
-	hub := NewHub("", "", "", nil)
+	hub := mustNewHub(t, "", "", "", nil)
 
 	sender := &Client{username: "alice", send: make(chan interface{}, 10)}
 	recipient := &Client{username: "bob", send: make(chan interface{}, 10)}
@@ -847,7 +862,7 @@ func TestBroadcastDM(t *testing.T) {
 }
 
 func TestBroadcastDMCaseInsensitive(t *testing.T) {
-	hub := NewHub("", "", "", nil)
+	hub := mustNewHub(t, "", "", "", nil)
 
 	sender := &Client{username: "Alice", send: make(chan interface{}, 10)}
 	recipient := &Client{username: "BOB", send: make(chan interface{}, 10)}
@@ -875,7 +890,7 @@ func TestBroadcastDMCaseInsensitive(t *testing.T) {
 }
 
 func TestConcurrentChannelOperations(t *testing.T) {
-	hub := NewHub("", "", "", nil)
+	hub := mustNewHub(t, "", "", "", nil)
 
 	done := make(chan bool, 4)
 	clients := make([]*Client, 10)

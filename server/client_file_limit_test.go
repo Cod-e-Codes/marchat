@@ -119,7 +119,7 @@ func setupFileLimitHub(t *testing.T, maxFileBytes int64) (string, func()) {
 	}
 	CreateSchema(db)
 
-	hub := NewHub(tdir, tdir, "", db)
+	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
 	handler := ServeWs(hub, db, nil, "admin-key", false, maxFileBytes, dbPath)

@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -52,11 +53,11 @@ type Hub struct {
 	channelMutex sync.RWMutex
 }
 
-func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
+func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) (*Hub, error) {
 	pluginManager := manager.NewPluginManager(pluginDir, dataDir, registryURL)
 	pluginCommandHandler := NewPluginCommandHandler(pluginManager)
 
-	return &Hub{
+	h := &Hub{
 		clients:              make(map[*Client]bool),
 		usernames:            make(map[string]struct{}),
 		broadcast:            make(chan interface{}),
@@ -69,6 +70,50 @@ func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
 		db:                   db,
 		channels:             make(map[string]map[*Client]bool),
 	}
+	if db != nil {
+		if err := h.loadModerationState(); err != nil {
+			return nil, err
+		}
+	}
+	return h, nil
+}
+
+// loadModerationState restores active bans and unexpired temp kicks from ban_history.
+// Open rows (unbanned_at IS NULL) with NULL expires_at are permanent bans.
+// Open rows with expires_at in the future are temp kicks; expired rows are skipped.
+func (h *Hub) loadModerationState() error {
+	rows, err := dbQuery(h.db, `
+		SELECT username, expires_at FROM ban_history
+		WHERE unbanned_at IS NULL`)
+	if err != nil {
+		return fmt.Errorf("load moderation state: %w", err)
+	}
+	defer rows.Close()
+
+	now := time.Now()
+	h.banMutex.Lock()
+	defer h.banMutex.Unlock()
+
+	for rows.Next() {
+		var username string
+		var expiresAt sql.NullTime
+		if err := rows.Scan(&username, &expiresAt); err != nil {
+			return fmt.Errorf("scan moderation row: %w", err)
+		}
+		lower := strings.ToLower(username)
+		if !expiresAt.Valid {
+			// Permanent ban (or pre-upgrade open row treated as permanent).
+			h.bans[lower] = now.Add(100 * 365 * 24 * time.Hour)
+			continue
+		}
+		if now.Before(expiresAt.Time) {
+			h.tempKicks[lower] = expiresAt.Time
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate moderation rows: %w", err)
+	}
+	return nil
 }
 
 func (h *Hub) TryReserveUsername(username string) bool {
@@ -118,9 +163,9 @@ func (h *Hub) BanUser(username string, adminUsername string) error {
 		"admin":       adminUsername,
 	})
 
-	// Record ban event in database
+	// Record ban event in database (NULL expires_at = permanent)
 	if h.getDB() != nil {
-		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername)
+		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, nil)
 		if err != nil {
 			log.Printf("Warning: failed to record ban event for user %s: %v", username, err)
 		}
@@ -294,9 +339,10 @@ func (h *Hub) KickUser(username string, adminUsername string) error {
 		"until":       kickExpiry.Format("2006-01-02 15:04:05"),
 	})
 
-	// Record kick event in database (reuse ban event structure)
+	// Record kick event in database with 24h expiry
 	if h.getDB() != nil {
-		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername)
+		exp := kickExpiry
+		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, &exp)
 		if err != nil {
 			log.Printf("Warning: failed to record kick event for user %s: %v", username, err)
 		}

@@ -305,7 +305,10 @@ func main() {
 		})
 	}
 
-	hub := server.NewHub(pluginDir, dataDir, registryURL, db)
+	hub, err := server.NewHub(pluginDir, dataDir, registryURL, db)
+	if err != nil {
+		log.Fatalf("Failed to create hub: %v", err)
+	}
 	go hub.Run()
 
 	// Log server startup

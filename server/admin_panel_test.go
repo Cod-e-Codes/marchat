@@ -19,7 +19,7 @@ func setupPanelEnv(t *testing.T) (*AdminPanel, func()) {
 	CreateSchema(db)
 	pluginDir := filepath.Join(tdir, "plugins")
 	dataDir := filepath.Join(tdir, "data")
-	hub := NewHub(pluginDir, dataDir, "", db)
+	hub := mustNewHub(t, pluginDir, dataDir, "", db)
 	cfg := &appcfg.Config{Port: 8080, AdminKey: "k", Admins: []string{"a"}, DBPath: dbPath, ConfigDir: tdir}
 	panel := NewAdminPanel(hub, db, hub.GetPluginManager(), cfg)
 	return panel, func() { _ = db.Close() }
