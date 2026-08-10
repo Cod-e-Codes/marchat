@@ -25,12 +25,13 @@ var (
 )
 
 type Hub struct {
-	clients      map[*Client]bool
-	usernames    map[string]struct{}
-	clientsMutex sync.RWMutex
-	broadcast    chan interface{}
-	register     chan *Client
-	unregister   chan *Client
+	clients           map[*Client]bool
+	usernames         map[string]struct{} // reserved names (handshake), lowercased
+	clientsByUsername map[string]*Client  // connected clients by lowercased username
+	clientsMutex      sync.RWMutex
+	broadcast         chan interface{}
+	register          chan *Client
+	unregister        chan *Client
 
 	// Ban management
 	bans      map[string]struct{}  // username -> permanently banned (no expiry)
@@ -60,6 +61,7 @@ func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) (*Hub, error) {
 	h := &Hub{
 		clients:              make(map[*Client]bool),
 		usernames:            make(map[string]struct{}),
+		clientsByUsername:    make(map[string]*Client),
 		broadcast:            make(chan interface{}),
 		register:             make(chan *Client),
 		unregister:           make(chan *Client),
@@ -270,16 +272,28 @@ func (h *Hub) disconnectClient(target *Client, reason string) {
 	}
 }
 
+// clientByUsernameLocked returns the connected client for a lowercased username.
+// Caller must hold clientsMutex (read or write).
+func (h *Hub) clientByUsernameLocked(lowerUsername string) *Client {
+	return h.clientsByUsername[lowerUsername]
+}
+
+// removeClientLocked removes a client from clients and clientsByUsername.
+// Caller must hold clientsMutex for write.
+func (h *Hub) removeClientLocked(client *Client) {
+	delete(h.clients, client)
+	if client != nil && client.username != "" {
+		lower := strings.ToLower(client.username)
+		if h.clientsByUsername[lower] == client {
+			delete(h.clientsByUsername, lower)
+		}
+	}
+}
+
 // kickUser forcibly disconnects a user by username.
 func (h *Hub) kickUser(username string, reason string) {
 	h.clientsMutex.RLock()
-	var target *Client
-	for client := range h.clients {
-		if strings.EqualFold(client.username, username) {
-			target = client
-			break
-		}
-	}
+	target := h.clientByUsernameLocked(strings.ToLower(username))
 	h.clientsMutex.RUnlock()
 
 	if target == nil {
@@ -305,13 +319,7 @@ func (h *Hub) KickUser(username string, adminUsername string) error {
 	}
 
 	h.clientsMutex.RLock()
-	var target *Client
-	for client := range h.clients {
-		if strings.EqualFold(client.username, username) {
-			target = client
-			break
-		}
-	}
+	target := h.clientByUsernameLocked(strings.ToLower(username))
 	h.clientsMutex.RUnlock()
 
 	if target == nil {
@@ -428,7 +436,7 @@ func (h *Hub) CleanupStaleConnections() {
 	for _, client := range staleClients {
 		if _, exists := h.clients[client]; exists {
 			log.Printf("[CLEANUP] Removing stale connection for user '%s' (IP: %s)", client.username, client.ipAddr)
-			delete(h.clients, client)
+			h.removeClientLocked(client)
 			delete(h.usernames, strings.ToLower(client.username))
 			client.conn.Close()
 		}
@@ -442,13 +450,7 @@ func (h *Hub) CleanupStaleConnections() {
 // ForceDisconnectUser forcibly removes a user from the clients map (admin command for stale connections)
 func (h *Hub) ForceDisconnectUser(username string, adminUsername string) bool {
 	h.clientsMutex.Lock()
-	var target *Client
-	for client := range h.clients {
-		if strings.EqualFold(client.username, username) {
-			target = client
-			break
-		}
-	}
+	target := h.clientByUsernameLocked(strings.ToLower(username))
 	if target == nil {
 		h.clientsMutex.Unlock()
 		log.Printf("[ADMIN] Force disconnect attempt for '%s' by '%s' - user not found", username, adminUsername)
@@ -457,8 +459,7 @@ func (h *Hub) ForceDisconnectUser(username string, adminUsername string) bool {
 
 	log.Printf("[ADMIN] Force disconnecting user '%s' (IP: %s) by admin '%s'", username, target.ipAddr, adminUsername)
 
-	// Remove from clients map
-	delete(h.clients, target)
+	h.removeClientLocked(target)
 	delete(h.usernames, strings.ToLower(target.username))
 	h.clientsMutex.Unlock()
 
@@ -504,6 +505,9 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			h.clientsMutex.Lock()
 			h.clients[client] = true
+			if client.username != "" {
+				h.clientsByUsername[strings.ToLower(client.username)] = client
+			}
 			h.clientsMutex.Unlock()
 			HubLogger.Info("Client registered", map[string]interface{}{
 				"username": client.username,
@@ -523,7 +527,7 @@ func (h *Hub) Run() {
 		case client := <-h.unregister:
 			h.clientsMutex.Lock()
 			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
+				h.removeClientLocked(client)
 				delete(h.usernames, strings.ToLower(client.username))
 				// Intentionally do not close client.send here.
 				// Closing send while readPump is still processing can trigger send-on-closed-channel panics.
@@ -562,7 +566,7 @@ func (h *Hub) Run() {
 						case client.send <- message:
 						default:
 							log.Printf("Dropping client %s due to full send channel\n", client.username)
-							delete(h.clients, client)
+							h.removeClientLocked(client)
 							delete(h.usernames, strings.ToLower(client.username))
 							// Fail-fast backpressure handling: drop slow client and close socket.
 							client.conn.Close()
@@ -576,7 +580,7 @@ func (h *Hub) Run() {
 					case client.send <- message:
 					default:
 						log.Printf("Dropping client %s due to full send channel\n", client.username)
-						delete(h.clients, client)
+						h.removeClientLocked(client)
 						delete(h.usernames, strings.ToLower(client.username))
 						// Fail-fast backpressure handling: drop slow client and close socket.
 						client.conn.Close()
@@ -599,13 +603,23 @@ func (h *Hub) Run() {
 func (h *Hub) broadcastDM(msg shared.Message) {
 	h.clientsMutex.RLock()
 	defer h.clientsMutex.RUnlock()
-	for client := range h.clients {
-		if strings.EqualFold(client.username, msg.Sender) || strings.EqualFold(client.username, msg.Recipient) {
-			select {
-			case client.send <- msg:
-			default:
-				log.Printf("Dropping DM for client %s due to full send channel", client.username)
-			}
+	seen := make(map[*Client]struct{}, 2)
+	for _, name := range []string{msg.Sender, msg.Recipient} {
+		if name == "" {
+			continue
+		}
+		client := h.clientByUsernameLocked(strings.ToLower(name))
+		if client == nil {
+			continue
+		}
+		if _, ok := seen[client]; ok {
+			continue
+		}
+		seen[client] = struct{}{}
+		select {
+		case client.send <- msg:
+		default:
+			log.Printf("Dropping DM for client %s due to full send channel", client.username)
 		}
 	}
 }

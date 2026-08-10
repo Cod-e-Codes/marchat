@@ -30,6 +30,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 	"time"
 
@@ -75,6 +76,7 @@ func setupLoadverifyHub(b *testing.B, total, inChannel int) *Hub {
 		loadverifyDrain(c.send)
 		hub.clientsMutex.Lock()
 		hub.clients[c] = true
+		hub.clientsByUsername[strings.ToLower(c.username)] = c
 		hub.clientsMutex.Unlock()
 		if i < inChannel {
 			hub.joinChannel(c, "bench")

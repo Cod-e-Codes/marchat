@@ -34,6 +34,7 @@ func setupDispatchTestClient(t *testing.T) (*Client, *Hub) {
 	}
 	hub.clientsMutex.Lock()
 	hub.clients[client] = true
+	hub.clientsByUsername[strings.ToLower(client.username)] = client
 	hub.clientsMutex.Unlock()
 	hub.joinChannel(client, "general")
 

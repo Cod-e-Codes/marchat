@@ -19,6 +19,7 @@ func registerTestClient(hub *Hub, username string) *Client {
 	}
 	hub.clientsMutex.Lock()
 	hub.clients[client] = true
+	hub.clientsByUsername[strings.ToLower(username)] = client
 	hub.clientsMutex.Unlock()
 	return client
 }
@@ -747,6 +748,7 @@ func TestKickUserNonBlocking(t *testing.T) {
 
 	hub.clientsMutex.Lock()
 	hub.clients[client] = true
+	hub.clientsByUsername[strings.ToLower(client.username)] = client
 	hub.clientsMutex.Unlock()
 
 	// kickUser must not block even though the buffer is full, and must not
@@ -859,6 +861,26 @@ func TestChannelManagement(t *testing.T) {
 	})
 }
 
+func TestClientByUsernameLookup(t *testing.T) {
+	hub := mustNewHub(t, "", "", "", nil)
+	alice := registerTestClient(hub, "Alice")
+	registerTestClient(hub, "bob")
+
+	hub.clientsMutex.RLock()
+	got := hub.clientByUsernameLocked("alice")
+	hub.clientsMutex.RUnlock()
+	if got != alice {
+		t.Fatalf("expected alice client, got %#v", got)
+	}
+
+	if err := hub.KickUser("ALICE", "admin"); err != nil {
+		t.Fatalf("KickUser via O(1) lookup: %v", err)
+	}
+	if !hub.IsUserBanned("alice") {
+		t.Fatal("kick via case-insensitive O(1) lookup should temp-ban")
+	}
+}
+
 func TestBroadcastDM(t *testing.T) {
 	hub := mustNewHub(t, "", "", "", nil)
 
@@ -870,6 +892,9 @@ func TestBroadcastDM(t *testing.T) {
 	hub.clients[sender] = true
 	hub.clients[recipient] = true
 	hub.clients[bystander] = true
+	hub.clientsByUsername[strings.ToLower(sender.username)] = sender
+	hub.clientsByUsername[strings.ToLower(recipient.username)] = recipient
+	hub.clientsByUsername[strings.ToLower(bystander.username)] = bystander
 	hub.clientsMutex.Unlock()
 
 	msg := shared.Message{
@@ -901,6 +926,8 @@ func TestBroadcastDMCaseInsensitive(t *testing.T) {
 	hub.clientsMutex.Lock()
 	hub.clients[sender] = true
 	hub.clients[recipient] = true
+	hub.clientsByUsername[strings.ToLower(sender.username)] = sender
+	hub.clientsByUsername[strings.ToLower(recipient.username)] = recipient
 	hub.clientsMutex.Unlock()
 
 	msg := shared.Message{
