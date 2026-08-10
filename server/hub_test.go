@@ -481,6 +481,37 @@ func TestHubCleanupExpiredBans(t *testing.T) {
 	}
 }
 
+func TestPermanentBanHasNoExpiry(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open test database: %v", err)
+	}
+	defer db.Close()
+	CreateSchema(db)
+
+	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
+	if err := hub.BanUser("dave", "admin"); err != nil {
+		t.Fatalf("BanUser: %v", err)
+	}
+
+	hub.banMutex.RLock()
+	_, permanent := hub.bans["dave"]
+	_, inTemp := hub.tempKicks["dave"]
+	hub.banMutex.RUnlock()
+
+	if !permanent {
+		t.Fatal("permanent ban must be stored in bans map")
+	}
+	if inTemp {
+		t.Fatal("permanent ban must not appear in tempKicks")
+	}
+
+	hub.CleanupExpiredBans()
+	if !hub.IsUserBanned("dave") {
+		t.Fatal("CleanupExpiredBans must not clear permanent bans")
+	}
+}
+
 func TestHubForceDisconnectUser(t *testing.T) {
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {

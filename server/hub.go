@@ -33,7 +33,7 @@ type Hub struct {
 	unregister   chan *Client
 
 	// Ban management
-	bans      map[string]time.Time // username -> expiry time (permanent bans use far future time)
+	bans      map[string]struct{}  // username -> permanently banned (no expiry)
 	tempKicks map[string]time.Time // username -> kick expiry time (24h temporary)
 	banMutex  sync.RWMutex
 
@@ -63,7 +63,7 @@ func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) (*Hub, error) {
 		broadcast:            make(chan interface{}),
 		register:             make(chan *Client),
 		unregister:           make(chan *Client),
-		bans:                 make(map[string]time.Time),
+		bans:                 make(map[string]struct{}),
 		tempKicks:            make(map[string]time.Time),
 		pluginManager:        pluginManager,
 		pluginCommandHandler: pluginCommandHandler,
@@ -103,7 +103,7 @@ func (h *Hub) loadModerationState() error {
 		lower := strings.ToLower(username)
 		if !expiresAt.Valid {
 			// Permanent ban (or pre-upgrade open row treated as permanent).
-			h.bans[lower] = now.Add(100 * 365 * 24 * time.Hour)
+			h.bans[lower] = struct{}{}
 			continue
 		}
 		if now.Before(expiresAt.Time) {
@@ -155,9 +155,8 @@ func (h *Hub) BanUser(username string, adminUsername string) error {
 	// Remove from temporary kicks if present
 	delete(h.tempKicks, lowerUsername)
 
-	// Add to permanent bans (using far future time to indicate permanent)
-	permanentBanTime := time.Now().Add(100 * 365 * 24 * time.Hour) // 100 years in the future
-	h.bans[lowerUsername] = permanentBanTime
+	// Add to permanent bans (no expiry)
+	h.bans[lowerUsername] = struct{}{}
 	AdminLogger.Info("User permanently banned", map[string]interface{}{
 		"banned_user": username,
 		"admin":       adminUsername,
@@ -227,7 +226,7 @@ func (h *Hub) IsUserBanned(username string) bool {
 
 	lowerUsername := strings.ToLower(username)
 
-	// Check permanent bans (these don't expire automatically)
+	// Check permanent bans (no expiry)
 	if _, exists := h.bans[lowerUsername]; exists {
 		return true
 	}
@@ -389,22 +388,14 @@ func (h *Hub) AllowUser(username string, adminUsername string) bool {
 	return false
 }
 
-// CleanupExpiredBans removes expired bans and kicks from the lists
+// CleanupExpiredBans removes expired temporary kicks from the lists.
+// Permanent bans have no expiry and are never cleared here.
 func (h *Hub) CleanupExpiredBans() {
 	h.banMutex.Lock()
 	defer h.banMutex.Unlock()
 
 	now := time.Now()
 
-	// Clean up expired permanent bans (shouldn't happen with our 100-year approach, but just in case)
-	for username, banTime := range h.bans {
-		if now.After(banTime) {
-			delete(h.bans, username)
-			log.Printf("[SYSTEM] Expired permanent ban removed for user: %s", username)
-		}
-	}
-
-	// Clean up expired temporary kicks
 	for username, kickTime := range h.tempKicks {
 		if now.After(kickTime) {
 			delete(h.tempKicks, username)
