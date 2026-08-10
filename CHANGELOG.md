@@ -14,7 +14,7 @@ On **`main`** only; not part of the latest tagged release until you tag and publ
 - **Server**: **Fix:** schema bootstrap uses versioned `MigrateSchema` (`schema_version`) and hard-fails when required tables or `ban_history.expires_at` are missing instead of warning and continuing.
 - **Dependencies**: **modernc.org/sqlite** v1.56.0 (journal-rollback corruption fix; **modernc.org/libc** v1.74.4); **github.com/lucasb-eyer/go-colorful** v1.4.1.
 - **Toolchain**: Go **1.25.13** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for the 6 reachable findings **govulncheck** reported on **1.25.12**).
-- **CI**: **`govulncheck ./...`** without **`-show verbose`** (default symbol scan; unreachable module advisories stay informational).
+- **CI**: **`govulncheck ./...`** without **`-show verbose`** (default symbol scan; unreachable module advisories stay informational). Pin **golangci-lint** v2.12.2 and **govulncheck** v1.6.0 (no `@latest`) in the main and nested-module jobs.
 
 ## v1.3.4
 
