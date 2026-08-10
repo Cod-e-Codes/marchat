@@ -48,8 +48,8 @@ Locally, CI smoke tests skip without env vars. See `testing-marchat` skill.
 
 ## Schema change workflow
 
-1. Add a new migration step in `server/migrate.go` (`applyMigrationV2`, etc.) and bump `currentSchemaVersion`; extend `verifySchema` when new required tables or columns ship.
-2. `MigrateSchema` runs ordered migrations, records `schema_version`, and verifies required tables (including `ban_history.expires_at`). `CreateSchema` in the same file is a thin `log.Fatal` wrapper for tests.
+1. Add a new migration step in `server/migrate.go` (`applyMigrationV2`, etc.) and bump `currentSchemaVersion`; extend `verifySchema` when new required tables or columns ship. Prefer deterministic DDL for versions after the v1 baseline (avoid inspect-and-reconcile).
+2. `MigrateSchema` runs ordered migrations, records `schema_version`, and verifies required tables (including `ban_history.expires_at`). SQLite/Postgres wrap each version in a transaction; MySQL cannot (DDL implicit commit) - document that when changing migrator behavior. `CreateSchema` in the same file is a thin `log.Fatal` wrapper for tests.
 3. Add or extend `db_dialect_test.go` for new SQL fragments.
 4. Run `go test ./server/...`.
 5. Document env or migration notes in `ARCHITECTURE.md` / `CHANGELOG.md` if user-visible.

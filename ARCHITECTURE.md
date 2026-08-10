@@ -291,7 +291,7 @@ See [PROTOCOL.md](PROTOCOL.md) for the full message format specification.
 
 ## Database Schema
 
-DDL below uses the **SQLite** dialect for readability. PostgreSQL and MySQL variants differ in type names (`BIGSERIAL`/`BIGINT AUTO_INCREMENT` for IDs, `VARCHAR(191)` for indexed text on MySQL, `LONGTEXT`/`LONGBLOB` for large fields) and are applied by versioned `MigrateSchema` in `server/migrate.go` (`schema_version`; `CreateSchema` is a thin fatal wrapper for tests).
+DDL below uses the **SQLite** dialect for readability. PostgreSQL and MySQL variants differ in type names (`BIGSERIAL`/`BIGINT AUTO_INCREMENT` for IDs, `VARCHAR(191)` for indexed text on MySQL, `LONGTEXT`/`LONGBLOB` for large fields) and are applied by versioned `MigrateSchema` in `server/migrate.go` (`schema_version`; `CreateSchema` is a thin fatal wrapper for tests). SQLite and PostgreSQL wrap each versioned migration in a transaction. MySQL DDL implicitly commits, so MySQL runs migration steps without a multi-statement transaction; `schema_version` is still recorded only after a successful apply. Future versions after the v1 baseline should be deterministic DDL steps, not inspect-and-reconcile passes.
 
 ### Tables
 
@@ -337,7 +337,7 @@ CREATE TABLE ban_history (
     expires_at DATETIME
 );
 ```
-Open rows (`unbanned_at` NULL) are the source of truth for active moderation across restart: `expires_at` NULL means permanent ban; non-NULL is a temporary kick expiry. Hub start loads those into in-memory maps.
+Open rows (`unbanned_at` NULL) are the source of truth for active moderation across restart: writers close any open row for the username before inserting a new one (at most one open row). `expires_at` NULL means permanent ban; non-NULL is a temporary kick expiry. Hub start loads the latest open row per user (`ORDER BY id DESC`).
 
 #### `schema_version`
 ```sql

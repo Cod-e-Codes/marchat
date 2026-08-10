@@ -69,7 +69,7 @@ func assertMigrateSchemaFromEmpty(t *testing.T, db *sql.DB) {
 	}
 }
 
-func TestMigrateSchemaPartialFailsVerification(t *testing.T) {
+func TestMigrateSchemaFailsWhenRecordedSchemaIsIncomplete(t *testing.T) {
 	db, err := InitDB(":memory:")
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
@@ -83,8 +83,8 @@ func TestMigrateSchemaPartialFailsVerification(t *testing.T) {
 		t.Fatalf("seed schema_version: %v", err)
 	}
 
-	// Partial schema: version recorded but ban_history never created.
-	if err := applyMigrationV1(db); err != nil {
+	// Version claims v1 but required table is missing (corruption / incomplete install).
+	if err := applyMigrationV1(migrationConn{db: db}); err != nil {
 		t.Fatalf("applyMigrationV1: %v", err)
 	}
 	if _, err := dbExec(db, `DROP TABLE ban_history`); err != nil {
@@ -97,5 +97,55 @@ func TestMigrateSchemaPartialFailsVerification(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "ban_history") {
 		t.Fatalf("error = %v, want mention of missing ban_history", err)
+	}
+}
+
+func TestMigrateSchemaV1RollsBackOnInjectedFailure(t *testing.T) {
+	db, err := InitDB(":memory:")
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer db.Close()
+
+	migrationFailAfterStep = "create user_message_state"
+	t.Cleanup(func() { migrationFailAfterStep = "" })
+
+	err = MigrateSchema(db)
+	if err == nil {
+		t.Fatal("expected MigrateSchema to fail on injected mid-migration error")
+	}
+	if !strings.Contains(err.Error(), "injected migration failure") {
+		t.Fatalf("error = %v, want injected failure", err)
+	}
+
+	version, err := readSchemaVersion(db)
+	if err != nil {
+		t.Fatalf("readSchemaVersion: %v", err)
+	}
+	if version != 0 {
+		t.Fatalf("schema version = %d after failed migration, want 0", version)
+	}
+
+	// messages + user_message_state were created inside the rolled-back transaction.
+	for _, table := range []string{"messages", "user_message_state", "ban_history"} {
+		ok, err := tableExists(db, table)
+		if err != nil {
+			t.Fatalf("tableExists(%q): %v", table, err)
+		}
+		if ok {
+			t.Fatalf("table %q should not exist after migration rollback", table)
+		}
+	}
+
+	migrationFailAfterStep = ""
+	if err := MigrateSchema(db); err != nil {
+		t.Fatalf("retry MigrateSchema after rollback: %v", err)
+	}
+	version, err = readSchemaVersion(db)
+	if err != nil {
+		t.Fatalf("readSchemaVersion after retry: %v", err)
+	}
+	if version != 1 {
+		t.Fatalf("schema version = %d after retry, want 1", version)
 	}
 }

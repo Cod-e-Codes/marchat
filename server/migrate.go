@@ -9,6 +9,10 @@ import (
 
 const currentSchemaVersion = 1
 
+// migrationFailAfterStep is a test-only hook. When non-empty, applyMigrationV1
+// returns an error after completing the named step (used to verify rollback).
+var migrationFailAfterStep string
+
 type schemaTypes struct {
 	idColumn          string
 	boolDefault       string
@@ -55,8 +59,43 @@ func schemaTypesForDialect(dialect DBDialect) schemaTypes {
 	return st
 }
 
+// migrationConn executes SQL against either *sql.DB or *sql.Tx while keeping
+// dialect rebinding keyed off the parent *sql.DB handle.
+type migrationConn struct {
+	db *sql.DB
+	tx *sql.Tx
+}
+
+func (c migrationConn) Exec(query string, args ...interface{}) (sql.Result, error) {
+	q := rebindQuery(c.db, query)
+	if c.tx != nil {
+		return c.tx.Exec(q, args...)
+	}
+	return c.db.Exec(q, args...)
+}
+
+func (c migrationConn) QueryRow(query string, args ...interface{}) *sql.Row {
+	q := rebindQuery(c.db, query)
+	if c.tx != nil {
+		return c.tx.QueryRow(q, args...)
+	}
+	return c.db.QueryRow(q, args...)
+}
+
+func (c migrationConn) maybeFail(step string) error {
+	if migrationFailAfterStep != "" && migrationFailAfterStep == step {
+		return fmt.Errorf("injected migration failure after %s", step)
+	}
+	return nil
+}
+
 // MigrateSchema applies ordered schema migrations and verifies required tables exist.
 // Existing databases without a schema_version row run the v1 baseline idempotently, then record version 1.
+//
+// SQLite and PostgreSQL apply each versioned migration (DDL + version row) inside a single
+// transaction so a mid-migration failure rolls back. MySQL DDL implicitly commits, so MySQL
+// runs steps without a multi-statement transaction; each statement is still statement-atomic
+// on InnoDB, and schema_version is recorded only after applyMigrationV1 returns nil.
 func MigrateSchema(db *sql.DB) error {
 	if err := ensureSchemaVersionTable(db); err != nil {
 		return fmt.Errorf("schema_version table: %w", err)
@@ -68,15 +107,41 @@ func MigrateSchema(db *sql.DB) error {
 	}
 
 	if version < 1 {
-		if err := applyMigrationV1(db); err != nil {
+		if err := applyVersionedMigration(db, 1, applyMigrationV1); err != nil {
 			return fmt.Errorf("migration v1: %w", err)
-		}
-		if err := setSchemaVersion(db, 1); err != nil {
-			return fmt.Errorf("record schema version 1: %w", err)
 		}
 	}
 
 	return verifySchema(db)
+}
+
+func applyVersionedMigration(db *sql.DB, version int, apply func(migrationConn) error) error {
+	dialect := getDBDialect(db)
+	if dialect == DialectMySQL {
+		// MySQL DDL ends any open transaction (implicit commit). Do not wrap.
+		if err := apply(migrationConn{db: db}); err != nil {
+			return err
+		}
+		return setSchemaVersion(db, nil, version)
+	}
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin migration transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	conn := migrationConn{db: db, tx: tx}
+	if err := apply(conn); err != nil {
+		return err
+	}
+	if err := setSchemaVersion(db, tx, version); err != nil {
+		return fmt.Errorf("record schema version %d: %w", version, err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit migration transaction: %w", err)
+	}
+	return nil
 }
 
 func ensureSchemaVersionTable(db *sql.DB) error {
@@ -101,22 +166,23 @@ func readSchemaVersion(db *sql.DB) (int, error) {
 	return int(version.Int64), nil
 }
 
-func setSchemaVersion(db *sql.DB, version int) error {
+func setSchemaVersion(db *sql.DB, tx *sql.Tx, version int) error {
+	conn := migrationConn{db: db, tx: tx}
+	var q string
 	switch getDBDialect(db) {
 	case DialectPostgres:
-		_, err := dbExec(db, `INSERT INTO schema_version (version) VALUES (?) ON CONFLICT (version) DO NOTHING`, version)
-		return err
+		q = `INSERT INTO schema_version (version) VALUES (?) ON CONFLICT (version) DO NOTHING`
 	case DialectMySQL:
-		_, err := dbExec(db, `INSERT IGNORE INTO schema_version (version) VALUES (?)`, version)
-		return err
+		q = `INSERT IGNORE INTO schema_version (version) VALUES (?)`
 	default:
-		_, err := dbExec(db, `INSERT OR IGNORE INTO schema_version (version) VALUES (?)`, version)
-		return err
+		q = `INSERT OR IGNORE INTO schema_version (version) VALUES (?)`
 	}
+	_, err := conn.Exec(q, version)
+	return err
 }
 
-func applyMigrationV1(db *sql.DB) error {
-	dialect := getDBDialect(db)
+func applyMigrationV1(conn migrationConn) error {
+	dialect := getDBDialect(conn.db)
 	st := schemaTypesForDialect(dialect)
 
 	basicSchema := fmt.Sprintf(`
@@ -137,8 +203,11 @@ func applyMigrationV1(db *sql.DB) error {
 	);`, st.idColumn, st.textType, st.textType, st.dateTimeType, st.boolDefault,
 		st.boolDefault, st.boolDefault, st.boolDefault, st.blobType, st.blobType, st.textType, st.channelColumnType)
 
-	if _, err := dbExec(db, basicSchema); err != nil {
+	if _, err := conn.Exec(basicSchema); err != nil {
 		return fmt.Errorf("create messages table: %w", err)
+	}
+	if err := conn.maybeFail("create messages"); err != nil {
+		return err
 	}
 
 	migrations := []struct {
@@ -153,12 +222,12 @@ func applyMigrationV1(db *sql.DB) error {
 	}
 
 	for _, m := range migrations {
-		exists, err := columnExists(db, "messages", m.column)
+		exists, err := columnExistsConn(conn, "messages", m.column)
 		if err != nil {
 			return fmt.Errorf("check messages.%s column: %w", m.column, err)
 		}
 		if !exists {
-			if _, err := dbExec(db, m.ddl); err != nil {
+			if _, err := conn.Exec(m.ddl); err != nil {
 				return fmt.Errorf("add messages.%s column: %w", m.column, err)
 			}
 		}
@@ -170,8 +239,11 @@ func applyMigrationV1(db *sql.DB) error {
 		last_message_id INTEGER NOT NULL DEFAULT 0,
 		last_seen ` + st.dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP
 	);`
-	if _, err := dbExec(db, userStateSchema); err != nil {
+	if _, err := conn.Exec(userStateSchema); err != nil {
 		return fmt.Errorf("create user_message_state table: %w", err)
+	}
+	if err := conn.maybeFail("create user_message_state"); err != nil {
+		return err
 	}
 
 	banHistorySchema := `
@@ -183,16 +255,16 @@ func applyMigrationV1(db *sql.DB) error {
 		banned_by ` + st.keyedTextType + ` NOT NULL,
 		expires_at ` + st.dateTimeType + `
 	);`
-	if _, err := dbExec(db, banHistorySchema); err != nil {
+	if _, err := conn.Exec(banHistorySchema); err != nil {
 		return fmt.Errorf("create ban_history table: %w", err)
 	}
 
-	expiresExists, err := columnExists(db, "ban_history", "expires_at")
+	expiresExists, err := columnExistsConn(conn, "ban_history", "expires_at")
 	if err != nil {
 		return fmt.Errorf("check ban_history.expires_at column: %w", err)
 	}
 	if !expiresExists {
-		if _, err := dbExec(db, `ALTER TABLE ban_history ADD COLUMN expires_at `+st.dateTimeType); err != nil {
+		if _, err := conn.Exec(`ALTER TABLE ban_history ADD COLUMN expires_at ` + st.dateTimeType); err != nil {
 			return fmt.Errorf("add ban_history.expires_at column: %w", err)
 		}
 	}
@@ -217,7 +289,7 @@ func applyMigrationV1(db *sql.DB) error {
 		if dialect == DialectMySQL {
 			q = strings.Replace(index, "IF NOT EXISTS ", "", 1)
 		}
-		if _, err := dbExec(db, q); err != nil {
+		if _, err := conn.Exec(q); err != nil {
 			if dialect == DialectMySQL && isMySQLDuplicateKeyName(err) {
 				continue
 			}
@@ -225,37 +297,37 @@ func applyMigrationV1(db *sql.DB) error {
 		}
 	}
 
-	if _, err := dbExec(db, `UPDATE messages SET message_id = id WHERE message_id = 0 OR message_id IS NULL`); err != nil {
+	if _, err := conn.Exec(`UPDATE messages SET message_id = id WHERE message_id = 0 OR message_id IS NULL`); err != nil {
 		return fmt.Errorf("backfill messages.message_id: %w", err)
 	}
 
-	if _, err := dbExec(db, `
+	if _, err := conn.Exec(`
 	CREATE TABLE IF NOT EXISTS message_reactions (
-		`+st.idColumn+`,
+		` + st.idColumn + `,
 		message_id INTEGER NOT NULL,
-		username `+st.keyedTextType+` NOT NULL,
-		emoji `+st.keyedTextType+` NOT NULL,
-		created_at `+st.dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		username ` + st.keyedTextType + ` NOT NULL,
+		emoji ` + st.keyedTextType + ` NOT NULL,
+		created_at ` + st.dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		UNIQUE(message_id, username, emoji)
 	);`); err != nil {
 		return fmt.Errorf("create message_reactions table: %w", err)
 	}
 
-	if _, err := dbExec(db, `
+	if _, err := conn.Exec(`
 	CREATE TABLE IF NOT EXISTS user_channels (
-		username `+st.keyedTextType+` NOT NULL,
-		channel `+st.keyedTextType+` NOT NULL,
-		updated_at `+st.dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		username ` + st.keyedTextType + ` NOT NULL,
+		channel ` + st.keyedTextType + ` NOT NULL,
+		updated_at ` + st.dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (username)
 	);`); err != nil {
 		return fmt.Errorf("create user_channels table: %w", err)
 	}
 
-	if _, err := dbExec(db, `
+	if _, err := conn.Exec(`
 	CREATE TABLE IF NOT EXISTS read_receipts (
-		username `+st.keyedTextType+` NOT NULL,
+		username ` + st.keyedTextType + ` NOT NULL,
 		message_id INTEGER NOT NULL,
-		read_at `+st.dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
+		read_at ` + st.dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP,
 		PRIMARY KEY (username, message_id)
 	);`); err != nil {
 		return fmt.Errorf("create read_receipts table: %w", err)
@@ -265,15 +337,19 @@ func applyMigrationV1(db *sql.DB) error {
 }
 
 func columnExists(db *sql.DB, table, column string) (bool, error) {
+	return columnExistsConn(migrationConn{db: db}, table, column)
+}
+
+func columnExistsConn(conn migrationConn, table, column string) (bool, error) {
 	var exists int
 	var err error
-	switch getDBDialect(db) {
+	switch getDBDialect(conn.db) {
 	case DialectPostgres:
-		err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`, table, column).Scan(&exists)
+		err = conn.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ? AND column_name = ?`, table, column).Scan(&exists)
 	case DialectMySQL:
-		err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`, table, column).Scan(&exists)
+		err = conn.QueryRow(`SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = ? AND column_name = ?`, table, column).Scan(&exists)
 	default:
-		err = dbQueryRow(db, fmt.Sprintf(`SELECT COUNT(*) FROM pragma_table_info(%q) WHERE name=?`, table), column).Scan(&exists)
+		err = conn.QueryRow(fmt.Sprintf(`SELECT COUNT(*) FROM pragma_table_info(%q) WHERE name=?`, table), column).Scan(&exists)
 	}
 	if err != nil {
 		return false, err
