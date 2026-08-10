@@ -24,6 +24,18 @@ var (
 	ErrKickNotConnected = errors.New("user is not connected")
 )
 
+// Hub coordinates WebSocket clients, channels, and moderation state.
+//
+// Lock ordering (when more than one mutex is needed in the same call path):
+//  1. Never hold banMutex across disconnectClient or any potentially blocking
+//     send on client.send (BanUser / KickUser release banMutex first).
+//  2. clientsMutex then banMutex is OK only as separate critical sections
+//     (lookup under clientsMutex, unlock, then mutate bans under banMutex).
+//     Do not nest banMutex inside clientsMutex for long operations.
+//  3. Prefer clientsMutex before channelMutex when both are required.
+//     Do not hold banMutex together with channelMutex.
+//  4. metricsMutex may be taken briefly while already holding clientsMutex on
+//     register/unregister paths. Never take clientsMutex while holding metricsMutex.
 type Hub struct {
 	clients           map[*Client]bool
 	usernames         map[string]struct{} // reserved names (handshake), lowercased
