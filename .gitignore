@@ -90,5 +90,8 @@ packaging-out/
 # Local scratch / generated invites (may contain secrets)
 tmp/
 
+# Local GitHub release-notes drafts (gh release create --notes-file). Canonical history is CHANGELOG.md and GitHub Releases.
+release-notes*.md
+
 # Caddy proxy overrides (public IP / DNS); tracked template is deploy/caddy/proxy.env.example
 deploy/caddy/proxy.env

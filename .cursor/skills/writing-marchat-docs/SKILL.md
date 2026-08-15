@@ -26,6 +26,7 @@ Update docs when behavior, protocol, env vars, or coverage changes. Do not edit 
 - Each release: date, link to prior tag, `git log` hint, narrative bullets (not a raw commit dump).
 - Call out breaking protocol or keystore changes explicitly.
 - Dependency bumps: name and version.
+- Published GitHub release bodies are separate from CHANGELOG. Do not commit `release-notes*.md` (gitignored local drafts for `--notes-file` only). Omit Docker from those drafts (CI appends it). See `releasing-marchat`.
 
 ## Behavior changes (required)
 

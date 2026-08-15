@@ -111,7 +111,7 @@ Write-Host ""
 Write-Host '=== USER: commit marchat packaging ===' -ForegroundColor Yellow
 Write-Host @"
 cd "$RepoRoot"
-git add packaging/ release-notes-v1.3.0.md
+git add packaging/
 git commit -m "chore(packaging): sync v1.3.0 release checksums"
 git push origin main
 "@

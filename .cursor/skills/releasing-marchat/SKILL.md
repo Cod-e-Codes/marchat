@@ -39,6 +39,16 @@ Details: `PACKAGING.md`, `.cursor/rules/marchat.mdc` Release Process section.
 - Docker: multi-arch `linux/amd64`, `linux/arm64` to Docker Hub on release.
 - Asset upload: `gh release upload` in workflow (not third-party release actions on Node 20).
 
+## GitHub release notes
+
+`CHANGELOG.md` is the in-repo narrative. The published body lives on the GitHub release. Do **not** commit `release-notes*.md` (gitignored).
+
+- Draft locally (for example `release-notes-vX.Y.Z.md`) and pass it to `gh release create --notes-file`. Leave the file untracked.
+- After the prepare commit exists, set `*Commit: <short sha>*` to `git rev-parse --short` of the commit you tag.
+- Do **not** include a `## Docker Image` section. The docker job appends Hub pull instructions with `gh release edit`. Putting that section in the notes file duplicates it when the image finishes.
+- To edit a published body later, pass a real markdown file to `gh release edit --notes-file`. Do not rebuild notes in PowerShell strings (newlines get flattened).
+- Chocolatey is not in `publish-downstream-packages`; after zips exist, run the post-release script (`choco pack`) and `choco push` when asked.
+
 ## Changelog entry
 
 Follow `writing-marchat-docs` skill and existing `CHANGELOG.md` sections: release date, compare links, grouped bullets (**Client**, **Server**, **Docs**, **Dependencies**, **Packaging**).

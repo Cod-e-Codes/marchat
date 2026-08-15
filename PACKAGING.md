@@ -29,6 +29,8 @@ Other install paths (zip, `install.sh` / `install.ps1`, Docker) stay in [README.
 
 When you tag a release, bump the version everywhere listed in install scripts, build-release.ps1, README badges and snippets, workflow defaults, and every file under packaging/ that embeds a version or URL.
 
+**Release notes:** `CHANGELOG.md` is the in-repo history. GitHub Releases hold the published body. Local `release-notes*.md` drafts are gitignored (input to `gh release create --notes-file` only; include `*Commit: <short sha>*` of the tagged commit). Do not put a Docker Image section in that file; the release workflow appends Hub pull commands after the image publishes.
+
 After the release assets exist on GitHub:
 
 1. Download each `marchat-<tag>-<platform>.zip` from the release.
