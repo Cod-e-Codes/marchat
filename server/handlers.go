@@ -79,207 +79,6 @@ type UserList struct {
 	Users []string `json:"users"`
 }
 
-func CreateSchema(db *sql.DB) {
-	dialect := getDBDialect(db)
-	idColumn := "id INTEGER PRIMARY KEY AUTOINCREMENT"
-	boolDefault := "BOOLEAN DEFAULT 0"
-	dateTimeType := "DATETIME"
-	blobType := "BLOB"
-	textType := "TEXT"
-	keyedTextType := "TEXT"
-	channelColumnType := "TEXT"
-	switch dialect {
-	case DialectPostgres:
-		idColumn = "id BIGSERIAL PRIMARY KEY"
-		boolDefault = "BOOLEAN DEFAULT FALSE"
-		dateTimeType = "TIMESTAMPTZ"
-		blobType = "BYTEA"
-	case DialectMySQL:
-		idColumn = "id BIGINT PRIMARY KEY AUTO_INCREMENT"
-		boolDefault = "BOOLEAN DEFAULT FALSE"
-		dateTimeType = "DATETIME"
-		blobType = "LONGBLOB"
-		textType = "LONGTEXT"
-		keyedTextType = "VARCHAR(191)"
-		channelColumnType = keyedTextType
-	}
-
-	// First, create the basic messages table if it doesn't exist
-	basicSchema := fmt.Sprintf(`
-	CREATE TABLE IF NOT EXISTS messages (
-		%s,
-		sender %s,
-		content %s,
-		created_at %s,
-		is_encrypted %s,
-		message_id INTEGER NOT NULL DEFAULT 0,
-		edited %s,
-		deleted %s,
-		pinned %s,
-		encrypted_data %s,
-		nonce %s,
-		recipient %s,
-		channel %s NOT NULL DEFAULT 'general'
-	);`, idColumn, textType, textType, dateTimeType, boolDefault, boolDefault, boolDefault, boolDefault, blobType, blobType, textType, channelColumnType)
-
-	_, err := dbExec(db, basicSchema)
-	if err != nil {
-		log.Fatal("failed to create basic schema:", err)
-	}
-
-	// Migrations: add columns if they don't exist
-	boolMigrationDefault := "BOOLEAN DEFAULT 0"
-	if dialect == DialectPostgres || dialect == DialectMySQL {
-		boolMigrationDefault = "BOOLEAN DEFAULT FALSE"
-	}
-	migrations := []struct {
-		column string
-		ddl    string
-	}{
-		{"message_id", `ALTER TABLE messages ADD COLUMN message_id INTEGER DEFAULT 0`},
-		{"edited", fmt.Sprintf("ALTER TABLE messages ADD COLUMN edited %s", boolMigrationDefault)},
-		{"deleted", fmt.Sprintf("ALTER TABLE messages ADD COLUMN deleted %s", boolMigrationDefault)},
-		{"pinned", fmt.Sprintf("ALTER TABLE messages ADD COLUMN pinned %s", boolMigrationDefault)},
-		{"channel", fmt.Sprintf("ALTER TABLE messages ADD COLUMN channel %s NOT NULL DEFAULT 'general'", channelColumnType)},
-	}
-
-	for _, m := range migrations {
-		var exists int
-		switch dialect {
-		case DialectPostgres:
-			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'messages' AND column_name = ?`, m.column).Scan(&exists)
-		case DialectMySQL:
-			err = dbQueryRow(db, `SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'messages' AND column_name = ?`, m.column).Scan(&exists)
-		default:
-			err = dbQueryRow(db, `SELECT COUNT(*) FROM pragma_table_info('messages') WHERE name=?`, m.column).Scan(&exists)
-		}
-		if err != nil {
-			log.Printf("Warning: failed to check for %s column: %v", m.column, err)
-			continue
-		}
-		if exists == 0 {
-			_, err = dbExec(db, m.ddl)
-			if err != nil {
-				log.Printf("Warning: failed to add %s column: %v", m.column, err)
-			} else {
-				log.Printf("Added %s column to messages table", m.column)
-			}
-		}
-	}
-
-	// Create user_message_state table
-	userStateSchema := `
-	CREATE TABLE IF NOT EXISTS user_message_state (
-		username ` + keyedTextType + ` PRIMARY KEY,
-		last_message_id INTEGER NOT NULL DEFAULT 0,
-		last_seen ` + dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP
-	);`
-
-	_, err = dbExec(db, userStateSchema)
-	if err != nil {
-		log.Fatal("failed to create user_message_state table:", err)
-	}
-
-	// Create ban_history table
-	banHistoryID := "id INTEGER PRIMARY KEY AUTOINCREMENT"
-	switch dialect {
-	case DialectPostgres:
-		banHistoryID = "id BIGSERIAL PRIMARY KEY"
-	case DialectMySQL:
-		banHistoryID = "id BIGINT PRIMARY KEY AUTO_INCREMENT"
-	}
-	banHistorySchema := `
-	CREATE TABLE IF NOT EXISTS ban_history (
-		` + banHistoryID + `,
-		username ` + keyedTextType + ` NOT NULL,
-		banned_at ` + dateTimeType + ` NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		unbanned_at ` + dateTimeType + `,
-		banned_by ` + keyedTextType + ` NOT NULL
-	);`
-
-	_, err = dbExec(db, banHistorySchema)
-	if err != nil {
-		log.Printf("Warning: failed to create ban_history table: %v", err)
-	}
-
-	// Create indexes for performance (MySQL needs a prefix length when indexing LONGTEXT)
-	recipientIdx := `CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient)`
-	if dialect == DialectMySQL {
-		recipientIdx = `CREATE INDEX IF NOT EXISTS idx_messages_recipient ON messages(recipient(191))`
-	}
-	indexes := []string{
-		`CREATE INDEX IF NOT EXISTS idx_messages_message_id ON messages(message_id)`,
-		`CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)`,
-		recipientIdx,
-		`CREATE INDEX IF NOT EXISTS idx_messages_deleted_created_at ON messages(deleted, created_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_user_message_state_username ON user_message_state(username)`,
-		`CREATE INDEX IF NOT EXISTS idx_ban_history_username ON ban_history(username)`,
-		`CREATE INDEX IF NOT EXISTS idx_ban_history_banned_at ON ban_history(banned_at)`,
-		`CREATE INDEX IF NOT EXISTS idx_ban_history_unbanned_at ON ban_history(unbanned_at)`,
-	}
-
-	for _, index := range indexes {
-		q := index
-		if dialect == DialectMySQL {
-			// MySQL does not support "CREATE INDEX IF NOT EXISTS ..." (syntax error).
-			q = strings.Replace(index, "IF NOT EXISTS ", "", 1)
-		}
-		_, err = dbExec(db, q)
-		if err != nil {
-			if dialect == DialectMySQL && isMySQLDuplicateKeyName(err) {
-				continue
-			}
-			log.Printf("Warning: failed to create index: %v", err)
-		}
-	}
-
-	// Migration: Update existing messages to have message_id = id
-	_, err = dbExec(db, `UPDATE messages SET message_id = id WHERE message_id = 0 OR message_id IS NULL`)
-	if err != nil {
-		log.Printf("Warning: failed to migrate existing messages: %v", err)
-	} else {
-		log.Printf("Successfully migrated existing messages")
-	}
-
-	// Reactions table (durable reactions across reconnects)
-	_, err = dbExec(db, `
-	CREATE TABLE IF NOT EXISTS message_reactions (
-		`+idColumn+`,
-		message_id INTEGER NOT NULL,
-		username `+keyedTextType+` NOT NULL,
-		emoji `+keyedTextType+` NOT NULL,
-		created_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		UNIQUE(message_id, username, emoji)
-	);`)
-	if err != nil {
-		log.Printf("Warning: failed to create message_reactions table: %v", err)
-	}
-
-	// Channel memberships table (durable memberships across reconnects)
-	_, err = dbExec(db, `
-	CREATE TABLE IF NOT EXISTS user_channels (
-		username `+keyedTextType+` NOT NULL,
-		channel `+keyedTextType+` NOT NULL,
-		updated_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (username)
-	);`)
-	if err != nil {
-		log.Printf("Warning: failed to create user_channels table: %v", err)
-	}
-
-	// Read receipt state tracking
-	_, err = dbExec(db, `
-	CREATE TABLE IF NOT EXISTS read_receipts (
-		username `+keyedTextType+` NOT NULL,
-		message_id INTEGER NOT NULL,
-		read_at `+dateTimeType+` NOT NULL DEFAULT CURRENT_TIMESTAMP,
-		PRIMARY KEY (username, message_id)
-	);`)
-	if err != nil {
-		log.Printf("Warning: failed to create read_receipts table: %v", err)
-	}
-}
-
 func InsertMessage(db *sql.DB, msg shared.Message) (int64, error) {
 	var id int64
 	channel := strings.ToLower(strings.TrimSpace(msg.Channel))
@@ -516,21 +315,34 @@ func clearUserMessageState(db *sql.DB, username string) error {
 	return err
 }
 
-// recordBanEvent records a ban event in the ban_history table
-func recordBanEvent(db *sql.DB, username, bannedBy string) error {
-	_, err := dbExec(db, `INSERT INTO ban_history (username, banned_by) VALUES (?, ?)`, username, bannedBy)
+// recordBanEvent records a ban or kick in ban_history.
+// expiresAt nil means a permanent ban; non-nil is the temporary kick expiry.
+// Any previously open rows for the username are closed first so at most one
+// open (unbanned_at IS NULL) row remains - the current moderation state.
+func recordBanEvent(db *sql.DB, username, bannedBy string, expiresAt *time.Time) error {
+	tx, err := db.Begin()
 	if err != nil {
-		log.Printf("Warning: failed to record ban event for user %s: %v", username, err)
+		return fmt.Errorf("begin ban_history tx: %w", err)
 	}
-	return err
+	defer func() { _ = tx.Rollback() }()
+
+	closeQ := rebindQuery(db, `UPDATE ban_history SET unbanned_at = CURRENT_TIMESTAMP WHERE username = ? AND unbanned_at IS NULL`)
+	if _, err := tx.Exec(closeQ, username); err != nil {
+		return fmt.Errorf("close open ban_history rows: %w", err)
+	}
+	insertQ := rebindQuery(db, `INSERT INTO ban_history (username, banned_by, expires_at) VALUES (?, ?, ?)`)
+	if _, err := tx.Exec(insertQ, username, bannedBy, expiresAt); err != nil {
+		return fmt.Errorf("insert ban_history row: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit ban_history tx: %w", err)
+	}
+	return nil
 }
 
-// recordUnbanEvent records an unban event in the ban_history table
+// recordUnbanEvent closes all open ban_history rows for username.
 func recordUnbanEvent(db *sql.DB, username string) error {
 	_, err := dbExec(db, `UPDATE ban_history SET unbanned_at = CURRENT_TIMESTAMP WHERE username = ? AND unbanned_at IS NULL`, username)
-	if err != nil {
-		log.Printf("Warning: failed to record unban event for user %s: %v", username, err)
-	}
 	return err
 }
 

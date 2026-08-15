@@ -29,7 +29,7 @@ func setupTestClient(t *testing.T) (*Client, *Hub, *sql.DB, func()) {
 	CreateSchema(db)
 
 	// Create hub with correct parameters
-	hub := NewHub(tdir, tdir, "http://localhost:8080", db)
+	hub := mustNewHub(t, tdir, tdir, "http://localhost:8080", db)
 	go hub.Run()
 
 	// Create mock websocket connection

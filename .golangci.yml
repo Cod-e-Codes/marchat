@@ -1,0 +1,23 @@
+# golangci-lint v2 config for marchat.
+# Pin bumps: https://github.com/golangci/golangci-lint/releases
+# Schema: https://golangci-lint.run/docs/product/migration-guide/
+version: "2"
+
+linters:
+  # Keep CI focused: govet-equivalent plus staticcheck SA* (bugs), without
+  # default errcheck-on-Close or ST/QF style nits across the whole tree.
+  default: none
+  enable:
+    - govet
+    - ineffassign
+    - staticcheck
+  settings:
+    staticcheck:
+      checks:
+        - all
+        - "-ST*"
+        - "-QF*"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

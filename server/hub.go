@@ -3,6 +3,7 @@ package server
 import (
 	"database/sql"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -23,16 +24,29 @@ var (
 	ErrKickNotConnected = errors.New("user is not connected")
 )
 
+// Hub coordinates WebSocket clients, channels, and moderation state.
+//
+// Hub mutex and blocking-operation rules (not a strict total lock order):
+//  1. Never hold banMutex across disconnectClient or any potentially blocking
+//     send on client.send (BanUser / KickUser release banMutex first).
+//  2. clientsMutex then banMutex is OK only as separate critical sections
+//     (lookup under clientsMutex, unlock, then mutate bans under banMutex).
+//     Do not nest banMutex inside clientsMutex for long operations.
+//  3. Prefer clientsMutex before channelMutex when both are required.
+//     Do not hold banMutex together with channelMutex.
+//  4. metricsMutex may be taken briefly while already holding clientsMutex on
+//     register/unregister paths. Never take clientsMutex while holding metricsMutex.
 type Hub struct {
-	clients      map[*Client]bool
-	usernames    map[string]struct{}
-	clientsMutex sync.RWMutex
-	broadcast    chan interface{}
-	register     chan *Client
-	unregister   chan *Client
+	clients           map[*Client]bool
+	usernames         map[string]struct{} // reserved names (handshake), lowercased
+	clientsByUsername map[string]*Client  // connected clients by lowercased username
+	clientsMutex      sync.RWMutex
+	broadcast         chan interface{}
+	register          chan *Client
+	unregister        chan *Client
 
 	// Ban management
-	bans      map[string]time.Time // username -> expiry time (permanent bans use far future time)
+	bans      map[string]struct{}  // username -> permanently banned (no expiry)
 	tempKicks map[string]time.Time // username -> kick expiry time (24h temporary)
 	banMutex  sync.RWMutex
 
@@ -52,23 +66,77 @@ type Hub struct {
 	channelMutex sync.RWMutex
 }
 
-func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) *Hub {
+func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) (*Hub, error) {
 	pluginManager := manager.NewPluginManager(pluginDir, dataDir, registryURL)
 	pluginCommandHandler := NewPluginCommandHandler(pluginManager)
 
-	return &Hub{
+	h := &Hub{
 		clients:              make(map[*Client]bool),
 		usernames:            make(map[string]struct{}),
+		clientsByUsername:    make(map[string]*Client),
 		broadcast:            make(chan interface{}),
 		register:             make(chan *Client),
 		unregister:           make(chan *Client),
-		bans:                 make(map[string]time.Time),
+		bans:                 make(map[string]struct{}),
 		tempKicks:            make(map[string]time.Time),
 		pluginManager:        pluginManager,
 		pluginCommandHandler: pluginCommandHandler,
 		db:                   db,
 		channels:             make(map[string]map[*Client]bool),
 	}
+	if db != nil {
+		if err := h.loadModerationState(); err != nil {
+			return nil, err
+		}
+	}
+	return h, nil
+}
+
+// loadModerationState restores active bans and unexpired temp kicks from ban_history.
+// Writers keep at most one open row per username (close-then-insert). For legacy
+// duplicates, the latest open row by id wins (ORDER BY id DESC, first seen).
+// NULL expires_at = permanent ban; future expires_at = temp kick; past = skip.
+func (h *Hub) loadModerationState() error {
+	rows, err := dbQuery(h.db, `
+		SELECT username, expires_at FROM ban_history
+		WHERE unbanned_at IS NULL
+		ORDER BY id DESC`)
+	if err != nil {
+		return fmt.Errorf("load moderation state: %w", err)
+	}
+	defer rows.Close()
+
+	now := time.Now()
+	seen := make(map[string]struct{})
+	h.banMutex.Lock()
+	defer h.banMutex.Unlock()
+
+	for rows.Next() {
+		var username string
+		var expiresAt sql.NullTime
+		if err := rows.Scan(&username, &expiresAt); err != nil {
+			return fmt.Errorf("scan moderation row: %w", err)
+		}
+		lower := strings.ToLower(username)
+		if _, already := seen[lower]; already {
+			continue
+		}
+		seen[lower] = struct{}{}
+		if !expiresAt.Valid {
+			// Permanent ban (or pre-upgrade open row treated as permanent).
+			h.bans[lower] = struct{}{}
+			delete(h.tempKicks, lower)
+			continue
+		}
+		if now.Before(expiresAt.Time) {
+			h.tempKicks[lower] = expiresAt.Time
+			delete(h.bans, lower)
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate moderation rows: %w", err)
+	}
+	return nil
 }
 
 func (h *Hub) TryReserveUsername(username string) bool {
@@ -107,32 +175,23 @@ func (h *Hub) BanUser(username string, adminUsername string) error {
 
 	lowerUsername := strings.ToLower(username)
 
-	// Remove from temporary kicks if present
-	delete(h.tempKicks, lowerUsername)
+	// Persist first when a DB is configured so a successful BanUser survives restart.
+	if h.getDB() != nil {
+		if err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, nil); err != nil {
+			h.banMutex.Unlock()
+			return fmt.Errorf("persist ban: %w", err)
+		}
+		if err := clearUserMessageState(h.getDB(), lowerUsername); err != nil {
+			log.Printf("Warning: failed to clear message state for banned user %s: %v", username, err)
+		}
+	}
 
-	// Add to permanent bans (using far future time to indicate permanent)
-	permanentBanTime := time.Now().Add(100 * 365 * 24 * time.Hour) // 100 years in the future
-	h.bans[lowerUsername] = permanentBanTime
+	delete(h.tempKicks, lowerUsername)
+	h.bans[lowerUsername] = struct{}{}
 	AdminLogger.Info("User permanently banned", map[string]interface{}{
 		"banned_user": username,
 		"admin":       adminUsername,
 	})
-
-	// Record ban event in database
-	if h.getDB() != nil {
-		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername)
-		if err != nil {
-			log.Printf("Warning: failed to record ban event for user %s: %v", username, err)
-		}
-	}
-
-	// Clear per-user last_seen bookkeeping on ban (ban gaps use ban_history, not this table).
-	if h.getDB() != nil {
-		err := clearUserMessageState(h.getDB(), lowerUsername)
-		if err != nil {
-			log.Printf("Warning: failed to clear message state for banned user %s: %v", username, err)
-		}
-	}
 
 	h.banMutex.Unlock()
 
@@ -147,27 +206,21 @@ func (h *Hub) UnbanUser(username string, adminUsername string) bool {
 
 	lowerUsername := strings.ToLower(username)
 	if _, exists := h.bans[lowerUsername]; exists {
+		if h.getDB() != nil {
+			if err := recordUnbanEvent(h.getDB(), lowerUsername); err != nil {
+				log.Printf("Warning: failed to record unban event for user %s: %v", username, err)
+				return false
+			}
+			if err := clearUserMessageState(h.getDB(), lowerUsername); err != nil {
+				log.Printf("Warning: failed to clear message state for unbanned user %s: %v", username, err)
+			}
+		}
+
 		delete(h.bans, lowerUsername)
 		AdminLogger.Info("User unbanned", map[string]interface{}{
 			"unbanned_user": username,
 			"admin":         adminUsername,
 		})
-
-		// Record unban event in database
-		if h.getDB() != nil {
-			err := recordUnbanEvent(h.getDB(), lowerUsername)
-			if err != nil {
-				log.Printf("Warning: failed to record unban event for user %s: %v", username, err)
-			}
-		}
-
-		// Clear per-user last_seen bookkeeping on unban.
-		if h.getDB() != nil {
-			err := clearUserMessageState(h.getDB(), lowerUsername)
-			if err != nil {
-				log.Printf("Warning: failed to clear message state for unbanned user %s: %v", username, err)
-			}
-		}
 
 		return true
 	}
@@ -182,7 +235,7 @@ func (h *Hub) IsUserBanned(username string) bool {
 
 	lowerUsername := strings.ToLower(username)
 
-	// Check permanent bans (these don't expire automatically)
+	// Check permanent bans (no expiry)
 	if _, exists := h.bans[lowerUsername]; exists {
 		return true
 	}
@@ -226,16 +279,28 @@ func (h *Hub) disconnectClient(target *Client, reason string) {
 	}
 }
 
+// clientByUsernameLocked returns the connected client for a lowercased username.
+// Caller must hold clientsMutex (read or write).
+func (h *Hub) clientByUsernameLocked(lowerUsername string) *Client {
+	return h.clientsByUsername[lowerUsername]
+}
+
+// removeClientLocked removes a client from clients and clientsByUsername.
+// Caller must hold clientsMutex for write.
+func (h *Hub) removeClientLocked(client *Client) {
+	delete(h.clients, client)
+	if client != nil && client.username != "" {
+		lower := strings.ToLower(client.username)
+		if h.clientsByUsername[lower] == client {
+			delete(h.clientsByUsername, lower)
+		}
+	}
+}
+
 // kickUser forcibly disconnects a user by username.
 func (h *Hub) kickUser(username string, reason string) {
 	h.clientsMutex.RLock()
-	var target *Client
-	for client := range h.clients {
-		if strings.EqualFold(client.username, username) {
-			target = client
-			break
-		}
-	}
+	target := h.clientByUsernameLocked(strings.ToLower(username))
 	h.clientsMutex.RUnlock()
 
 	if target == nil {
@@ -261,13 +326,7 @@ func (h *Hub) KickUser(username string, adminUsername string) error {
 	}
 
 	h.clientsMutex.RLock()
-	var target *Client
-	for client := range h.clients {
-		if strings.EqualFold(client.username, username) {
-			target = client
-			break
-		}
-	}
+	target := h.clientByUsernameLocked(strings.ToLower(username))
 	h.clientsMutex.RUnlock()
 
 	if target == nil {
@@ -285,30 +344,26 @@ func (h *Hub) KickUser(username string, adminUsername string) error {
 		return ErrKickPermanentlyBanned
 	}
 
-	// Add to temporary kicks for 24 hours
 	kickExpiry := time.Now().Add(24 * time.Hour)
+
+	// Persist first when a DB is configured so a successful KickUser survives restart.
+	if h.getDB() != nil {
+		exp := kickExpiry
+		if err := recordBanEvent(h.getDB(), lowerUsername, adminUsername, &exp); err != nil {
+			h.banMutex.Unlock()
+			return fmt.Errorf("persist kick: %w", err)
+		}
+		if err := clearUserMessageState(h.getDB(), lowerUsername); err != nil {
+			log.Printf("Warning: failed to clear message state for kicked user %s: %v", username, err)
+		}
+	}
+
 	h.tempKicks[lowerUsername] = kickExpiry
 	AdminLogger.Info("User kicked", map[string]interface{}{
 		"kicked_user": username,
 		"admin":       adminUsername,
 		"until":       kickExpiry.Format("2006-01-02 15:04:05"),
 	})
-
-	// Record kick event in database (reuse ban event structure)
-	if h.getDB() != nil {
-		err := recordBanEvent(h.getDB(), lowerUsername, adminUsername)
-		if err != nil {
-			log.Printf("Warning: failed to record kick event for user %s: %v", username, err)
-		}
-	}
-
-	// Clear per-user last_seen bookkeeping on kick (ban gaps use ban_history, not this table).
-	if h.getDB() != nil {
-		err := clearUserMessageState(h.getDB(), lowerUsername)
-		if err != nil {
-			log.Printf("Warning: failed to clear message state for kicked user %s: %v", username, err)
-		}
-	}
 
 	h.banMutex.Unlock()
 
@@ -325,17 +380,15 @@ func (h *Hub) AllowUser(username string, adminUsername string) bool {
 
 	// Check if user is in temporary kick list
 	if _, exists := h.tempKicks[lowerUsername]; exists {
-		delete(h.tempKicks, lowerUsername)
-		log.Printf("[ADMIN] User '%s' allowed back by '%s' (kick override)", username, adminUsername)
-
-		// Record unban event in database
 		if h.getDB() != nil {
-			err := recordUnbanEvent(h.getDB(), lowerUsername)
-			if err != nil {
+			if err := recordUnbanEvent(h.getDB(), lowerUsername); err != nil {
 				log.Printf("Warning: failed to record allow event for user %s: %v", username, err)
+				return false
 			}
 		}
 
+		delete(h.tempKicks, lowerUsername)
+		log.Printf("[ADMIN] User '%s' allowed back by '%s' (kick override)", username, adminUsername)
 		return true
 	}
 
@@ -343,22 +396,14 @@ func (h *Hub) AllowUser(username string, adminUsername string) bool {
 	return false
 }
 
-// CleanupExpiredBans removes expired bans and kicks from the lists
+// CleanupExpiredBans removes expired temporary kicks from the lists.
+// Permanent bans have no expiry and are never cleared here.
 func (h *Hub) CleanupExpiredBans() {
 	h.banMutex.Lock()
 	defer h.banMutex.Unlock()
 
 	now := time.Now()
 
-	// Clean up expired permanent bans (shouldn't happen with our 100-year approach, but just in case)
-	for username, banTime := range h.bans {
-		if now.After(banTime) {
-			delete(h.bans, username)
-			log.Printf("[SYSTEM] Expired permanent ban removed for user: %s", username)
-		}
-	}
-
-	// Clean up expired temporary kicks
 	for username, kickTime := range h.tempKicks {
 		if now.After(kickTime) {
 			delete(h.tempKicks, username)
@@ -391,7 +436,7 @@ func (h *Hub) CleanupStaleConnections() {
 	for _, client := range staleClients {
 		if _, exists := h.clients[client]; exists {
 			log.Printf("[CLEANUP] Removing stale connection for user '%s' (IP: %s)", client.username, client.ipAddr)
-			delete(h.clients, client)
+			h.removeClientLocked(client)
 			delete(h.usernames, strings.ToLower(client.username))
 			client.conn.Close()
 		}
@@ -405,13 +450,7 @@ func (h *Hub) CleanupStaleConnections() {
 // ForceDisconnectUser forcibly removes a user from the clients map (admin command for stale connections)
 func (h *Hub) ForceDisconnectUser(username string, adminUsername string) bool {
 	h.clientsMutex.Lock()
-	var target *Client
-	for client := range h.clients {
-		if strings.EqualFold(client.username, username) {
-			target = client
-			break
-		}
-	}
+	target := h.clientByUsernameLocked(strings.ToLower(username))
 	if target == nil {
 		h.clientsMutex.Unlock()
 		log.Printf("[ADMIN] Force disconnect attempt for '%s' by '%s' - user not found", username, adminUsername)
@@ -420,8 +459,7 @@ func (h *Hub) ForceDisconnectUser(username string, adminUsername string) bool {
 
 	log.Printf("[ADMIN] Force disconnecting user '%s' (IP: %s) by admin '%s'", username, target.ipAddr, adminUsername)
 
-	// Remove from clients map
-	delete(h.clients, target)
+	h.removeClientLocked(target)
 	delete(h.usernames, strings.ToLower(target.username))
 	h.clientsMutex.Unlock()
 
@@ -467,6 +505,9 @@ func (h *Hub) Run() {
 		case client := <-h.register:
 			h.clientsMutex.Lock()
 			h.clients[client] = true
+			if client.username != "" {
+				h.clientsByUsername[strings.ToLower(client.username)] = client
+			}
 			h.clientsMutex.Unlock()
 			HubLogger.Info("Client registered", map[string]interface{}{
 				"username": client.username,
@@ -486,7 +527,7 @@ func (h *Hub) Run() {
 		case client := <-h.unregister:
 			h.clientsMutex.Lock()
 			if _, ok := h.clients[client]; ok {
-				delete(h.clients, client)
+				h.removeClientLocked(client)
 				delete(h.usernames, strings.ToLower(client.username))
 				// Intentionally do not close client.send here.
 				// Closing send while readPump is still processing can trigger send-on-closed-channel panics.
@@ -525,7 +566,7 @@ func (h *Hub) Run() {
 						case client.send <- message:
 						default:
 							log.Printf("Dropping client %s due to full send channel\n", client.username)
-							delete(h.clients, client)
+							h.removeClientLocked(client)
 							delete(h.usernames, strings.ToLower(client.username))
 							// Fail-fast backpressure handling: drop slow client and close socket.
 							client.conn.Close()
@@ -539,7 +580,7 @@ func (h *Hub) Run() {
 					case client.send <- message:
 					default:
 						log.Printf("Dropping client %s due to full send channel\n", client.username)
-						delete(h.clients, client)
+						h.removeClientLocked(client)
 						delete(h.usernames, strings.ToLower(client.username))
 						// Fail-fast backpressure handling: drop slow client and close socket.
 						client.conn.Close()
@@ -562,13 +603,23 @@ func (h *Hub) Run() {
 func (h *Hub) broadcastDM(msg shared.Message) {
 	h.clientsMutex.RLock()
 	defer h.clientsMutex.RUnlock()
-	for client := range h.clients {
-		if strings.EqualFold(client.username, msg.Sender) || strings.EqualFold(client.username, msg.Recipient) {
-			select {
-			case client.send <- msg:
-			default:
-				log.Printf("Dropping DM for client %s due to full send channel", client.username)
-			}
+	seen := make(map[*Client]struct{}, 2)
+	for _, name := range []string{msg.Sender, msg.Recipient} {
+		if name == "" {
+			continue
+		}
+		client := h.clientByUsernameLocked(strings.ToLower(name))
+		if client == nil {
+			continue
+		}
+		if _, ok := seen[client]; ok {
+			continue
+		}
+		seen[client] = struct{}{}
+		select {
+		case client.send <- msg:
+		default:
+			log.Printf("Dropping DM for client %s due to full send channel", client.username)
 		}
 	}
 }

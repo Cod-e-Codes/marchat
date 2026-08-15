@@ -35,25 +35,28 @@ jobs:
       - name: Test
         run: go test -race ./...
 
-      - name: Lint (golangci-lint if available, else go vet)
+      - name: Lint (golangci-lint)
         run: |
-          if go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest 2>/dev/null; then
-            $(go env GOPATH)/bin/golangci-lint run ./...
-          else
-            go vet ./...
-          fi
+          # Bump from https://github.com/golangci/golangci-lint/releases
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+          $(go env GOPATH)/bin/golangci-lint run ./...
 
       - name: Govulncheck
         run: |
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          # Bump from https://pkg.go.dev/golang.org/x/vuln?tab=versions
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
           "$(go env GOPATH)/bin/govulncheck" ./...
 
       # Nested modules are not part of root `go test ./...` / `go build ./...` (separate go.mod).
       - name: Nested Go modules (plugin/sdk, plugin/examples/echo)
         run: |
           set -euo pipefail
-          go install golang.org/x/vuln/cmd/govulncheck@latest
+          # Bump from https://pkg.go.dev/golang.org/x/vuln?tab=versions
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
           VULN="$(go env GOPATH)/bin/govulncheck"
+          # Bump from https://github.com/golangci/golangci-lint/releases
+          go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.12.2
+          LINT="$(go env GOPATH)/bin/golangci-lint"
           for dir in plugin/sdk plugin/examples/echo; do
             echo "::group::$dir"
             (
@@ -65,17 +68,10 @@ jobs:
               go test -race ./...
               go vet ./...
               "$VULN" ./...
+              "$LINT" run ./...
             )
             echo "::endgroup::"
           done
-          LINT="$(go env GOPATH)/bin/golangci-lint"
-          if [ -x "$LINT" ]; then
-            for dir in plugin/sdk plugin/examples/echo; do
-              echo "::group::lint $dir"
-              (cd "$dir" && "$LINT" run ./...)
-              echo "::endgroup::"
-            done
-          fi
 
   database-smoke:
     runs-on: ubuntu-latest

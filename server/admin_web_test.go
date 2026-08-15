@@ -31,7 +31,7 @@ func setupTestServerEnv(t *testing.T) (*sql.DB, *Hub, *appcfg.Config, func()) {
 	_ = os.MkdirAll(pluginDir, 0o755)
 	_ = os.MkdirAll(dataDir, 0o755)
 
-	hub := NewHub(pluginDir, dataDir, "", db)
+	hub := mustNewHub(t, pluginDir, dataDir, "", db)
 	go func() { // run hub in background
 		hub.Run()
 	}()

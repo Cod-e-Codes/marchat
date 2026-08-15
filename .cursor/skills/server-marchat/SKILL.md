@@ -22,6 +22,8 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 ## Hub and WebSocket
 
 - Per-channel routing, DMs, typing, read receipts, reactions.
+- Moderation: permanent bans and unexpired temp kicks load from `ban_history` on hub start (latest open row per user); writers close open rows before insert and persist before updating in-memory maps. See Hub mutex rules comment on `Hub` in `hub.go`.
+- Inbound WebSocket messages: `readPump` rate-limits then `dispatchInbound` / typed handlers in `client_dispatch.go`.
 - Outbound client messages are channel-stamped from hub membership (`stampClientChannel`); client-supplied `channel` values are ignored for routing.
 - All outbound/persist paths stamp `sender` from the authenticated session (`stampSenderTimedOutbound`); NUL bytes in persistable `content` are rejected before insert; empty or whitespace-only plaintext on `text` / `dm` / `edit` is rejected when `encrypted` is false (encrypted opaque ciphertext is never treated as empty).
 - Reserved usernames during handshake (no double-book before registration).

@@ -282,7 +282,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
-	server.CreateSchema(db)
+	if err := server.MigrateSchema(db); err != nil {
+		log.Fatalf("Failed to migrate database schema: %v", err)
+	}
 
 	// Set up plugin directories
 	pluginDir := cfg.ConfigDir + "/plugins"
@@ -305,7 +307,10 @@ func main() {
 		})
 	}
 
-	hub := server.NewHub(pluginDir, dataDir, registryURL, db)
+	hub, err := server.NewHub(pluginDir, dataDir, registryURL, db)
+	if err != nil {
+		log.Fatalf("Failed to create hub: %v", err)
+	}
 	go hub.Run()
 
 	// Log server startup
