@@ -139,7 +139,7 @@ Per-file statement percentages for important paths are listed under [Test Covera
 
 ### Prerequisites
 
-- Go 1.25.12 or later
+- Go 1.25.13 or later
 - SQLite support (built into Go)
 - PowerShell (for Windows test script)
 
@@ -385,7 +385,7 @@ Statement percentages below use the same `mergedcoverage` profile as `go tool co
 
 The test suite is designed to run in CI/CD environments:
 
-- **Default job** (`.github/workflows/go.yml` `build`): `gofmt -l` must be empty on the root tree, then `go test -race ./...`, `go vet ./...`, **`govulncheck -show verbose ./...`**, and **`golangci-lint run ./...`** (SQLite only for DB tests; DB smoke skips without env). Then **`plugin/sdk`** and **`plugin/examples/echo`** each run `go mod tidy`, `gofmt -l`, `go build ./...`, `go test -race ./...`, `go vet ./...`, **`govulncheck`**, and **`golangci-lint`** (nested modules use their own `go.mod` and are not included in root `./...`).
+- **Default job** (`.github/workflows/go.yml` `build`): `gofmt -l` must be empty on the root tree, then `go test -race ./...`, `go vet ./...`, **`govulncheck ./...`**, and **`golangci-lint run ./...`** (SQLite only for DB tests; DB smoke skips without env). Then **`plugin/sdk`** and **`plugin/examples/echo`** each run `go mod tidy`, `gofmt -l`, `go build ./...`, `go test -race ./...`, `go vet ./...`, **`govulncheck`**, and **`golangci-lint`** (nested modules use their own `go.mod` and are not included in root `./...`).
 - **Database smoke job** (`database-smoke`): Postgres 16 and MySQL 8 services, then `go test -race ./server -run 'Test(Postgres|MySQL)InitDBAndSchemaSmoke'` with `MARCHAT_CI_POSTGRES_URL` / `MARCHAT_CI_MYSQL_URL` set.
 - **Parallel Safe**: Standard tests avoid shared mutable global state; subprocess tests serialize via their own `go run` invocations. **Doctor** tests that swap **`osEnviron`** do not use **`t.Parallel()`** with each other. **Plugin host** **`StopPlugin`** joins stdout/stderr readers before clearing instance fields so lifecycle tests stay race-clean.
 - **Deterministic**: Doctor subprocess tests set `MARCHAT_DOCTOR_NO_NETWORK=1` to avoid GitHub API flakiness.
@@ -478,14 +478,14 @@ gofmt -w .
 golangci-lint run ./...
 go test ./... -count=1
 go vet ./...
-govulncheck -show verbose ./...
+govulncheck ./...
 foreach ($D in @("plugin\sdk", "plugin\examples\echo")) {
   Push-Location $D
   gofmt -w .
   golangci-lint run ./...
   go test ./... -count=1
   go vet ./...
-  govulncheck -show verbose ./...
+  govulncheck ./...
   Pop-Location
 }
 ```

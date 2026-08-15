@@ -19,7 +19,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
       - name: Tidy modules
         run: go mod tidy
@@ -46,7 +46,7 @@ jobs:
       - name: Govulncheck
         run: |
           go install golang.org/x/vuln/cmd/govulncheck@latest
-          "$(go env GOPATH)/bin/govulncheck" -show verbose ./...
+          "$(go env GOPATH)/bin/govulncheck" ./...
 
       # Nested modules are not part of root `go test ./...` / `go build ./...` (separate go.mod).
       - name: Nested Go modules (plugin/sdk, plugin/examples/echo)
@@ -64,7 +64,7 @@ jobs:
               go build ./...
               go test -race ./...
               go vet ./...
-              "$VULN" -show verbose ./...
+              "$VULN" ./...
             )
             echo "::endgroup::"
           done
@@ -114,7 +114,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
-          go-version: '1.25.12'
+          go-version: '1.25.13'
 
       - name: Tidy modules
         run: go mod tidy
