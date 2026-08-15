@@ -6,6 +6,7 @@
 ### Server
 
 - **File uploads**: **Fix** oversized uploads under the WebSocket DoS read ceiling (**32 MiB**) get a System reply on a live connection; `SetReadLimit` sits above policy wire size so gorilla does not close with empty **1009** before the reply can flush. Residual over-ceiling reads log `ErrReadLimit` only ([#114](https://github.com/Cod-e-Codes/marchat/issues/114) follow-up)
+> **Note:** v1.3.4 has no schema migrator and does not reload bans/kicks from `ban_history` across restart. Upgrade to **[v1.3.5](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.5)** for durable moderation and versioned `MigrateSchema`.
 
 ### Documentation
 

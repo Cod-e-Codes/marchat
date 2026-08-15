@@ -6,6 +6,10 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+## v1.3.5
+
+**Released 2026-08-15.** Since **[v1.3.4](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.4)**; compare [`v1.3.4...v1.3.5`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.4...v1.3.5). Commits: **`git log v1.3.4..v1.3.5 --oneline`**.
+
 - **Server**: **Fix:** `:kick` / `:ban` (and admin TUI / web user actions) reject self-targets case-insensitively and return clear errors instead of disconnecting the admin and writing a 24h ban; `KickUser` / `BanUser` return errors so callers claim success only on `nil`; kicking an already permanently banned user returns an error without claiming success ([#115](https://github.com/Cod-e-Codes/marchat/issues/115)).
 - **Server**: **Fix:** `:kick` (and admin TUI / web kick actions) are online-only: `KickUser` requires an active WebSocket connection, disconnects the target, and applies a 24h temporary ban; offline or never-connected users return `ErrKickNotConnected` with no `tempKicks` entry or `ban_history` row; `:ban` / `BanUser` remain offline-capable ([#116](https://github.com/Cod-e-Codes/marchat/issues/116)).
 - **Server**: **Fix:** reject empty or whitespace-only plaintext on `text`, `dm`, and `edit` when `encrypted` is false (System reply, no persist/broadcast); encrypted opaque `content` is not treated as empty ([#117](https://github.com/Cod-e-Codes/marchat/issues/117)).
@@ -14,10 +18,11 @@ On **`main`** only; not part of the latest tagged release until you tag and publ
 - **Server**: **Fix:** schema bootstrap uses versioned `MigrateSchema` (`schema_version`) and hard-fails when required tables or `ban_history.expires_at` are missing instead of warning and continuing. SQLite/Postgres apply each version inside a transaction (mid-migration failure rolls back); MySQL DDL cannot participate in multi-statement transactions (implicit commit), so steps run without a wrapping transaction and `schema_version` is recorded only after a successful apply.
 - **Server**: Connected-user lookups (`KickUser`, `kickUser`, `ForceDisconnectUser`, `broadcastDM`) use an O(1) `clientsByUsername` map under `clientsMutex`.
 - **Server**: **Fix:** `:ban` / `:kick` close any open `ban_history` row before inserting (at most one open row per user), persist to the DB before updating in-memory enforcement state, and load the latest open row by `id` on hub start so kick-then-ban (and legacy duplicates) restart cleanly.
-- **Docs**: **ARCHITECTURE** documents `MigrateSchema` / `schema_version` / `ban_history.expires_at`; **TESTING** local lint install pins match CI (no `@latest`).
+- **Docs**: **ARCHITECTURE** documents `MigrateSchema` / `schema_version` / `ban_history.expires_at`; **TESTING** local lint install pins match CI (no `@latest`); main-module coverage refreshed to **47.8%**.
 - **Dependencies**: **modernc.org/sqlite** v1.56.0 (journal-rollback corruption fix; **modernc.org/libc** v1.74.4); **github.com/lucasb-eyer/go-colorful** v1.4.1; **golang.org/x/crypto** v0.55.0; **github.com/charmbracelet/x/ansi** v0.11.8; **charm.land/lipgloss/v2** v2.0.6.
 - **Toolchain**: Go **1.25.13** in **go.mod**, nested plugin modules, CI, and **Dockerfile** (stdlib fixes for the 6 reachable findings **govulncheck** reported on **1.25.12**).
 - **CI**: **`govulncheck ./...`** without **`-show verbose`** (default symbol scan; unreachable module advisories stay informational). Pin **golangci-lint** v2.12.2 and **govulncheck** v1.6.0 (no `@latest`) in the main and nested-module jobs; add `.golangci.yml` (v2) enabling govet/ineffassign/staticcheck with `all` minus `ST*`/`QF*` (bug-focused checks, not SA*-only).
+- **Packaging**: Version strings and URLs for **v1.3.5** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.5** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.3.4
 
