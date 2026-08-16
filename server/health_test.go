@@ -32,7 +32,7 @@ func setupTestHealthChecker(t *testing.T) (*HealthChecker, *sql.DB, func()) {
 	hc := NewHealthChecker(hub, db, "test-version")
 
 	cleanup := func() {
-		db.Close()
+		CloseDB(db)
 	}
 
 	return hc, db, cleanup
@@ -118,7 +118,7 @@ func TestHealthChecker_CheckDatabaseHealth(t *testing.T) {
 	}
 
 	// Test with closed database (should be unhealthy)
-	db.Close()
+	CloseDB(db)
 	health = hc.checkDatabaseHealth()
 
 	if health.Status != HealthStatusUnhealthy {
@@ -297,7 +297,7 @@ func TestHealthChecker_HealthCheckHandler(t *testing.T) {
 	}
 
 	// Test unhealthy status - close the database to make it unhealthy
-	hc.db.Close()
+	CloseDB(hc.db)
 	w = httptest.NewRecorder()
 	hc.HealthCheckHandler(w, req)
 
@@ -325,7 +325,7 @@ func TestHealthChecker_SimpleHealthHandler(t *testing.T) {
 	}
 
 	// Test unhealthy status - close the database to make it unhealthy
-	hc.db.Close()
+	CloseDB(hc.db)
 	w = httptest.NewRecorder()
 	hc.SimpleHealthHandler(w, req)
 

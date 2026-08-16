@@ -125,7 +125,7 @@ func (hc *HealthChecker) checkDatabaseHealth() *ComponentHealth {
 
 	// Test database connection with a simple query
 	var count int
-	err := hc.db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&count)
+	err := dbQueryRow(dbRead(hc.db), "SELECT COUNT(*) FROM messages").Scan(&count)
 
 	responseTime := time.Since(start)
 
@@ -240,7 +240,7 @@ func (hc *HealthChecker) getSystemMetrics() SystemMetrics {
 
 	totalMessages := 0
 	if hc.db != nil {
-		_ = hc.db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&totalMessages)
+		_ = dbQueryRow(dbRead(hc.db), "SELECT COUNT(*) FROM messages").Scan(&totalMessages)
 	}
 
 	hc.mutex.RLock()

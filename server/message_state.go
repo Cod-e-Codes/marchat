@@ -45,7 +45,7 @@ func LoadReactionsForMessages(db *sql.DB, messageIDs []int64) []shared.Message {
 		ph = append(ph, "?")
 		args = append(args, id)
 	}
-	rows, err := dbQuery(db, `SELECT message_id, username, emoji FROM message_reactions WHERE message_id IN (`+strings.Join(ph, ",")+`) ORDER BY created_at ASC`, args...)
+	rows, err := dbQuery(dbRead(db), `SELECT message_id, username, emoji FROM message_reactions WHERE message_id IN (`+strings.Join(ph, ",")+`) ORDER BY created_at ASC`, args...)
 	if err != nil {
 		log.Printf("warning: load reactions failed: %v", err)
 		return nil
@@ -88,7 +88,7 @@ func LoadUserChannel(db *sql.DB, username string) string {
 		return ""
 	}
 	var channel string
-	if err := dbQueryRow(db, `SELECT channel FROM user_channels WHERE username = ?`, strings.ToLower(username)).Scan(&channel); err != nil {
+	if err := dbQueryRow(dbRead(db), `SELECT channel FROM user_channels WHERE username = ?`, strings.ToLower(username)).Scan(&channel); err != nil {
 		return ""
 	}
 	if channel == "" {
@@ -119,7 +119,7 @@ func LoadReadReceiptsForMessages(db *sql.DB, username string, messageIDs []int64
 		args = append(args, id)
 	}
 
-	rows, err := dbQuery(db, `SELECT message_id, read_at FROM read_receipts WHERE username = ? AND message_id IN (`+strings.Join(ph, ",")+`) ORDER BY read_at ASC`, args...)
+	rows, err := dbQuery(dbRead(db), `SELECT message_id, read_at FROM read_receipts WHERE username = ? AND message_id IN (`+strings.Join(ph, ",")+`) ORDER BY read_at ASC`, args...)
 	if err != nil {
 		log.Printf("warning: load read receipts failed: %v", err)
 		return nil

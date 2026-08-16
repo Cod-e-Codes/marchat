@@ -20,6 +20,9 @@ func TestAppendSQLiteDSNPragmas(t *testing.T) {
 	if !strings.Contains(plain, "_busy_timeout=5000") {
 		t.Fatalf("plain path missing busy_timeout: %q", plain)
 	}
+	if !strings.Contains(plain, "_txlock=immediate") {
+		t.Fatalf("plain path missing _txlock=immediate: %q", plain)
+	}
 
 	withQuery := appendSQLiteDSNPragmas("file:test.db?mode=rwc")
 	if !strings.HasPrefix(withQuery, "file:test.db?mode=rwc&") {
@@ -37,7 +40,7 @@ func TestInitDBAndSchema(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	if db == nil {
 		t.Fatalf("db is nil")
@@ -70,7 +73,7 @@ func TestInitDBSQLiteFilePragmasAndPool(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	var busyTimeout int
 	if err := db.QueryRow("PRAGMA busy_timeout;").Scan(&busyTimeout); err != nil {
@@ -90,7 +93,30 @@ func TestInitDBSQLiteFilePragmasAndPool(t *testing.T) {
 
 	stats := db.Stats()
 	if stats.MaxOpenConnections != 1 {
-		t.Fatalf("MaxOpenConnections = %d, want 1", stats.MaxOpenConnections)
+		t.Fatalf("writer MaxOpenConnections = %d, want 1", stats.MaxOpenConnections)
+	}
+
+	read := dbRead(db)
+	if read == nil || read == db {
+		t.Fatal("file-backed InitDB should pair a distinct reader pool")
+	}
+	readStats := read.Stats()
+	if readStats.MaxOpenConnections != sqliteReadMaxOpenConns {
+		t.Fatalf("reader MaxOpenConnections = %d, want %d", readStats.MaxOpenConnections, sqliteReadMaxOpenConns)
+	}
+	var readBusy int
+	if err := read.QueryRow("PRAGMA busy_timeout;").Scan(&readBusy); err != nil {
+		t.Fatalf("reader PRAGMA busy_timeout: %v", err)
+	}
+	if readBusy <= 0 {
+		t.Fatalf("reader busy_timeout = %d, want > 0", readBusy)
+	}
+	var queryOnly int
+	if err := read.QueryRow("PRAGMA query_only;").Scan(&queryOnly); err != nil {
+		t.Fatalf("PRAGMA query_only: %v", err)
+	}
+	if queryOnly == 0 {
+		t.Fatal("reader query_only = 0, want on")
 	}
 }
 
@@ -99,7 +125,7 @@ func TestInitDBSQLiteMemory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB(:memory:): %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	var busyTimeout int
 	if err := db.QueryRow("PRAGMA busy_timeout;").Scan(&busyTimeout); err != nil {
@@ -107,6 +133,13 @@ func TestInitDBSQLiteMemory(t *testing.T) {
 	}
 	if busyTimeout <= 0 {
 		t.Fatalf("busy_timeout = %d, want > 0", busyTimeout)
+	}
+
+	if dbRead(db) != db {
+		t.Fatal("memory InitDB should not split a reader pool")
+	}
+	if db.Stats().MaxOpenConnections != 1 {
+		t.Fatalf("memory MaxOpenConnections = %d, want 1", db.Stats().MaxOpenConnections)
 	}
 
 	CreateSchema(db)
@@ -128,7 +161,7 @@ func TestInitDBSQLitePathWithExistingQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB(%q): %v", dsn, err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	var busyTimeout int
 	if err := db.QueryRow("PRAGMA busy_timeout;").Scan(&busyTimeout); err != nil {
@@ -173,7 +206,7 @@ func TestInitDBSQLiteConcurrentInserts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	const goroutines = 8
@@ -209,5 +242,99 @@ func TestInitDBSQLiteConcurrentInserts(t *testing.T) {
 	}
 	if n != goroutines*perG {
 		t.Fatalf("message count = %d, want %d", n, goroutines*perG)
+	}
+
+	var readN int
+	if err := dbRead(db).QueryRow(`SELECT COUNT(*) FROM messages`).Scan(&readN); err != nil {
+		t.Fatalf("reader count: %v", err)
+	}
+	if readN != n {
+		t.Fatalf("reader message count = %d, want %d (writer inserts must be visible after commit)", readN, n)
+	}
+}
+
+func TestSQLiteWALReadersProceedDuringWriteTx(t *testing.T) {
+	tdir := t.TempDir()
+	db, err := InitDB(filepath.Join(tdir, "walread.db"))
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer CloseDB(db)
+	CreateSchema(db)
+
+	tx, err := db.Begin()
+	if err != nil {
+		t.Fatalf("begin: %v", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	_, err = tx.Exec(`INSERT INTO messages (sender, content, created_at, is_encrypted, recipient, channel) VALUES (?, ?, ?, ?, ?, ?)`,
+		"user", "held-write", time.Now(), false, "", "general")
+	if err != nil {
+		t.Fatalf("insert in open tx: %v", err)
+	}
+
+	read := dbRead(db)
+	if read == db {
+		t.Fatal("expected distinct reader pool for file-backed SQLite")
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		var n int
+		done <- read.QueryRow(`SELECT COUNT(*) FROM messages`).Scan(&n)
+	}()
+
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("reader SELECT during open write tx: %v", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("reader SELECT blocked behind open write transaction")
+	}
+}
+
+func TestInsertMessageVisibleOnReaderPoolAndReplay(t *testing.T) {
+	tdir := t.TempDir()
+	db, err := InitDB(filepath.Join(tdir, "persist.db"))
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer CloseDB(db)
+	CreateSchema(db)
+
+	const body = "persist-roundtrip-payload"
+	id, err := InsertMessage(db, shared.Message{
+		Sender:    "carol",
+		Content:   body,
+		CreatedAt: time.Now(),
+		Channel:   "general",
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+	if id <= 0 {
+		t.Fatalf("InsertMessage id = %d, want > 0", id)
+	}
+
+	var n int
+	if err := dbQueryRow(dbRead(db), `SELECT COUNT(*) FROM messages WHERE content = ?`, body).Scan(&n); err != nil {
+		t.Fatalf("reader lookup: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("reader saw %d rows for inserted content, want 1", n)
+	}
+
+	recent := GetRecentMessages(db)
+	found := false
+	for _, msg := range recent {
+		if msg.Content == body && msg.Sender == "carol" && msg.MessageID == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("GetRecentMessages missing persisted message id=%d; got %+v", id, recent)
 	}
 }

@@ -474,7 +474,7 @@ func (ap *AdminPanel) refreshData() {
 
 func (ap *AdminPanel) loadUsers() {
 	// Get message counts per user
-	rows, err := ap.db.Query(`
+	rows, err := dbQuery(dbRead(ap.db), `
 		SELECT sender, COUNT(*) as message_count 
 		FROM messages 
 		WHERE sender != 'System' 
@@ -635,14 +635,14 @@ func (ap *AdminPanel) updateSystemStats() {
 
 	// Get message count
 	var messageCount int
-	err := ap.db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&messageCount)
+	err := dbQueryRow(dbRead(ap.db), "SELECT COUNT(*) FROM messages").Scan(&messageCount)
 	if err != nil {
 		log.Printf("Error getting message count: %v", err)
 	}
 
 	// Get unique user count
 	var userCount int
-	err = ap.db.QueryRow("SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
+	err = dbQueryRow(dbRead(ap.db), "SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
 	if err != nil {
 		log.Printf("Error getting user count: %v", err)
 	}

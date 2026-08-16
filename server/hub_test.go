@@ -45,7 +45,7 @@ func TestNewHub(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -98,7 +98,7 @@ func TestHubBanUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -135,7 +135,7 @@ func TestHubUnbanUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -176,7 +176,7 @@ func TestHubKickUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -223,7 +223,7 @@ func TestHubKickUserOfflineReturnsError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
@@ -260,7 +260,7 @@ func TestHubKickUserCaseInsensitiveOnlineMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
@@ -280,7 +280,7 @@ func TestHubRejectsSelfKickAndBan(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
@@ -331,7 +331,7 @@ func TestHubKickPermanentlyBannedReturnsError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
@@ -365,7 +365,7 @@ func TestHubAllowUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -407,7 +407,7 @@ func TestHubBanOverridesKick(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -449,7 +449,7 @@ func TestHubCleanupExpiredBans(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -487,7 +487,7 @@ func TestPermanentBanHasNoExpiry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)
@@ -518,7 +518,7 @@ func TestHubForceDisconnectUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -542,7 +542,7 @@ func TestHubGetPluginManager(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -563,7 +563,7 @@ func TestHubBanCaseInsensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -598,7 +598,7 @@ func TestHubMultipleBansAndKicks(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -646,7 +646,7 @@ func TestHubConcurrentBanOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema for database operations
 	CreateSchema(db)
@@ -733,7 +733,7 @@ func TestKickUserNonBlocking(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, "./plugins", "./data", "http://registry.example.com", db)

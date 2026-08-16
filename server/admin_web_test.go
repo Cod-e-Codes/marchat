@@ -12,6 +12,7 @@ import (
 	"time"
 
 	appcfg "github.com/Cod-e-Codes/marchat/config"
+	"github.com/Cod-e-Codes/marchat/shared"
 )
 
 // helper to create a temporary DB and hub for tests
@@ -23,7 +24,6 @@ func setupTestServerEnv(t *testing.T) (*sql.DB, *Hub, *appcfg.Config, func()) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	db.SetMaxOpenConns(1)
 	CreateSchema(db)
 
 	pluginDir := filepath.Join(tdir, "plugins")
@@ -48,7 +48,7 @@ func setupTestServerEnv(t *testing.T) (*sql.DB, *Hub, *appcfg.Config, func()) {
 	}
 
 	cleanup := func() {
-		_ = db.Close()
+		_ = CloseDB(db)
 	}
 	return db, hub, cfg, cleanup
 }
@@ -173,4 +173,35 @@ func TestAdminWeb_LoginSessionAndProtectedRoutes(t *testing.T) {
 
 	// allow background goroutines to settle
 	time.Sleep(50 * time.Millisecond)
+}
+
+func TestAdminWeb_GetUsersDataSeesPersistedMessages(t *testing.T) {
+	db, hub, cfg, cleanup := setupTestServerEnv(t)
+	defer cleanup()
+
+	id, err := InsertMessage(db, shared.Message{
+		Sender:    "bob",
+		Content:   "hello",
+		CreatedAt: time.Now(),
+		Channel:   "general",
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+	if id <= 0 {
+		t.Fatalf("InsertMessage id = %d, want > 0", id)
+	}
+
+	was := NewWebAdminServer(hub, db, cfg)
+	users := was.getUsersData()
+	found := false
+	for _, u := range users {
+		if u.Username == "bob" && u.Messages == 1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("getUsersData did not see persisted bob message; users=%+v", users)
+	}
 }

@@ -56,7 +56,7 @@ func setupLoadverifyHub(b *testing.B, total, inChannel int) *Hub {
 	if err != nil {
 		b.Fatalf("sqlite: %v", err)
 	}
-	b.Cleanup(func() { db.Close() })
+	b.Cleanup(func() { CloseDB(db) })
 	CreateSchema(db)
 	hub, err := NewHub("", "", "", db)
 	if err != nil {
