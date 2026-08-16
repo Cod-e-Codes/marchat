@@ -474,7 +474,7 @@ func (ap *AdminPanel) refreshData() {
 
 func (ap *AdminPanel) loadUsers() {
 	// Get message counts per user
-	rows, err := ap.db.Query(`
+	rows, err := dbQuery(dbRead(ap.db), `
 		SELECT sender, COUNT(*) as message_count 
 		FROM messages 
 		WHERE sender != 'System' 

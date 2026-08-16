@@ -952,7 +952,7 @@ func (w *WebAdminServer) getSystemStats() webSystemStats {
 
 func (w *WebAdminServer) getUsersData() []webUserInfo {
 	// Get message counts per user
-	rows, err := w.db.Query(`
+	rows, err := dbQuery(dbRead(w.db), `
 		SELECT sender, COUNT(*) as message_count 
 		FROM messages 
 		WHERE sender != 'System' 

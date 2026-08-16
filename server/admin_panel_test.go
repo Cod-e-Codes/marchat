@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appcfg "github.com/Cod-e-Codes/marchat/config"
+	"github.com/Cod-e-Codes/marchat/shared"
 )
 
 func setupPanelEnv(t *testing.T) (*AdminPanel, func()) {
@@ -42,6 +43,30 @@ func TestAdminPanel_InitAndRefresh(t *testing.T) {
 	// userTable rows should be set (possibly empty) and not nil
 	if panel.userTable.Rows() == nil {
 		t.Errorf("expected user table rows initialized")
+	}
+
+	id, err := InsertMessage(panel.db, shared.Message{
+		Sender:    "alice",
+		Content:   "hello",
+		CreatedAt: time.Now(),
+		Channel:   "general",
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+	if id <= 0 {
+		t.Fatalf("InsertMessage id = %d, want > 0", id)
+	}
+	panel.loadUsers()
+	found := false
+	for _, u := range panel.users {
+		if u.Username == "alice" && u.Messages == 1 {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("loadUsers did not see persisted alice message; users=%+v", panel.users)
 	}
 }
 

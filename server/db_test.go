@@ -243,6 +243,14 @@ func TestInitDBSQLiteConcurrentInserts(t *testing.T) {
 	if n != goroutines*perG {
 		t.Fatalf("message count = %d, want %d", n, goroutines*perG)
 	}
+
+	var readN int
+	if err := dbRead(db).QueryRow(`SELECT COUNT(*) FROM messages`).Scan(&readN); err != nil {
+		t.Fatalf("reader count: %v", err)
+	}
+	if readN != n {
+		t.Fatalf("reader message count = %d, want %d (writer inserts must be visible after commit)", readN, n)
+	}
 }
 
 func TestSQLiteWALReadersProceedDuringWriteTx(t *testing.T) {
@@ -284,5 +292,49 @@ func TestSQLiteWALReadersProceedDuringWriteTx(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("reader SELECT blocked behind open write transaction")
+	}
+}
+
+func TestInsertMessageVisibleOnReaderPoolAndReplay(t *testing.T) {
+	tdir := t.TempDir()
+	db, err := InitDB(filepath.Join(tdir, "persist.db"))
+	if err != nil {
+		t.Fatalf("InitDB: %v", err)
+	}
+	defer CloseDB(db)
+	CreateSchema(db)
+
+	const body = "persist-roundtrip-payload"
+	id, err := InsertMessage(db, shared.Message{
+		Sender:    "carol",
+		Content:   body,
+		CreatedAt: time.Now(),
+		Channel:   "general",
+	})
+	if err != nil {
+		t.Fatalf("InsertMessage: %v", err)
+	}
+	if id <= 0 {
+		t.Fatalf("InsertMessage id = %d, want > 0", id)
+	}
+
+	var n int
+	if err := dbQueryRow(dbRead(db), `SELECT COUNT(*) FROM messages WHERE content = ?`, body).Scan(&n); err != nil {
+		t.Fatalf("reader lookup: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("reader saw %d rows for inserted content, want 1", n)
+	}
+
+	recent := GetRecentMessages(db)
+	found := false
+	for _, msg := range recent {
+		if msg.Content == body && msg.Sender == "carol" && msg.MessageID == id {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("GetRecentMessages missing persisted message id=%d; got %+v", id, recent)
 	}
 }
