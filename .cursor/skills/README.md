@@ -29,7 +29,7 @@ For Cursor, dependencies, or platform behavior not defined in this repo, verify 
 
 Update domain skills when shipped behavior changes. Recent fixes on `main` (or in flight):
 
-- SQLite `InitDB`: DSN per-connection pragmas (`busy_timeout`, WAL) + `MaxOpenConns(1)` / `MaxIdleConns(1)`; do not one-shot `PRAGMA` with the default pool ([#118](https://github.com/Cod-e-Codes/marchat/issues/118))
+- SQLite `InitDB`: DSN per-connection pragmas (`busy_timeout`, WAL) + writer `MaxOpenConns(1)` / `MaxIdleConns(1)` and file-backed reader pool (`MaxOpenConns(4)`, `_query_only`); do not one-shot `PRAGMA` with the default pool ([#118](https://github.com/Cod-e-Codes/marchat/issues/118), [#126](https://github.com/Cod-e-Codes/marchat/issues/126))
 - Kick/ban self-target rejection and online-only kick (`ErrKickNotConnected` for offline targets; `BanUser` offline-capable)
 - Client transcript notices: negative `message_id` classified by content; scoped to active channel
 - URL click: OSC 8 hyperlinks on wrapped segments (Lip Gloss v2); manual click fallback remains unreliable for wrapped long URLs; copy/paste when needed ([#103](https://github.com/Cod-e-Codes/marchat/issues/103))

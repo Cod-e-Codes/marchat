@@ -29,7 +29,7 @@ func TestPermanentBanPersistsAcrossHubRestart(t *testing.T) {
 	if !hub1.IsUserBanned("alice") {
 		t.Fatal("alice should be banned before restart")
 	}
-	if err := db.Close(); err != nil {
+	if err := CloseDB(db); err != nil {
 		t.Fatalf("close db: %v", err)
 	}
 
@@ -37,7 +37,7 @@ func TestPermanentBanPersistsAcrossHubRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB reopen: %v", err)
 	}
-	defer db2.Close()
+	defer CloseDB(db2)
 	CreateSchema(db2)
 
 	hub2 := mustNewHub(t, tdir, tdir, "", db2)
@@ -69,7 +69,7 @@ func TestTempKickPersistsAcrossHubRestart(t *testing.T) {
 	if !hub1.IsUserBanned("bob") {
 		t.Fatal("bob should be kicked before restart")
 	}
-	if err := db.Close(); err != nil {
+	if err := CloseDB(db); err != nil {
 		t.Fatalf("close db: %v", err)
 	}
 
@@ -77,7 +77,7 @@ func TestTempKickPersistsAcrossHubRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB reopen: %v", err)
 	}
-	defer db2.Close()
+	defer CloseDB(db2)
 	CreateSchema(db2)
 
 	hub2 := mustNewHub(t, tdir, tdir, "", db2)
@@ -113,7 +113,7 @@ func TestExpiredTempKickNotLoadedOnRestart(t *testing.T) {
 	if err := recordBanEvent(db, "carol", "admin", &past); err != nil {
 		t.Fatalf("recordBanEvent: %v", err)
 	}
-	if err := db.Close(); err != nil {
+	if err := CloseDB(db); err != nil {
 		t.Fatalf("close db: %v", err)
 	}
 
@@ -121,7 +121,7 @@ func TestExpiredTempKickNotLoadedOnRestart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB reopen: %v", err)
 	}
-	defer db2.Close()
+	defer CloseDB(db2)
 	CreateSchema(db2)
 
 	hub := mustNewHub(t, tdir, tdir, "", db2)
@@ -172,14 +172,14 @@ func TestKickThenBanLeavesSingleOpenRow(t *testing.T) {
 		t.Fatal("open row after permanent ban should have NULL expires_at")
 	}
 
-	if err := db.Close(); err != nil {
+	if err := CloseDB(db); err != nil {
 		t.Fatalf("close: %v", err)
 	}
 	db2, err := InitDB(dbPath)
 	if err != nil {
 		t.Fatalf("reopen: %v", err)
 	}
-	defer db2.Close()
+	defer CloseDB(db2)
 	CreateSchema(db2)
 	hub2 := mustNewHub(t, tdir, tdir, "", db2)
 
@@ -204,7 +204,7 @@ func TestLoadModerationStateLatestOpenRowWins(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	kickExpiry := time.Now().Add(12 * time.Hour)

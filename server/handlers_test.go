@@ -20,7 +20,7 @@ func TestInsertMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -61,7 +61,7 @@ func TestInsertEncryptedMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -101,7 +101,7 @@ func TestInsertMessageEncryptedDM(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -143,7 +143,7 @@ func TestGetRecentMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -194,7 +194,7 @@ func TestQueryVisibleMessagesForUserRespectsLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	now := time.Now()
@@ -235,7 +235,7 @@ func TestGetRecentMessagesForUserFiltersDMs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	now := time.Now()
@@ -348,7 +348,7 @@ func TestGetRecentMessagesForUserReconnectReplay(t *testing.T) {
 			if err != nil {
 				t.Fatalf("open db: %v", err)
 			}
-			defer db.Close()
+			defer CloseDB(db)
 			CreateSchema(db)
 
 			now := time.Now()
@@ -372,7 +372,7 @@ func TestGetRecentMessagesForUserReconnectWithNewMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	now := time.Now()
@@ -421,7 +421,7 @@ func TestGetRecentMessagesForUserInvisibleDMsDoNotSuppressScrollback(t *testing.
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	now := time.Now()
@@ -521,7 +521,7 @@ func TestClearMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -576,7 +576,7 @@ func TestBackupDatabase(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to create test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -615,7 +615,7 @@ func TestBackupDatabaseRejectsNonSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	setDBDialect(db, DialectPostgres)
 
 	_, err = BackupDatabase(db, "postgres://example")
@@ -642,7 +642,7 @@ func TestGetDatabaseStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -685,7 +685,7 @@ func TestEditMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -772,7 +772,7 @@ func TestDeleteMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -860,7 +860,7 @@ func TestSearchMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -942,7 +942,7 @@ func TestTogglePinMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 
@@ -989,7 +989,7 @@ func TestGetPinnedMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	CreateSchema(db)
 

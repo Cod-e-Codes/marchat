@@ -23,7 +23,6 @@ func setupTestServerEnv(t *testing.T) (*sql.DB, *Hub, *appcfg.Config, func()) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	db.SetMaxOpenConns(1)
 	CreateSchema(db)
 
 	pluginDir := filepath.Join(tdir, "plugins")
@@ -48,7 +47,7 @@ func setupTestServerEnv(t *testing.T) (*sql.DB, *Hub, *appcfg.Config, func()) {
 	}
 
 	cleanup := func() {
-		_ = db.Close()
+		_ = CloseDB(db)
 	}
 	return db, hub, cfg, cleanup
 }

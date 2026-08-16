@@ -22,7 +22,7 @@ func setupPanelEnv(t *testing.T) (*AdminPanel, func()) {
 	hub := mustNewHub(t, pluginDir, dataDir, "", db)
 	cfg := &appcfg.Config{Port: 8080, AdminKey: "k", Admins: []string{"a"}, DBPath: dbPath, ConfigDir: tdir}
 	panel := NewAdminPanel(hub, db, hub.GetPluginManager(), cfg)
-	return panel, func() { _ = db.Close() }
+	return panel, func() { _ = CloseDB(db) }
 }
 
 func TestAdminPanel_InitAndRefresh(t *testing.T) {

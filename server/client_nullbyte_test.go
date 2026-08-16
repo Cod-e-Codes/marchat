@@ -28,7 +28,7 @@ func TestInsertMessage_NullByteAcceptedOnSQLite(t *testing.T) {
 	if err != nil {
 		t.Fatalf("open db: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	content := "before\x00after"
@@ -66,7 +66,7 @@ func TestIntegrationNullByteRejectedNoBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, tdir, tdir, "", db)

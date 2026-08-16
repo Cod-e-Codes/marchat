@@ -22,7 +22,7 @@ func TestPostgresInitDBAndSchemaSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB postgres: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	if getDBDialect(db) != DialectPostgres {
 		t.Fatalf("dialect = %v, want postgres", getDBDialect(db))
@@ -47,7 +47,7 @@ func TestMySQLInitDBAndSchemaSmoke(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB mysql: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	if getDBDialect(db) != DialectMySQL {
 		t.Fatalf("dialect = %v, want mysql", getDBDialect(db))

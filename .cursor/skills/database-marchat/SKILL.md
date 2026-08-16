@@ -23,8 +23,9 @@ Runtime backend via `MARCHAT_DB_PATH`: SQLite (default), PostgreSQL, or MySQL. D
 - Parameterized queries only; no string-concatenated user input.
 - Every schema or query change must work on all three dialects (or use `db_dialect.go` helpers).
 - SQLite (`InitDB` only):
-  - Put connection pragmas in the DSN so every pooled connection gets them (`_busy_timeout=5000`, `_journal_mode=WAL`, `_synchronous=NORMAL`, plus `_pragma` for cache/temp). Join with `?` or `&` if the path already has a query (`appendSQLiteDSNPragmas`).
-  - After `Ping`, set `SetMaxOpenConns(1)` and `SetMaxIdleConns(1)`. Do **not** leave the default multi-connection `database/sql` pool on SQLite.
+  - Put connection pragmas in the DSN so every pooled connection gets them (`_busy_timeout=5000`, `_journal_mode=WAL`, `_synchronous=NORMAL`, `_txlock=immediate` on the writer, plus `_pragma` for cache/temp). Join with `?` or `&` if the path already has a query (`appendSQLiteDSNPragmas`).
+  - After `Ping`, set writer `SetMaxOpenConns(1)` and `SetMaxIdleConns(1)`. For file-backed SQLite, open a sibling reader pool (`MaxOpenConns(4)`, `_query_only=1`, same `busy_timeout`; no `_journal_mode`, no `mode=ro`, no `cache=shared`). Route SELECTs through `dbRead(db)`. Close with `CloseDB`. Do **not** leave the default unbounded `database/sql` pool on the writer.
+  - Do **not** split `:memory:` (each connection is a different database).
   - Do **not** rely on one-shot `Exec("PRAGMA ...")` after open for settings that must stick on every connection (that was the #118 `SQLITE_BUSY` failure mode).
   - Verify after open: `busy_timeout > 0`; for file-backed DBs, `journal_mode` is `wal`. In-memory (`:memory:` / `mode=memory`) requires busy_timeout only.
   - Quote paths safely in `VACUUM INTO` and similar.
