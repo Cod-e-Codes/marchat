@@ -60,11 +60,11 @@ func (c *Client) dispatchInbound(msg *shared.Message) {
 		return
 	}
 	if msg.Type == shared.LeaveChannelType {
-		c.handleInboundLeaveChannel(msg)
+		c.handleInboundLeaveChannel()
 		return
 	}
 	if msg.Type == shared.ListChannelsType {
-		c.handleInboundListChannels(msg)
+		c.handleInboundListChannels()
 		return
 	}
 
@@ -286,7 +286,7 @@ func (c *Client) handleInboundJoinChannel(msg *shared.Message) {
 	}
 }
 
-func (c *Client) handleInboundLeaveChannel(msg *shared.Message) {
+func (c *Client) handleInboundLeaveChannel() {
 	current := c.hub.getClientChannel(c)
 	if current != "general" {
 		c.hub.leaveChannel(c, current)
@@ -301,7 +301,7 @@ func (c *Client) handleInboundLeaveChannel(msg *shared.Message) {
 	}
 }
 
-func (c *Client) handleInboundListChannels(msg *shared.Message) {
+func (c *Client) handleInboundListChannels() {
 	channels := c.hub.listChannels()
 	current := c.hub.getClientChannel(c)
 	var lines []string

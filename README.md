@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v1.3.5-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.5)
+[![Version](https://img.shields.io/badge/version-v1.3.6-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.6)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -37,7 +37,7 @@ Both clients follow the same wire format documented in [PROTOCOL.md](PROTOCOL.md
 
 ## Release notes
 
-**Latest tagged release:** [v1.3.5](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.5) (2026-08-15). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
+**Latest tagged release:** [v1.3.6](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.6) (2026-09-01). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 **`main` branch:** may include changes not yet in that tag (for example items under **Unreleased** in [CHANGELOG.md](CHANGELOG.md)). Feature descriptions elsewhere in this README match the tree you build from source; compare your binary’s `-doctor` / `-version` output to the release page when in doubt.
 
@@ -153,12 +153,12 @@ Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQ
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.5/marchat-v1.3.5-linux-amd64.zip
-unzip marchat-v1.3.5-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.6/marchat-v1.3.6-linux-amd64.zip
+unzip marchat-v1.3.6-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.5/marchat-v1.3.5-darwin-amd64.zip
-unzip marchat-v1.3.5-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.6/marchat-v1.3.6-darwin-amd64.zip
+unzip marchat-v1.3.6-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -184,11 +184,11 @@ See [PACKAGING.md](PACKAGING.md) and `packaging/` for Homebrew, Scoop, winget, C
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v1.3.5
+docker pull codecodesxyz/marchat:v1.3.6
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v1.3.5
+  codecodesxyz/marchat:v1.3.6
 ```
 
 **Docker Compose (local development):**
@@ -837,13 +837,13 @@ Percentages are **statement coverage** from a merged profile (`go test -coverpro
 | `internal/doctor` | 65.9% | Medium |
 | `plugin/store` | 44.8% | Medium |
 | `cmd/license` | 42.2% | Medium |
-| `server` | 45.7% | Medium |
+| `server` | 51.5% | Medium |
 | `plugin/manager` | 65.6% | Medium |
 | `client/exthook` | 24.1% | Low |
 | `client` | 36.3% | Low |
-| `cmd/server` | 13.7% | Low |
+| `cmd/server` | 13.4% | Low |
 
-**Overall: 47.6%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
+**Overall: 48.3%** (main module packages only). See [TESTING.md](TESTING.md) for detailed information.
 
 ## Contributing
 

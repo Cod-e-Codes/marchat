@@ -6,7 +6,15 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
-- **Server**: **Fix:** file-backed SQLite uses a single-connection writer pool (`MaxOpenConns(1)`, `_txlock=immediate`) plus a bounded WAL reader pool (`MaxOpenConns(4)`, `_query_only=1`) so health/admin/history reads are not serialized behind inserts; `:memory:` and Postgres/MySQL are unchanged. Close with `CloseDB`. No schema migration ([#126](https://github.com/Cod-e-Codes/marchat/issues/126)).
+## v1.3.6
+
+**Released 2026-09-01.** Since **[v1.3.5](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.5)**; compare [`v1.3.5...v1.3.6`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.5...v1.3.6). Commits: **`git log v1.3.5..v1.3.6 --oneline`**.
+
+- **Server**: **Fix:** file-backed SQLite uses a single-connection writer pool (`MaxOpenConns(1)`, `_txlock=immediate`) plus a bounded WAL reader pool (`MaxOpenConns(4)`, `_query_only=1`) so health/admin/history reads are not serialized behind inserts; `:memory:` and Postgres/MySQL are unchanged. Close with `CloseDB`. No schema migration ([#126](https://github.com/Cod-e-Codes/marchat/issues/126), [#127](https://github.com/Cod-e-Codes/marchat/pull/127)).
+- **Docs**: **TESTING** notes that CI golangci-lint is govet/ineffassign/staticcheck SA* and that gopls `unusedparams` is not in CI; main-module coverage refreshed to **48.3%**.
+- **Dependencies**: **modernc.org/sqlite** v1.57.0; **charm.land/bubbletea/v2** v2.0.9; **charm.land/bubbles/v2** v2.2.1; **github.com/mattn/go-runewidth** v0.0.28.
+- **Packaging**: Version strings and URLs for **v1.3.6** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.6** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
+- **Docker**: the v1.3.6 image rebuild runs `apk upgrade` on Alpine 3.22 and picks up **openssl 3.5.8** (no Dockerfile change).
 
 ## v1.3.5
 
