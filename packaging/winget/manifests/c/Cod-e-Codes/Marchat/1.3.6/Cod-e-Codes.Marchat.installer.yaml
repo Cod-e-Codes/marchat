@@ -9,7 +9,7 @@ NestedInstallerType: portable
 Installers:
   - Architecture: x64
     InstallerUrl: https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.6/marchat-v1.3.6-windows-amd64.zip
-    InstallerSha256: 0000000000000000000000000000000000000000000000000000000000000000
+    InstallerSha256: B24A2CDABF99E1561F703ADFD0AF986E12A58CE0059951BC8D7D615D67727CD5
     NestedInstallerFiles:
       - RelativeFilePath: marchat-client-windows-amd64.exe
         PortableCommandAlias: marchat-client
