@@ -111,7 +111,7 @@ On Windows (PowerShell), use `Resolve-Path` for absolute paths and run `go run .
 |-----------|----------------|-------------|
 | Server plugins | Server | Commands, hub automation, shared bots |
 | Client hooks | Your machine | Personal automation, local pipelines |
-| Second WebSocket client | Your machine / elsewhere | Full bots, independent sessions |
+| Second WebSocket client | Your machine / elsewhere | Full bots, independent sessions ([marchat-bot](https://github.com/Cod-e-Codes/marchat-bot)) |
 
 ## Stability
 

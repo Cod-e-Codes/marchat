@@ -6,6 +6,9 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+- **Docs**: Pointer to [marchat-bot](https://github.com/Cod-e-Codes/marchat-bot) (standalone Go WebSocket bot SDK; not a plugin) in **README**, **PROTOCOL**, **docs/README**, **CLIENT_HOOKS**, and **PLUGIN_ECOSYSTEM**.
+- **Packaging**: Drop versioned `scripts/post-release-v*.ps1` helpers; pattern is gitignored. Chocolatey remains `choco pack` in `packaging/chocolatey/` (**PACKAGING.md**).
+
 ## v1.3.6
 
 **Released 2026-09-01.** Since **[v1.3.5](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.5)**; compare [`v1.3.5...v1.3.6`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.5...v1.3.6). Commits: **`git log v1.3.5..v1.3.6 --oneline`**.

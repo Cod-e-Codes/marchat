@@ -2,7 +2,7 @@
 
 This document provides a comprehensive overview of the plugin ecosystem implementation for marchat, covering architecture, development, and usage.
 
-**Start here:** read [plugin/README.md](plugin/README.md) for install and manifest basics, then skim **Architecture Overview** below. Use [plugin/examples/echo](plugin/examples/echo) as a minimal stdio JSON plugin, and import **`github.com/Cod-e-Codes/marchat/plugin/sdk`** for `RunStdio`, `HandlePluginRequest`, and wire types. Server behavior (subprocess lifecycle, fan-out) lives under `plugin/host` and `plugin/manager`; see [ARCHITECTURE.md](ARCHITECTURE.md).
+**Start here:** read [plugin/README.md](plugin/README.md) for install and manifest basics, then skim **Architecture Overview** below. Use [plugin/examples/echo](plugin/examples/echo) as a minimal stdio JSON plugin, and import **`github.com/Cod-e-Codes/marchat/plugin/sdk`** for `RunStdio`, `HandlePluginRequest`, and wire types. Server behavior (subprocess lifecycle, fan-out) lives under `plugin/host` and `plugin/manager`; see [ARCHITECTURE.md](ARCHITECTURE.md). For a standalone WebSocket bot SDK that is not a plugin and does not import this module, see [marchat-bot](https://github.com/Cod-e-Codes/marchat-bot).
 
 ## Architecture Overview
 

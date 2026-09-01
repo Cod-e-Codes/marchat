@@ -93,5 +93,8 @@ tmp/
 # Local GitHub release-notes drafts (gh release create --notes-file). Canonical history is CHANGELOG.md and GitHub Releases.
 release-notes*.md
 
+# Local per-release packaging helpers (Chocolatey pack / copy from packaging-out). Do not commit.
+scripts/post-release-v*.ps1
+
 # Caddy proxy overrides (public IP / DNS); tracked template is deploy/caddy/proxy.env.example
 deploy/caddy/proxy.env

@@ -2,7 +2,7 @@
 
 This document outlines the communication protocol used by `marchat`, a terminal-based chat application built with Go and Bubble Tea. It covers WebSocket interactions, message formats, and expected client behavior. The protocol is designed for simplicity, extensibility, and ease of implementation for alternative clients or integrations.
 
-For optional graphical clients that implement this protocol, see [README.md](README.md#optional-graphical-clients).
+For optional graphical clients that implement this protocol, see [README.md](README.md#optional-graphical-clients). For a standalone Go WebSocket bot SDK (not a plugin; does not import this module), see [marchat-bot](https://github.com/Cod-e-Codes/marchat-bot).
 
 ---
 

@@ -47,7 +47,7 @@ Details: `PACKAGING.md`, `.cursor/rules/marchat.mdc` Release Process section.
 - After the prepare commit exists, set `*Commit: <short sha>*` to `git rev-parse --short` of the commit you tag.
 - Do **not** include a `## Docker Image` section. The docker job appends Hub pull instructions with `gh release edit`. Putting that section in the notes file duplicates it when the image finishes.
 - To edit a published body later, pass a real markdown file to `gh release edit --notes-file`. Do not rebuild notes in PowerShell strings (newlines get flattened).
-- Chocolatey is not in `publish-downstream-packages`; after zips exist, run the post-release script (`choco pack`) and `choco push` when asked.
+- Chocolatey is not in `publish-downstream-packages`; after zips exist, `choco pack` in `packaging/chocolatey/` and `choco push` when asked. See `PACKAGING.md`.
 
 ## Changelog entry
 

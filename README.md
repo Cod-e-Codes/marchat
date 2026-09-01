@@ -25,6 +25,7 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 | Contributing code | [CONTRIBUTING.md](CONTRIBUTING.md), [TESTING.md](TESTING.md), [ARCHITECTURE.md](ARCHITECTURE.md) |
 | Reviewing security | [SECURITY.md](SECURITY.md), [PROTOCOL.md](PROTOCOL.md) |
 | Prefer a graphical client | [marchat_flutter](https://github.com/Cod-e-Codes/marchat_flutter), [marchat-gui](https://github.com/Cod-e-Codes/marchat-gui) |
+| Writing a bot | [marchat-bot](https://github.com/Cod-e-Codes/marchat-bot) |
 
 ## Optional graphical clients
 
@@ -34,6 +35,10 @@ A lightweight terminal chat with real-time messaging over WebSockets, optional E
 - [marchat-gui](https://github.com/Cod-e-Codes/marchat-gui): Go and Fyne companion client for desktop use.
 
 Both clients follow the same wire format documented in [PROTOCOL.md](PROTOCOL.md).
+
+## Bots
+
+[marchat-bot](https://github.com/Cod-e-Codes/marchat-bot) is a standalone Go SDK for WebSocket bots against a marchat server. It is not a plugin and does not import this module or `plugin/sdk`; wire types are vendored and the runtime dependency is `gorilla/websocket`. The SDK does not encrypt or decrypt E2E payloads. It follows the same wire format documented in [PROTOCOL.md](PROTOCOL.md).
 
 ## Release notes
 
