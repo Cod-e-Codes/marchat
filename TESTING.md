@@ -12,7 +12,7 @@ The Marchat test suite provides foundational coverage of the application's core 
 - **Database Tests**: Testing database operations and schema management
 - **Server Tests**: Testing WebSocket handling, message routing, and user management
 
-**Note**: Narrative release summaries live in **[CHANGELOG.md](CHANGELOG.md)** (and on GitHub Releases). This is a foundational test suite with good coverage for smaller utility packages and growing coverage for client and server components. **Overall statement coverage is 47.8%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage`, `coverage`, or per-package `ph` / `sv`) so the argument is not misparsed. The nested **`plugin/sdk`** module (separate `go.mod`) is not included in that merged number; its package statement coverage is **58.8%** when measured with `cd plugin/sdk && go test -coverprofile=sdkcover ./... && go tool cover -func=sdkcover`.
+**Note**: Narrative release summaries live in **[CHANGELOG.md](CHANGELOG.md)** (and on GitHub Releases). This is a foundational test suite with good coverage for smaller utility packages and growing coverage for client and server components. **Overall statement coverage is 47.6%** across all packages in the main module, computed from the merged profile at the repo root (for example the `coverage` file or another path passed to `go test -coverprofile=... ./...`). Regenerate summaries with `go tool cover -func=<same-path>`. On **Windows PowerShell**, prefer a profile filename **without** a `.out` suffix (e.g. `mergedcoverage`, `coverage`, or per-package `ph` / `sv`) so the argument is not misparsed. The nested **`plugin/sdk`** module (separate `go.mod`) is not included in that merged number; its package statement coverage is **58.8%** when measured with `cd plugin/sdk && go test -coverprofile=sdkcover ./... && go tool cover -func=sdkcover`.
 
 **Doctor env tests:** Production code reads process env via **`collectMarchatEnviron`** and the swappable **`osEnviron`** variable (see `internal/doctor/env.go`), guarded by **`environMu`**. Tests that replace **`osEnviron`** must capture the previous function while holding **`environMu`** and must not use **`t.Parallel()`** alongside other tests that also swap it, or **`go test -race`** can observe races and overlapping mocks. **`buildEnvLines`** tests are therefore sequential in the package.
 
@@ -69,7 +69,7 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `server/admin_web_test.go` | Admin web interface | HTTP endpoints, authentication, admin panel functionality |
 | `server/config_ui_test.go` | Server configuration UI | Configuration management, environment handling |
 | `server/admin_panel_test.go` | Admin panel functionality | Admin-specific operations and controls |
-| `server/db_test.go` | Database operations | `InitDB` SQLite DSN pragmas (`busy_timeout`, WAL), `:memory:`, query-join `&`, single-conn pool, short concurrent inserts, schema smoke |
+| `server/db_test.go` | Database operations | `InitDB` SQLite DSN pragmas (`busy_timeout`, WAL, `_txlock=immediate`), `:memory:` single pool, file-backed reader pool (`MaxOpenConns=4`, `query_only`), WAL reader during open write tx, query-join `&`, writer `MaxOpenConns=1`, short concurrent inserts, schema smoke |
 | `server/db_dialect_test.go` | SQL dialect helpers | DSN detection, Postgres placeholder rebinding, boolean SQL literals, MySQL DSN via `mysql.Config` |
 | `server/db_ci_smoke_test.go` | CI DB smoke | Postgres/MySQL `InitDB`, `CreateSchema`, core tables, pool not forced to 1, visible handshake replay query, search and pin SQL (env-gated) |
 | `server/message_state_test.go` | Durable reactions | Reaction persistence and replay helpers |
@@ -275,7 +275,7 @@ Nested **`plugin/sdk`**: `cd plugin/sdk && go test -coverprofile=sdkcover ./... 
 | `client` | 29.4% | Low |
 | `cmd/server` | 13.7% | Low |
 
-**Overall coverage: 47.8%** (all packages in the main module; merged profile `mergedcoverage` from `go test -coverprofile=mergedcoverage ./...`, total from `go tool cover -func=mergedcoverage`)
+**Overall coverage: 47.6%** (all packages in the main module; merged profile `mergedcoverage` from `go test -coverprofile=mergedcoverage ./...`, total from `go tool cover -func=mergedcoverage`)
 
 ### High Coverage (70%+)
 - **Shared Package**: Cryptographic operations, data types, message handling, version utilities (88.1%)
@@ -506,7 +506,7 @@ When adding new functionality to Marchat:
 - **Packages (`go list ./...`)**: 15 in the main module; `plugin/sdk` and `plugin/examples/echo` are nested modules with their own `go.mod` files (root `go test ./...` does not run their tests).
 - **Coverage by Package** (statement %, `go test -cover ./...`): 88.1% (`shared`), 87.1% (`plugin/license`), 80.8% (`plugin/fileurl`), 84.9% (`client/crypto`), 74.0% (`config`), 65.6% (`plugin/manager`), 66.0% (`plugin/host`), 57.4% (`client/config`), 65.9% (`internal/doctor`), 44.8% (`plugin/store`), 42.2% (`cmd/license`), 45.7% (`server`), 36.3% (`client`), 24.1% (`client/exthook`), 13.7% (`cmd/server`)
 - **Nested `plugin/sdk` coverage**: **58.8%** statements (run inside `plugin/sdk`; not part of the root merged profile).
-- **Overall Coverage**: **47.8%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell use a profile path **without** a `.out` suffix, for example `mergedcoverage`, `ph`, or `sv`, so `-func=` is not misparsed)
+- **Overall Coverage**: **47.6%** across main-module packages (regenerate with `go test -coverprofile=mergedcoverage ./...` then `go tool cover -func=mergedcoverage`; on PowerShell use a profile path **without** a `.out` suffix, for example `mergedcoverage`, `ph`, or `sv`, so `-func=` is not misparsed)
 - **Execution Time**: on the order of a few seconds for `go test ./...` on a typical dev machine
 - **Reliability**: deterministic; use `go test -race ./...` where supported (see CI)
 

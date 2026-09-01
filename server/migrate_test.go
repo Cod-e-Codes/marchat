@@ -13,7 +13,7 @@ func TestMigrateSchemaFromEmpty(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB: %v", err)
 		}
-		defer db.Close()
+		defer CloseDB(db)
 		assertMigrateSchemaFromEmpty(t, db)
 	})
 
@@ -23,7 +23,7 @@ func TestMigrateSchemaFromEmpty(t *testing.T) {
 		if err != nil {
 			t.Fatalf("InitDB: %v", err)
 		}
-		defer db.Close()
+		defer CloseDB(db)
 		assertMigrateSchemaFromEmpty(t, db)
 	})
 }
@@ -74,7 +74,7 @@ func TestMigrateSchemaFailsWhenRecordedSchemaIsIncomplete(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	if err := ensureSchemaVersionTable(db); err != nil {
 		t.Fatalf("ensureSchemaVersionTable: %v", err)
@@ -105,7 +105,7 @@ func TestMigrateSchemaV1RollsBackOnInjectedFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	migrationFailAfterStep = "create user_message_state"
 	t.Cleanup(func() { migrationFailAfterStep = "" })

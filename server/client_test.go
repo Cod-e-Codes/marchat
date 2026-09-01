@@ -64,7 +64,7 @@ func setupTestClient(t *testing.T) (*Client, *Hub, *sql.DB, func()) {
 
 	cleanup := func() {
 		conn.Close()
-		db.Close()
+		CloseDB(db)
 	}
 
 	return client, hub, db, cleanup

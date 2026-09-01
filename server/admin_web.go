@@ -910,13 +910,13 @@ func (w *WebAdminServer) getSystemStats() webSystemStats {
 	runtime.ReadMemStats(&m)
 
 	var messageCount int
-	err := w.db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&messageCount)
+	err := dbQueryRow(dbRead(w.db), "SELECT COUNT(*) FROM messages").Scan(&messageCount)
 	if err != nil {
 		log.Printf("Error getting message count: %v", err)
 	}
 
 	var userCount int
-	err = w.db.QueryRow("SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
+	err = dbQueryRow(dbRead(w.db), "SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
 	if err != nil {
 		log.Printf("Error getting user count: %v", err)
 	}
@@ -952,7 +952,7 @@ func (w *WebAdminServer) getSystemStats() webSystemStats {
 
 func (w *WebAdminServer) getUsersData() []webUserInfo {
 	// Get message counts per user
-	rows, err := w.db.Query(`
+	rows, err := dbQuery(dbRead(w.db), `
 		SELECT sender, COUNT(*) as message_count 
 		FROM messages 
 		WHERE sender != 'System' 
@@ -1135,7 +1135,7 @@ func (w *WebAdminServer) updateMetrics() {
 
 	// Get current message count
 	var messageCount int
-	if err := w.db.QueryRow("SELECT COUNT(*) FROM messages").Scan(&messageCount); err != nil {
+	if err := dbQueryRow(dbRead(w.db), "SELECT COUNT(*) FROM messages").Scan(&messageCount); err != nil {
 		log.Printf("Error getting message count: %v", err)
 	}
 

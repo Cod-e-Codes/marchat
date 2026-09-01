@@ -37,7 +37,7 @@ Implementation: `internal/doctor/`. DB dialect and DSN shape checks live there a
 | Postgres boolean errors | Dialect boolean helpers in `server/db_dialect.go` (`:search`, pin toggle) |
 | MySQL time parsing | `mysql.Config` with `parseTime=true` in `InitDB` |
 | SQLite path vs remote DSN | `MARCHAT_DB_PATH`; `mysql:` / `postgres:` prefixes for driver detection |
-| SQLite `SQLITE_BUSY` / missing messages under load | Confirm `InitDB` DSN pragmas (`_busy_timeout`, WAL) and `MaxOpenConns(1)`; not one-shot `PRAGMA` alone ([#118](https://github.com/Cod-e-Codes/marchat/issues/118)) |
+| SQLite `SQLITE_BUSY` / missing messages under load | Confirm `InitDB` DSN pragmas (`_busy_timeout`, WAL) and writer `MaxOpenConns(1)`; not one-shot `PRAGMA` alone ([#118](https://github.com/Cod-e-Codes/marchat/issues/118)). Health/admin read tail latency under writes: file-backed reader pool via `dbRead` ([#126](https://github.com/Cod-e-Codes/marchat/issues/126)) |
 | Plugin disable race | `StopPlugin` waits for stdout/stderr readers (`plugin/host`) |
 | Rate limit | `server/loadverify_ratelimit_test.go` constants match `client.go` read pump |
 

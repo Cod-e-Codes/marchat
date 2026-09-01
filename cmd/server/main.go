@@ -282,6 +282,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+	defer func() { _ = server.CloseDB(db) }()
 	if err := server.MigrateSchema(db); err != nil {
 		log.Fatalf("Failed to migrate database schema: %v", err)
 	}

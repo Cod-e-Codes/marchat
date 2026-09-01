@@ -18,7 +18,7 @@ func setupDispatchTestClient(t *testing.T) (*Client, *Hub) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	t.Cleanup(func() { db.Close() })
+	t.Cleanup(func() { CloseDB(db) })
 	CreateSchema(db)
 
 	hub := mustNewHub(t, tdir, tdir, "", db)

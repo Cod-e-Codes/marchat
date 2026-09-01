@@ -128,7 +128,7 @@ func setupFileLimitHub(t *testing.T, maxFileBytes int64) (string, func()) {
 
 	cleanup := func() {
 		srv.Close()
-		db.Close()
+		CloseDB(db)
 	}
 	return wsURL, cleanup
 }

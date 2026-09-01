@@ -33,7 +33,7 @@ func setupSpoofTestHub(t *testing.T) (*sql.DB, string, func()) {
 
 	cleanup := func() {
 		srv.Close()
-		db.Close()
+		CloseDB(db)
 	}
 	return db, wsURL, cleanup
 }

@@ -12,7 +12,7 @@ func TestPersistReaction_UsesReactionTargetID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	id, err := InsertMessage(db, shared.Message{Sender: "alice", Content: "hello", CreatedAt: time.Now()})
@@ -43,7 +43,7 @@ func TestPersistReaction_RemovalUsesReactionTargetID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	id, err := InsertMessage(db, shared.Message{Sender: "alice", Content: "hello", CreatedAt: time.Now()})
@@ -80,7 +80,7 @@ func TestDurableStateLoaders_HandleEmptyTablesOnFirstBoot(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB failed: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	id, err := InsertMessage(db, shared.Message{Sender: "alice", Content: "hello", CreatedAt: time.Now()})

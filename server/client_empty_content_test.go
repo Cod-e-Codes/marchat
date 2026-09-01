@@ -35,7 +35,7 @@ func TestIntegrationEmptyTextRejectedNoBroadcast(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, tdir, tdir, "", db)
@@ -104,7 +104,7 @@ func TestIntegrationEmptyDMRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, tdir, tdir, "", db)
@@ -172,7 +172,7 @@ func TestIntegrationEmptyEditRejected(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, tdir, tdir, "", db)
@@ -244,7 +244,7 @@ func TestIntegrationEncryptedOpaqueTextAccepted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, tdir, tdir, "", db)
@@ -311,7 +311,7 @@ func TestIntegrationCommandPathStillWorksWithEmptyCheck(t *testing.T) {
 	if err != nil {
 		t.Fatalf("InitDB: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	hub := mustNewHub(t, tdir, tdir, "", db)

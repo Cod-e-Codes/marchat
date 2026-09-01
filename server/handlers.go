@@ -207,7 +207,7 @@ func GetRecentMessagesWithLimit(db *sql.DB, limit int) []shared.Message {
 		recentMessagesCacheMutex.RUnlock()
 	}
 
-	rows, err := dbQuery(db, fmt.Sprintf(`SELECT %s FROM messages ORDER BY created_at DESC LIMIT ?`, messageHistoryRowSelectColumns(db)), limit)
+	rows, err := dbQuery(dbRead(db), fmt.Sprintf(`SELECT %s FROM messages ORDER BY created_at DESC LIMIT ?`, messageHistoryRowSelectColumns(db)), limit)
 	if err != nil {
 		log.Println("Query error:", err)
 		return nil
@@ -232,7 +232,7 @@ func queryVisibleMessagesForUser(db *sql.DB, lowerUsername string, limit int) []
 	if limit <= 0 {
 		limit = HandshakeReplayLimit
 	}
-	rows, err := dbQuery(db, visibleMessagesForUserSQL(db), lowerUsername, lowerUsername, limit)
+	rows, err := dbQuery(dbRead(db), visibleMessagesForUserSQL(db), lowerUsername, lowerUsername, limit)
 	if err != nil {
 		log.Printf("Query error in queryVisibleMessagesForUser for %s: %v", lowerUsername, err)
 		return nil
@@ -468,7 +468,7 @@ func SearchMessages(db *sql.DB, query string, limit int) []shared.Message {
 	if limit <= 0 {
 		limit = 20
 	}
-	rows, err := dbQuery(db, searchMessagesSQL(db),
+	rows, err := dbQuery(dbRead(db), searchMessagesSQL(db),
 		"%"+query+"%", limit)
 	if err != nil {
 		log.Println("Search query error:", err)
@@ -503,7 +503,7 @@ func TogglePinMessage(db *sql.DB, messageID int64) (bool, error) {
 }
 
 func GetPinnedMessages(db *sql.DB) []shared.Message {
-	rows, err := dbQuery(db, pinnedMessagesSQL(db))
+	rows, err := dbQuery(dbRead(db), pinnedMessagesSQL(db))
 	if err != nil {
 		log.Println("Pinned messages query error:", err)
 		return nil
@@ -579,24 +579,25 @@ func sqliteQuoteLiteral(s string) string {
 // GetDatabaseStats returns statistics about the database
 func GetDatabaseStats(db *sql.DB) (string, error) {
 	var stats strings.Builder
+	read := dbRead(db)
 
 	// Count messages
 	var messageCount int
-	err := dbQueryRow(db, "SELECT COUNT(*) FROM messages").Scan(&messageCount)
+	err := dbQueryRow(read, "SELECT COUNT(*) FROM messages").Scan(&messageCount)
 	if err != nil {
 		return "", fmt.Errorf("failed to count messages: %v", err)
 	}
 
 	// Count unique users
 	var userCount int
-	err = dbQueryRow(db, "SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
+	err = dbQueryRow(read, "SELECT COUNT(DISTINCT sender) FROM messages WHERE sender != 'System'").Scan(&userCount)
 	if err != nil {
 		return "", fmt.Errorf("failed to count users: %v", err)
 	}
 
 	// Get oldest and newest message dates
 	var oldestDate, newestDate sql.NullString
-	err = dbQueryRow(db, "SELECT MIN(created_at), MAX(created_at) FROM messages").Scan(&oldestDate, &newestDate)
+	err = dbQueryRow(read, "SELECT MIN(created_at), MAX(created_at) FROM messages").Scan(&oldestDate, &newestDate)
 	if err != nil {
 		return "", fmt.Errorf("failed to get date range: %v", err)
 	}

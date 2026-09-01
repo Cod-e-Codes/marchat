@@ -23,7 +23,7 @@ func TestIntegrationMessageFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -74,7 +74,7 @@ func TestIntegrationUserBanFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -139,7 +139,7 @@ func TestIntegrationDatabaseStats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -185,7 +185,7 @@ func TestIntegrationEncryptedMessageFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -227,7 +227,7 @@ func TestIntegrationMessageCap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
@@ -267,7 +267,7 @@ func TestIntegrationWebSocketHandshakeReplayOnReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 	CreateSchema(db)
 
 	now := time.Now()
@@ -349,7 +349,7 @@ func TestIntegrationConcurrentOperations(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Failed to open test database: %v", err)
 	}
-	defer db.Close()
+	defer CloseDB(db)
 
 	// Create schema
 	CreateSchema(db)
