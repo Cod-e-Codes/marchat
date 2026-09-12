@@ -7,22 +7,22 @@ class Marchat < Formula
   on_macos do
     on_arm do
       url "https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.7/marchat-v1.3.7-darwin-arm64.zip"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "7938d4a805a5f0bfedd09b5a4c5d1bca574ea8d467e9de0583676e8efd01567d"
     end
     on_intel do
       url "https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.7/marchat-v1.3.7-darwin-amd64.zip"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "677bf5f369024ad1b9aaf186907a71a0061eb29b599ffd4394d0318b6247e1fd"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.7/marchat-v1.3.7-linux-arm64.zip"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "702b1efce4ceaa9a7936b5c996a84ffbec7c8e3f75e8f53bdae12db84ccf495f"
     end
     on_intel do
       url "https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.7/marchat-v1.3.7-linux-amd64.zip"
-      sha256 "0000000000000000000000000000000000000000000000000000000000000000"
+      sha256 "2fed25891ed37904b9917875e1a2405ef0f617e79573421d0300a089566f5faa"
     end
   end
 
