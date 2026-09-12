@@ -24,7 +24,7 @@ This repo (`go.mod`, `ARCHITECTURE.md`, `PROTOCOL.md`, `.cursor/`) overrides gen
 
 ## Implementation rules
 
-- Go 1.25+ idioms; toolchain patch in `go.mod` is authoritative for CI and Docker.
+- Go 1.26+ idioms; toolchain patch in `go.mod` is authoritative for CI and Docker.
 - Never hand-edit `go.mod` versions; use `go get -u package` or `go get package@latest`, then `go mod tidy`.
 - Parameterized SQL only; dialect differences go through `server/db_dialect.go`.
 - Chat E2E is a global ChaCha20-Poly1305 symmetric key, not per-user X25519 exchange.

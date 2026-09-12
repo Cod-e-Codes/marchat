@@ -43,7 +43,7 @@ Project skills live in `.cursor/skills/` (index: `.cursor/skills/README.md`). Cu
 Prefer this repo (`go.mod`, `ARCHITECTURE.md`, `PROTOCOL.md`, skills) as source of truth. For Cursor Agent Skills layout, GitHub Actions, or dependency APIs not covered here, web search or fetch official docs before changing config.
 
 ## Project Context
-- Language: Go 1.25+ with modern idioms (see `go.mod` for toolchain patch; CI/Docker/docs stay aligned)
+- Language: Go 1.26+ with modern idioms (see `go.mod` for toolchain patch; CI/Docker/docs stay aligned)
 - Architecture: Client-server with WebSocket (JSON) communication
 - Key components: Client TUI (Bubble Tea / Lipgloss), server hub + WebSocket handlers, shared types, plugin subprocess host, optional web admin (TUI + HTTP), health endpoints
 - Database: Pluggable SQL at runtime via `MARCHAT_DB_PATH` - SQLite (default), PostgreSQL, or MySQL; dialect-aware schema and queries in `server/db_dialect.go` and `server/db.go`. Durable tables include reactions and read receipts (not only message rows). Use `mysql:` / `mysql://` DSN forms so driver detection matches Postgres-style URLs (see CI smoke tests and docs).

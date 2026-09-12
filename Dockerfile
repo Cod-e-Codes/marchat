@@ -1,5 +1,5 @@
 # === Build Stage ===
-FROM golang:1.25.13-alpine AS builder
+FROM golang:1.26.8-alpine AS builder
 
 # Build arguments for version information
 ARG GIT_COMMIT

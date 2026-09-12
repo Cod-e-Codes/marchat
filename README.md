@@ -7,7 +7,7 @@
 [![Go Version](https://img.shields.io/github/go-mod/go-version/Cod-e-Codes/marchat?logo=go)](https://go.dev/dl/)
 [![GitHub all releases](https://img.shields.io/github/downloads/Cod-e-Codes/marchat/total?logo=github)](https://github.com/Cod-e-Codes/marchat/releases)
 [![Docker Pulls](https://img.shields.io/docker/pulls/codecodesxyz/marchat?logo=docker)](https://hub.docker.com/r/codecodesxyz/marchat)
-[![Version](https://img.shields.io/badge/version-v1.3.6-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.6)
+[![Version](https://img.shields.io/badge/version-v1.3.7-blue)](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.7)
 
 A lightweight terminal chat with real-time messaging over WebSockets, optional E2E encryption, and a flexible plugin ecosystem. Built for developers who prefer the command line.
 
@@ -42,7 +42,7 @@ Both clients follow the same wire format documented in [PROTOCOL.md](PROTOCOL.md
 
 ## Release notes
 
-**Latest tagged release:** [v1.3.6](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.6) (2026-09-01). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
+**Latest tagged release:** [v1.3.7](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.7) (2026-09-12). Narrative history: [CHANGELOG.md](CHANGELOG.md). Assets and tags: [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
 **`main` branch:** may include changes not yet in that tag (for example items under **Unreleased** in [CHANGELOG.md](CHANGELOG.md)). Feature descriptions elsewhere in this README match the tree you build from source; compare your binary’s `-doctor` / `-version` output to the release page when in doubt.
 
@@ -158,12 +158,12 @@ Tables created by the server (dialect-aware DDL for SQLite, PostgreSQL, and MySQ
 **Binary Installation:**
 ```bash
 # Linux (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.6/marchat-v1.3.6-linux-amd64.zip
-unzip marchat-v1.3.6-linux-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.7/marchat-v1.3.7-linux-amd64.zip
+unzip marchat-v1.3.7-linux-amd64.zip && chmod +x marchat-*
 
 # macOS (amd64)
-wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.6/marchat-v1.3.6-darwin-amd64.zip
-unzip marchat-v1.3.6-darwin-amd64.zip && chmod +x marchat-*
+wget https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.7/marchat-v1.3.7-darwin-amd64.zip
+unzip marchat-v1.3.7-darwin-amd64.zip && chmod +x marchat-*
 
 # Windows - PowerShell
 iwr -useb https://raw.githubusercontent.com/Cod-e-Codes/marchat/main/install.ps1 | iex
@@ -189,11 +189,11 @@ See [PACKAGING.md](PACKAGING.md) and `packaging/` for Homebrew, Scoop, winget, C
 
 **Docker:**
 ```bash
-docker pull codecodesxyz/marchat:v1.3.6
+docker pull codecodesxyz/marchat:v1.3.7
 docker run -d -p 8080:8080 \
   -e MARCHAT_ADMIN_KEY=$(openssl rand -hex 32) \
   -e MARCHAT_USERS=admin1,admin2 \
-  codecodesxyz/marchat:v1.3.6
+  codecodesxyz/marchat:v1.3.7
 ```
 
 **Docker Compose (local development):**
@@ -224,7 +224,7 @@ go build -o marchat-client ./client
 ```
 
 **Prerequisites for source build:**
-- Go 1.25.13 or later ([download](https://go.dev/dl/))
+- Go 1.26.8 or later ([download](https://go.dev/dl/))
 - Linux clipboard support: `sudo apt install xclip` (Ubuntu/Debian) or `sudo yum install xclip` (RHEL/CentOS)
 
 **Terminal colors:** The server startup banner and the client’s pre-chat output (connection, E2E status, profile picker tags such as `[Admin]` / `[E2E]`, and auth prompts) use [Lip Gloss v2](https://github.com/charmbracelet/lipgloss) (`charm.land/lipgloss/v2`) for emphasis. Set **`NO_COLOR=1`** (or **`NO_COLOR`**) in the environment to disable colors on plain stdout/stderr.

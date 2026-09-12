@@ -6,8 +6,15 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+## v1.3.7
+
+**Released 2026-09-12.** Since **[v1.3.6](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.6)**; compare [`v1.3.6...v1.3.7`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.6...v1.3.7). Commits: **`git log v1.3.6..v1.3.7 --oneline`**.
+
 - **Docs**: Pointer to [marchat-bot](https://github.com/Cod-e-Codes/marchat-bot) (standalone Go WebSocket bot SDK; not a plugin) in **README**, **PROTOCOL**, **docs/README**, **CLIENT_HOOKS**, and **PLUGIN_ECOSYSTEM**.
 - **Packaging**: Drop versioned `scripts/post-release-v*.ps1` helpers; pattern is gitignored. Chocolatey remains `choco pack` in `packaging/chocolatey/` (**PACKAGING.md**).
+- **Dependencies**: **golang.org/x/crypto** v0.57.0; **golang.org/x/term** v0.46.0 (transitive **golang.org/x/sync** v0.23.0, **golang.org/x/sys** v0.48.0, **golang.org/x/text** v0.42.0, **golang.org/x/mod** v0.41.0, **golang.org/x/tools** v0.49.0); **modernc.org/sqlite** v1.58.0 (transitive **modernc.org/libc** v1.75.6, **modernc.org/mathutil** v1.7.1, **modernc.org/memory** v1.12.1); **github.com/jackc/pgx/v5** v5.11.0; **github.com/go-sql-driver/mysql** v1.10.1; **github.com/mattn/go-runewidth** v0.0.29.
+- **Toolchain**: Go **1.26.8** in **go.mod**, nested plugin modules (**plugin/sdk**, **plugin/examples/echo**), CI (**.github/workflows/go.yml**, **.github/workflows/release.yml**), and **Dockerfile**; minimum required by **golang.org/x/crypto** v0.57.0 is **1.26.0** (module `go` directive).
+- **Packaging**: Version strings and URLs for **v1.3.7** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.7** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.3.6
 

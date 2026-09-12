@@ -6,9 +6,9 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to build (e.g., v1.3.6)'
+        description: 'Version to build (e.g., v1.3.7)'
         required: true
-        default: 'v1.3.6'
+        default: 'v1.3.7'
 
 permissions:
   contents: read
@@ -71,7 +71,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@7a3fe6cf4cb3a834922a1244abfce67bcef6a0c5 # v6.2.0
         with:
-          go-version: '1.25.13'
+          go-version: '1.26.8'
 
       - name: Get build metadata
         id: metadata
