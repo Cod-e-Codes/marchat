@@ -17,7 +17,7 @@ require (
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/joho/godotenv v1.5.1
 	github.com/lucasb-eyer/go-colorful v1.4.1
-	github.com/mattn/go-runewidth v0.0.29
+	github.com/mattn/go-runewidth v0.0.30
 	golang.org/x/crypto v0.57.0
 	golang.org/x/term v0.46.0
 	modernc.org/sqlite v1.58.0
