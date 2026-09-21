@@ -8,6 +8,7 @@ On **`main`** only; not part of the latest tagged release until you tag and publ
 
 - **Server**: Cap chat `content` at 32 KiB by default (`MARCHAT_MAX_MESSAGE_BYTES`, or `MARCHAT_MAX_MESSAGE_MB`). Oversized `text`, `dm`, `edit`, `search`, and command bodies get a System reply and stay connected; nothing is persisted or broadcast. Encrypted ciphertext uses the same byte cap. Plugin chat and command replies over the cap are dropped before broadcast. File uploads keep their own limit. Admin TUI, web admin, and `-doctor` show the message cap.
 - **Client**: Reject oversized composer, DM, code snippet, edit, and search bodies before send, including E2E wire `content` after encryption. WebSocket close **1009** is reported as a message-too-big error.
+- **Dependencies**: **modernc.org/sqlite** v1.59.0 (transitive **modernc.org/libc** v1.75.7; **modernc.org/mathutil** v1.7.1 and **modernc.org/memory** v1.12.1 unchanged); **github.com/mattn/go-runewidth** v0.0.30.
 
 ## v1.3.7
 
