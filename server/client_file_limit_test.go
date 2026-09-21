@@ -122,7 +122,7 @@ func setupFileLimitHub(t *testing.T, maxFileBytes int64) (string, func()) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, maxFileBytes, dbPath)
+	handler := ServeWs(hub, db, nil, "admin-key", false, maxFileBytes, 0, dbPath)
 	srv := httptest.NewServer(handler)
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
 

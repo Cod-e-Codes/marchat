@@ -26,6 +26,7 @@ App entry: `cmd/server/main.go`. Library: `server/` (hub, client, handlers, db, 
 - Inbound WebSocket messages: `readPump` rate-limits then `dispatchInbound` / typed handlers in `client_dispatch.go`.
 - Outbound client messages are channel-stamped from hub membership (`stampClientChannel`); client-supplied `channel` values are ignored for routing.
 - All outbound/persist paths stamp `sender` from the authenticated session (`stampSenderTimedOutbound`); NUL bytes in persistable `content` are rejected before insert; empty or whitespace-only plaintext on `text` / `dm` / `edit` is rejected when `encrypted` is false (encrypted opaque ciphertext is never treated as empty).
+- Chat `content` cap: `MARCHAT_MAX_MESSAGE_BYTES` / `MARCHAT_MAX_MESSAGE_MB` (default 32 KiB) checked in `dispatchInbound` for non-file types (System reply, connection stays open, no persist/broadcast). `SetReadLimit` stays the file DoS ceiling. Plugin chat and command replies over the cap are dropped in `Hub.Run` before broadcast (`SetMaxMessageBytes` before `Run`).
 - Reserved usernames during handshake (no double-book before registration).
 - Serialized writes per connection (`client.go`).
 - File uploads: `SetReadLimit` uses `websocketReadLimit` (max of policy `fileMessageReadLimit` wire size and a **32 MiB** DoS ceiling) so modest oversize is fully read; declared/payload checks send a System reply and `continue`. `ErrReadLimit` (above the ceiling) logs rejection only - gorilla already sent empty close **1009**, so a System enqueue cannot flush.

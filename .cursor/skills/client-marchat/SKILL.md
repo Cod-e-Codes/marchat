@@ -18,6 +18,7 @@ Bubble Tea + Lipgloss TUI on **Charm v2** (`charm.land/bubbletea/v2`, `bubbles/v
 - **Reconnect**: exponential backoff (capped at 30s); delay resets only after successful connect (`wsConnected`), not each `Init()` retry; no reconnect on fatal username/handshake errors (`websocket.go`, `main.go`).
 - **Commands**: `:q` quits; `Esc` closes menus; help in `commands.go` (shortcuts vs text commands). Transient command results belong in the **banner** when short; longer lists (e.g. `:themes`) may use transcript System lines.
 - **E2E**: same wire path for channel text and DMs when encryption on; files via keystore `EncryptRaw` / `DecryptRaw`. Do not log plaintext on send/decrypt paths.
+- **Message size**: composer, `:dm`, code snippets, `:edit`, and `:search` reject `content` above `MARCHAT_MAX_MESSAGE_BYTES` / `MARCHAT_MAX_MESSAGE_MB` (default 32 KiB) before send. E2E checks plaintext, then the base64 wire string. Oversized input stays in the composer (snippets stay open). Close **1009** is a generic message-too-big error. `:export` is local and is not capped.
 - **Config**: `MARCHAT_CONFIG_DIR` / `ResolveClientConfigDir()`; keystore path resolution and migration in `client/config/config.go`.
 - **Chrome**: terminal-native labels; no decorative lock emoji in UI chrome (user content may include emoji).
 - **Metadata**: Alt+M or `:msginfo` toggles message id and encrypted flag per line (`render.go`).

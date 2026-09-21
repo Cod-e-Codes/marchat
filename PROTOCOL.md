@@ -74,7 +74,7 @@ Optional fields (`recipient`, `reaction`, etc.) are omitted from JSON when unset
 #### Fields
 
 - `sender` (string): Username of the sender.
-- `content` (string): Message text. Empty if type is `file`. For `search`, carries the query string. For unencrypted `text`, `dm`, and `edit`, the server rejects empty or whitespace-only `content` with a private System `text` reply (connection stays open; nothing is persisted or broadcast). When `encrypted` is `true`, `content` is opaque ciphertext and is not checked for emptiness.
+- `content` (string): Message text. Empty if type is `file`. For `search`, carries the query string. For unencrypted `text`, `dm`, and `edit`, the server rejects empty or whitespace-only `content` with a private System `text` reply (connection stays open; nothing is persisted or broadcast). When `encrypted` is `true`, `content` is opaque ciphertext and is not checked for emptiness. `content` longer than the message cap (default 32 KiB; `MARCHAT_MAX_MESSAGE_BYTES` / `MARCHAT_MAX_MESSAGE_MB`) is rejected the same way for non-file types, including encrypted ciphertext.
 - `created_at` (string): RFC3339 timestamp.
 - `type` (string): Core types include `"text"`, `"file"`, and `"admin_command"`. See [Extended Message Types](#extended-message-types) for additional values.
 - `file` (object, optional): Present only when `type` is `"file"`.
@@ -95,12 +95,19 @@ Optional fields (`recipient`, `reaction`, etc.) are omitted from JSON when unset
 }
 ```
 
-Maximum file size is configurable (default 1MB). Oversized files (declared `size` or actual payload above the limit) are rejected with a System message and the connection stays open when the WebSocket message fits under the server's absolute read ceiling (**32 MiB**, or the policy wire size of the configured max file if larger). That ceiling is intentionally above the policy max-file wire size so typical oversize uploads are fully readable and get the System reply instead of an empty close. Wire payloads above the absolute read ceiling close the connection with close code **1009** (message too big); the marchat client maps **1009** to a file-size error. Configure via environment variables on the server:
+Maximum file size is configurable (default 1MB). Oversized files (declared `size` or actual payload above the limit) are rejected with a System message and the connection stays open when the WebSocket message fits under the server's absolute read ceiling (**32 MiB**, or the policy wire size of the configured max file if larger). That ceiling is intentionally above the policy max-file wire size so typical oversize uploads are fully readable and get the System reply instead of an empty close. Wire payloads above the absolute read ceiling close the connection with close code **1009** (message too big); the marchat client maps **1009** to a message-too-big error. Configure via environment variables on the server:
 
 - `MARCHAT_MAX_FILE_BYTES`: exact byte limit (takes precedence)
 - `MARCHAT_MAX_FILE_MB`: size in megabytes
 
 If neither is set, the default is 1MB.
+
+Maximum chat `content` size is configurable (default **32 KiB**, 32768 bytes). The limit is the UTF-8 byte length of the wire `content` string (`len(content)`), including E2E ciphertext: when `encrypted` is true the server cannot decrypt, so it caps the opaque base64 string the same way. A body whose length equals the cap is allowed. Oversized `content` on `text`, `dm`, `edit`, `search`, and `:` / `admin_command` is rejected with a private System `text` reply (`Message not sent: exceeds maximum size limit`) and the connection stays open. Nothing is persisted or broadcast. File payloads stay on the file cap above; `type` `file` is not subject to the content cap. Frames above the WebSocket read ceiling still close with **1009**. Configure via environment variables on the server (the reference client reads the same variables to fail before send):
+
+- `MARCHAT_MAX_MESSAGE_BYTES`: exact byte limit (takes precedence)
+- `MARCHAT_MAX_MESSAGE_MB`: size in megabytes
+
+If neither is set, the default is 32 KiB. Near the cap, E2E plaintext that fits can still fail after encryption because base64 ciphertext is larger than the plaintext.
 
 #### Reaction object
 
@@ -176,6 +183,7 @@ The server stores and relays opaque `content` (and encrypted file blobs) without
 - On message send:
   - Persists eligible messages to the configured SQL backend selected by `MARCHAT_DB_PATH` (SQLite path, PostgreSQL DSN, or MySQL DSN).
   - Rejects unencrypted `text` / `dm` / `edit` with empty or whitespace-only `content` (System reply to sender; no persist or broadcast). Encrypted payloads are not emptiness-checked.
+  - Rejects `content` longer than the configured message cap (default 32 KiB; see [File object](#file-object) for the file cap, which is separate). System reply to the sender; no persist or broadcast; connection stays open. Applies to non-file inbound types, including encrypted opaque `content`. Plugin-originated chat and command replies over the same cap are dropped and not broadcast.
   - Delivers to all connected clients **or** only to members of a channel when `channel` is non-empty and `sender` is not `System` (see [Channels](#channels)). Direct messages use a separate path (sender and recipient only).
 - Reactions, read receipts, and last channel per user may be persisted server-side and replayed to reconnecting clients.
 - DM unread counters and DM thread hide/archive state are client-side UI state in the reference TUI, not server protocol fields. The reference client stores this local state under its client config directory. Opening a DM thread marks that thread read immediately in the reference client.

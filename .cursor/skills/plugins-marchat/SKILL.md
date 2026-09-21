@@ -42,6 +42,7 @@ JSON IPC over stdin/stdout. Packages: `plugin/sdk`, `plugin/host`, `plugin/manag
 
 - `server/plugin_commands.go` dispatches to manager.
 - Hub stays off plugin IPC for core routing; plugin messages use bounded fan-out.
+- Plugin `"message"` and `"command_response"` bodies are broadcast only when `content` is within the chat cap (`pluginContentWithinLimit` in `Hub.Run`). Oversized plugin chat is logged and dropped. User chat over the cap never reaches plugins because `dispatchInbound` rejects it first.
 
 ## Testing
 

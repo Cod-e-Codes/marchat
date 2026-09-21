@@ -41,7 +41,7 @@ func TestIntegrationEmptyTextRejectedNoBroadcast(t *testing.T) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, dbPath)
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, 0, dbPath)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -110,7 +110,7 @@ func TestIntegrationEmptyDMRejected(t *testing.T) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, dbPath)
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, 0, dbPath)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -178,7 +178,7 @@ func TestIntegrationEmptyEditRejected(t *testing.T) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, dbPath)
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, 0, dbPath)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -250,7 +250,7 @@ func TestIntegrationEncryptedOpaqueTextAccepted(t *testing.T) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, dbPath)
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, 0, dbPath)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 
@@ -317,7 +317,7 @@ func TestIntegrationCommandPathStillWorksWithEmptyCheck(t *testing.T) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, dbPath)
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, 0, dbPath)
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 

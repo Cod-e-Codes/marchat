@@ -29,6 +29,7 @@ For Cursor, dependencies, or platform behavior not defined in this repo, verify 
 
 Update domain skills when shipped behavior changes. Recent fixes on `main` (or in flight):
 
+- Chat `content` cap: `MARCHAT_MAX_MESSAGE_BYTES` / `MARCHAT_MAX_MESSAGE_MB` (default 32 KiB) on non-file inbound bodies and plugin chat/command replies; file cap and WebSocket read ceiling stay separate
 - SQLite `InitDB`: DSN per-connection pragmas (`busy_timeout`, WAL) + writer `MaxOpenConns(1)` / `MaxIdleConns(1)` and file-backed reader pool (`MaxOpenConns(4)`, `_query_only`); do not one-shot `PRAGMA` with the default pool ([#118](https://github.com/Cod-e-Codes/marchat/issues/118), [#126](https://github.com/Cod-e-Codes/marchat/issues/126))
 - Kick/ban self-target rejection and online-only kick (`ErrKickNotConnected` for offline targets; `BanUser` offline-capable)
 - Client transcript notices: negative `message_id` classified by content; scoped to active channel

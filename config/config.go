@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/Cod-e-Codes/marchat/shared"
 	"github.com/joho/godotenv"
 )
 
@@ -43,6 +44,9 @@ type Config struct {
 
 	// File transfer settings
 	MaxFileBytes int64 `json:"max_file_bytes"`
+
+	// Chat content cap (UTF-8 bytes of wire content). Zero is treated as the default.
+	MaxMessageBytes int64 `json:"max_message_bytes"`
 
 	// E2E encryption settings
 	GlobalE2EKey string `json:"global_e2e_key"`
@@ -180,24 +184,19 @@ func (c *Config) loadFromEnv() error {
 		c.PluginRegistryURL = "https://raw.githubusercontent.com/Cod-e-Codes/marchat-plugins/main/registry.json"
 	}
 
-	// Max file size configuration (bytes or MB)
-	// Priority: MARCHAT_MAX_FILE_BYTES > MARCHAT_MAX_FILE_MB > default 1MB
-	const oneMB int64 = 1024 * 1024
-	if bytesStr := os.Getenv("MARCHAT_MAX_FILE_BYTES"); bytesStr != "" {
-		val, err := strconv.ParseInt(bytesStr, 10, 64)
-		if err != nil || val <= 0 {
-			return fmt.Errorf("invalid MARCHAT_MAX_FILE_BYTES: %s", bytesStr)
-		}
-		c.MaxFileBytes = val
-	} else if mbStr := os.Getenv("MARCHAT_MAX_FILE_MB"); mbStr != "" {
-		val, err := strconv.ParseInt(mbStr, 10, 64)
-		if err != nil || val <= 0 {
-			return fmt.Errorf("invalid MARCHAT_MAX_FILE_MB: %s", mbStr)
-		}
-		c.MaxFileBytes = val * oneMB
-	} else {
-		c.MaxFileBytes = oneMB
+	// Max file size: MARCHAT_MAX_FILE_BYTES > MARCHAT_MAX_FILE_MB > default 1MB
+	maxFile, err := shared.ParseMaxBytesEnv(shared.EnvMaxFileBytes, shared.EnvMaxFileMB, shared.DefaultMaxFileBytes)
+	if err != nil {
+		return err
 	}
+	c.MaxFileBytes = maxFile
+
+	// Max chat content: MARCHAT_MAX_MESSAGE_BYTES > MARCHAT_MAX_MESSAGE_MB > default 32 KiB
+	maxMessage, err := shared.ParseMaxBytesEnv(shared.EnvMaxMessageBytes, shared.EnvMaxMessageMB, shared.DefaultMaxMessageBytes)
+	if err != nil {
+		return err
+	}
+	c.MaxMessageBytes = maxMessage
 
 	// Global E2E key configuration
 	if globalE2EKey := os.Getenv("MARCHAT_GLOBAL_E2E_KEY"); globalE2EKey != "" {

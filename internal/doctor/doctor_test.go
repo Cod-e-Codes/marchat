@@ -170,6 +170,22 @@ func TestRunServerDoctor_environmentReflectsDotenv(t *testing.T) {
 }
 
 // Not parallel: buildEnvLines reads osEnviron; must not run while another test's mock is installed.
+func TestBuildEnvLines_includesMessageLimit(t *testing.T) {
+	for _, role := range []string{"client", "server"} {
+		found := false
+		for _, e := range buildEnvLines(role) {
+			if e.Key == "MARCHAT_MAX_MESSAGE_BYTES" {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("%s doctor env should list MARCHAT_MAX_MESSAGE_BYTES", role)
+		}
+	}
+}
+
+// Not parallel: buildEnvLines reads osEnviron; must not run while another test's mock is installed.
 func TestBuildEnvLines_clientIncludesHookVars(t *testing.T) {
 	found := false
 	for _, e := range buildEnvLines("client") {

@@ -19,6 +19,7 @@ Normative spec: `PROTOCOL.md`. Types and crypto: `shared/types.go`, `shared/cryp
 - WebSocket `/ws`; JSON messages.
 - Handshake is first message after connect (`username`, optional `admin` / `admin_key`).
 - Message types: text, system, typing, reactions, edits, deletes, pins, DMs (with `recipient`), channels, read receipts, files.
+- Chat `content` byte cap (default 32 KiB, `MARCHAT_MAX_MESSAGE_BYTES` / `MARCHAT_MAX_MESSAGE_MB`) is separate from the file cap. Non-file inbound `content`, including E2E ciphertext, over the cap gets a System reply and is not persisted. File payloads use the file limit. WebSocket `SetReadLimit` stays the file DoS ceiling.
 
 ## E2E (chat)
 

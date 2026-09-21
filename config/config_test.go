@@ -380,6 +380,58 @@ func TestConfigDirUpdatedFromDotEnv(t *testing.T) {
 	}
 }
 
+func TestLoadConfigMessageSizeLimit(t *testing.T) {
+	os.Setenv("MARCHAT_PORT", "8080")
+	os.Setenv("MARCHAT_ADMIN_KEY", "test-key")
+	os.Setenv("MARCHAT_USERS", "user1")
+	defer func() {
+		os.Unsetenv("MARCHAT_PORT")
+		os.Unsetenv("MARCHAT_ADMIN_KEY")
+		os.Unsetenv("MARCHAT_USERS")
+		os.Unsetenv("MARCHAT_MAX_MESSAGE_BYTES")
+		os.Unsetenv("MARCHAT_MAX_MESSAGE_MB")
+		os.Unsetenv("MARCHAT_MAX_FILE_BYTES")
+		os.Unsetenv("MARCHAT_MAX_FILE_MB")
+	}()
+
+	t.Run("default", func(t *testing.T) {
+		os.Unsetenv("MARCHAT_MAX_MESSAGE_BYTES")
+		os.Unsetenv("MARCHAT_MAX_MESSAGE_MB")
+		os.Unsetenv("MARCHAT_MAX_FILE_BYTES")
+		os.Unsetenv("MARCHAT_MAX_FILE_MB")
+		cfg, err := LoadConfig(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.MaxMessageBytes != 32*1024 {
+			t.Fatalf("MaxMessageBytes = %d, want 32768", cfg.MaxMessageBytes)
+		}
+		if cfg.MaxFileBytes != 1024*1024 {
+			t.Fatalf("MaxFileBytes = %d, want 1MB", cfg.MaxFileBytes)
+		}
+	})
+
+	t.Run("bytes win over mb", func(t *testing.T) {
+		os.Setenv("MARCHAT_MAX_MESSAGE_BYTES", "100")
+		os.Setenv("MARCHAT_MAX_MESSAGE_MB", "2")
+		cfg, err := LoadConfig(t.TempDir())
+		if err != nil {
+			t.Fatal(err)
+		}
+		if cfg.MaxMessageBytes != 100 {
+			t.Fatalf("MaxMessageBytes = %d, want 100", cfg.MaxMessageBytes)
+		}
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		os.Setenv("MARCHAT_MAX_MESSAGE_BYTES", "0")
+		os.Unsetenv("MARCHAT_MAX_MESSAGE_MB")
+		if _, err := LoadConfig(t.TempDir()); err == nil {
+			t.Fatal("expected error for non-positive MARCHAT_MAX_MESSAGE_BYTES")
+		}
+	})
+}
+
 // TestSessionSecretGeneratedRandomly checks that SessionSecret is a 64 char long generated hex when not provided
 func TestSessionSecretGeneratedRandomly(t *testing.T) {
 	os.Setenv("MARCHAT_PORT", "8080")

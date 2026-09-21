@@ -14,6 +14,7 @@ import (
 
 	"github.com/Cod-e-Codes/marchat/config"
 	"github.com/Cod-e-Codes/marchat/plugin/manager"
+	"github.com/Cod-e-Codes/marchat/shared"
 
 	"charm.land/bubbles/v2/help"
 	"charm.land/bubbles/v2/key"
@@ -1236,6 +1237,7 @@ func (ap *AdminPanel) renderOverview() string {
 	doc.WriteString(fmt.Sprintf("TLS: %s\n", tlsStatus))
 
 	doc.WriteString(fmt.Sprintf("Max File Size: %.1f MB\n", float64(ap.config.MaxFileBytes)/1024/1024))
+	doc.WriteString(fmt.Sprintf("Max Message Size: %s\n", shared.FormatMessageLimit(ap.config.MaxMessageBytes)))
 	doc.WriteString(fmt.Sprintf("Log Level: %s\n", ap.config.LogLevel))
 	doc.WriteString(fmt.Sprintf("Ban History Gaps: %t\n", ap.config.BanGapsHistory))
 	doc.WriteString(fmt.Sprintf("Admin Users: %d\n", len(ap.config.Admins)))
@@ -1318,6 +1320,7 @@ func (ap *AdminPanel) renderSystem() string {
 	doc.WriteString(fmt.Sprintf("  Config Directory: %s\n", ap.config.ConfigDir))
 	doc.WriteString(fmt.Sprintf("  Log Level: %s\n", ap.config.LogLevel))
 	doc.WriteString(fmt.Sprintf("  Max File Size: %.1f MB\n", float64(ap.config.MaxFileBytes)/1024/1024))
+	doc.WriteString(fmt.Sprintf("  Max Message Size: %s\n", shared.FormatMessageLimit(ap.config.MaxMessageBytes)))
 	doc.WriteString(fmt.Sprintf("  Admin Users: %s\n", strings.Join(ap.config.Admins, ", ")))
 
 	// TLS Configuration with live detection

@@ -285,7 +285,7 @@ func TestIntegrationWebSocketHandshakeReplayOnReconnect(t *testing.T) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, filepath.Join(tdir, "test.db"))
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, 0, filepath.Join(tdir, "test.db"))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 

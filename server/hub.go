@@ -64,6 +64,21 @@ type Hub struct {
 
 	channels     map[string]map[*Client]bool
 	channelMutex sync.RWMutex
+
+	// maxMessageBytes is the chat content cap for plugin-originated bodies.
+	// Set before Run. Zero uses shared.DefaultMaxMessageBytes.
+	maxMessageBytes int64
+}
+
+// SetMaxMessageBytes sets the chat content cap used when plugin messages enter the hub.
+// Call it before Run. A non-positive value uses the default cap.
+func (h *Hub) SetMaxMessageBytes(n int64) {
+	h.maxMessageBytes = n
+}
+
+// pluginContentWithinLimit reports whether a plugin chat or command reply may be broadcast.
+func pluginContentWithinLimit(content string, maxBytes int64) bool {
+	return !shared.ContentExceedsLimit(content, maxBytes)
 }
 
 func NewHub(pluginDir, dataDir, registryURL string, db *sql.DB) (*Hub, error) {
@@ -496,7 +511,13 @@ func (h *Hub) Run() {
 	// Start plugin message handler goroutine
 	go func() {
 		for msg := range h.pluginManager.GetMessageChannel() {
-			h.broadcast <- ConvertPluginMessage(msg)
+			converted := ConvertPluginMessage(msg)
+			if !pluginContentWithinLimit(converted.Content, h.maxMessageBytes) {
+				limit := shared.EffectiveMaxMessageBytes(h.maxMessageBytes)
+				log.Printf("Dropped oversized plugin message from %s (%d bytes, max %d)", converted.Sender, len(converted.Content), limit)
+				continue
+			}
+			h.broadcast <- converted
 		}
 	}()
 

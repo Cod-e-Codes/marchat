@@ -665,7 +665,7 @@ type adminAuth struct {
 	adminKey string
 }
 
-func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsHistory bool, maxFileBytes int64, dbPath string) http.HandlerFunc {
+func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsHistory bool, maxFileBytes, maxMessageBytes int64, dbPath string) http.HandlerFunc {
 	auth := adminAuth{admins: make(map[string]struct{}), adminKey: adminKey}
 	for _, u := range adminList {
 		auth.admins[strings.ToLower(u)] = struct{}{}
@@ -802,6 +802,7 @@ func ServeWs(hub *Hub, db *sql.DB, adminList []string, adminKey string, banGapsH
 			ipAddr:               ipAddr,
 			pluginCommandHandler: hub.pluginCommandHandler,
 			maxFileBytes:         maxFileBytes,
+			maxMessageBytes:      maxMessageBytes,
 			dbPath:               dbPath,
 		}
 		log.Printf("Client %s connected (admin=%v, IP: %s)", username, isAdmin, ipAddr)

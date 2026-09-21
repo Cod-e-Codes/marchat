@@ -77,6 +77,7 @@ Some client behavior is only verifiable in a real terminal emulator with mouse r
 | `server/client_test.go` | Server client management | WebSocket client initialization, message handling, admin operations, unknown admin command system reply (`TestHandleCommandUnknownAdminSendsSystemReply`), channel stamping (`TestStampClientChannelOverwritesSpoofedChannel`), non-admin unknown vs admin-only command replies |
 | `server/client_sender_spoof_test.go` | Sender identity enforcement | Integration tests that wire `sender` is ignored on text/file paths (`stampSenderTimedOutbound`) |
 | `server/client_file_limit_test.go` | File size limits | `fileMessageReadLimit` / `websocketReadLimit` (32 MiB DoS ceiling); System reply before close for modest wire oversize; connection stays usable after reject |
+| `server/client_message_limit_test.go` | Chat content cap | Dispatch reject for text/DM/edit/search/command and encrypted opaque `content`; at-limit accept; plugin helper; integration System reply then a later send still works |
 | `server/client_nullbyte_test.go` | NUL content validation | `contentContainsNUL`, SQLite NUL insert baseline, integration reject-no-broadcast |
 | `server/message_validate_test.go` | Plaintext empty helper | `plaintextContentEmpty` table-driven cases (empty, whitespace, encrypted opaque) |
 | `server/client_empty_content_test.go` | Empty plaintext rejection | Integration reject for text/DM/edit; encrypted opaque accept; command path still works |

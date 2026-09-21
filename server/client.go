@@ -66,6 +66,16 @@ func fileTooLargeSystemMessage(maxBytes int64) shared.Message {
 	}
 }
 
+func messageTooLargeSystemMessage(maxBytes int64) shared.Message {
+	limit := shared.EffectiveMaxMessageBytes(maxBytes)
+	return shared.Message{
+		Sender:    "System",
+		Content:   fmt.Sprintf("Message not sent: exceeds maximum size limit (%d bytes)", limit),
+		CreatedAt: time.Now(),
+		Type:      shared.TextMessage,
+	}
+}
+
 type Client struct {
 	hub                  *Hub
 	conn                 *websocket.Conn
@@ -77,6 +87,7 @@ type Client struct {
 	ipAddr               string // Store IP address for logging and ban enforcement
 	pluginCommandHandler *PluginCommandHandler
 	maxFileBytes         int64
+	maxMessageBytes      int64
 	dbPath               string // Store database path for backup operations
 }
 

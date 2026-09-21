@@ -172,6 +172,10 @@ func main() {
 		fmt.Fprintf(os.Stderr, "    MARCHAT_CONFIG_DIR=/path/to/config (optional)\n")
 		fmt.Fprintf(os.Stderr, "    MARCHAT_BAN_HISTORY_GAPS=true (optional, default: false)\n")
 		fmt.Fprintf(os.Stderr, "    MARCHAT_PLUGIN_REGISTRY_URL=url (optional, default: GitHub registry)\n")
+		fmt.Fprintf(os.Stderr, "    MARCHAT_MAX_FILE_BYTES=1048576 (optional, default: 1MB; or MARCHAT_MAX_FILE_MB)\n")
+		fmt.Fprintf(os.Stderr, "    MARCHAT_MAX_FILE_MB=1 (optional alternative to MARCHAT_MAX_FILE_BYTES)\n")
+		fmt.Fprintf(os.Stderr, "    MARCHAT_MAX_MESSAGE_BYTES=32768 (optional, default: 32KiB; or MARCHAT_MAX_MESSAGE_MB)\n")
+		fmt.Fprintf(os.Stderr, "    MARCHAT_MAX_MESSAGE_MB=1 (optional alternative to MARCHAT_MAX_MESSAGE_BYTES)\n")
 		fmt.Fprintf(os.Stderr, "    MARCHAT_GLOBAL_E2E_KEY=base64-key (optional, for global E2E encryption)\n")
 		fmt.Fprintf(os.Stderr, "  .env file: Create %s/.env with the above variables\n", actualConfigDir)
 		fmt.Fprintf(os.Stderr, "  Config directory: Use --config-dir or MARCHAT_CONFIG_DIR to specify custom location\n")
@@ -312,6 +316,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create hub: %v", err)
 	}
+	hub.SetMaxMessageBytes(cfg.MaxMessageBytes)
 	go hub.Run()
 
 	// Log server startup
@@ -328,7 +333,7 @@ func main() {
 		adminPanelReady = true
 	}
 
-	http.HandleFunc("/ws", server.ServeWs(hub, db, admins, key, cfg.BanGapsHistory, cfg.MaxFileBytes, cfg.DBPath))
+	http.HandleFunc("/ws", server.ServeWs(hub, db, admins, key, cfg.BanGapsHistory, cfg.MaxFileBytes, cfg.MaxMessageBytes, cfg.DBPath))
 
 	// Web admin panel routes (optional)
 	if *enableWebPanel {

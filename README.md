@@ -244,6 +244,8 @@ go build -o marchat-client ./client
 | `MARCHAT_GLOBAL_E2E_KEY` | No | - | Base64 32-byte global E2E key (server and/or client). On the **client**, if set, it **overrides** the key from `keystore.dat` for that run only; the keystore file is **not** updated. See [E2E Encryption](#e2e-encryption). |
 | `MARCHAT_MAX_FILE_BYTES` | No | `1048576` | Max file size in bytes (1MB default) |
 | `MARCHAT_MAX_FILE_MB` | No | `1` | Max file size in MB (alternative to bytes) |
+| `MARCHAT_MAX_MESSAGE_BYTES` | No | `32768` | Max chat `content` in bytes (32 KiB default) |
+| `MARCHAT_MAX_MESSAGE_MB` | No | - | Max chat `content` in MB (alternative to bytes) |
 | `MARCHAT_ALLOWED_USERS` | No | - | Username allowlist (comma-separated) |
 | `MARCHAT_ALLOWED_ORIGINS` | No | - | Extra WebSocket `Origin` values (comma-separated URLs or hostnames) |
 | `MARCHAT_TRUSTED_PROXIES` | No | - | Reverse-proxy IPs/CIDRs; when set, `X-Forwarded-For` / `X-Real-IP` are honored for client IP and admin login rate limits |
@@ -275,6 +277,8 @@ Notes:
 **Doctor / diagnostics:** Set `MARCHAT_DOCTOR_NO_NETWORK` to `1` to skip the GitHub latest-release check in `-doctor` / `-doctor-json`.
 
 **File Size Configuration:** Use either `MARCHAT_MAX_FILE_BYTES` (exact bytes) or `MARCHAT_MAX_FILE_MB` (megabytes). If both are set, `MARCHAT_MAX_FILE_BYTES` takes priority.
+
+**Message Size Configuration:** Use either `MARCHAT_MAX_MESSAGE_BYTES` (exact UTF-8 bytes of wire `content`) or `MARCHAT_MAX_MESSAGE_MB` (megabytes). If both are set, `MARCHAT_MAX_MESSAGE_BYTES` takes priority. Default is 32 KiB. The server rejects oversized chat, DM, edit, search, and command bodies with a System reply and keeps the connection open. Encrypted `content` is capped as opaque ciphertext. The reference client applies the same env vars before send. See [PROTOCOL.md](PROTOCOL.md).
 
 **Interactive Setup:** Use `--interactive` flag for guided server configuration when environment variables are missing.
 

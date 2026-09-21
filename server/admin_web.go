@@ -23,6 +23,7 @@ import (
 
 	"github.com/Cod-e-Codes/marchat/config"
 	"github.com/Cod-e-Codes/marchat/plugin/manager"
+	"github.com/Cod-e-Codes/marchat/shared"
 )
 
 //go:embed admin_web.html
@@ -329,6 +330,7 @@ type webConfigInfo struct {
 	Port           int    `json:"port"`
 	TLSEnabled     bool   `json:"tls_enabled"`
 	MaxFileSize    string `json:"max_file_size"`
+	MaxMessageSize string `json:"max_message_size"`
 	LogLevel       string `json:"log_level"`
 	BanHistoryGaps bool   `json:"ban_history_gaps"`
 	AdminCount     int    `json:"admin_count"`
@@ -892,6 +894,7 @@ func (w *WebAdminServer) getOverviewData() webOverviewData {
 			Port:           w.cfg.Port,
 			TLSEnabled:     w.cfg.IsTLSEnabled(),
 			MaxFileSize:    fmt.Sprintf("%.1f MB", float64(w.cfg.MaxFileBytes)/1024/1024),
+			MaxMessageSize: shared.FormatMessageLimit(w.cfg.MaxMessageBytes),
 			LogLevel:       w.cfg.LogLevel,
 			BanHistoryGaps: w.cfg.BanGapsHistory,
 			AdminCount:     len(w.cfg.Admins),
@@ -1060,6 +1063,7 @@ func (w *WebAdminServer) getSystemData() map[string]interface{} {
 			"config_dir":       w.cfg.ConfigDir,
 			"log_level":        w.cfg.LogLevel,
 			"max_file_size":    fmt.Sprintf("%.1f MB", float64(w.cfg.MaxFileBytes)/1024/1024),
+			"max_message_size": shared.FormatMessageLimit(w.cfg.MaxMessageBytes),
 			"admin_users":      strings.Join(w.cfg.Admins, ", "),
 			"tls_enabled":      w.cfg.IsTLSEnabled(),
 			"tls_cert_file":    w.cfg.TLSCertFile,

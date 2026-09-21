@@ -119,9 +119,15 @@ func sendEncryptedChatMessage(ws *websocket.Conn, keystore *crypto.KeyStore, use
 	if keystore == nil {
 		return fmt.Errorf("keystore not initialized")
 	}
+	if contentExceedsMessageLimit(plaintext) {
+		return messageTooLargeError()
+	}
 	msg, err := buildEncryptedOutboundMessage(keystore, username, plaintext, msgType, recipient)
 	if err != nil {
 		return err
+	}
+	if contentExceedsMessageLimit(msg.Content) {
+		return messageTooLargeError()
 	}
 	return ws.WriteJSON(msg)
 }
@@ -129,6 +135,9 @@ func sendEncryptedChatMessage(ws *websocket.Conn, keystore *crypto.KeyStore, use
 func sendDirectMessage(ws *websocket.Conn, keystore *crypto.KeyStore, username, recipient, content string, useE2E bool) error {
 	if recipient == "" {
 		return fmt.Errorf("dm recipient is required")
+	}
+	if contentExceedsMessageLimit(content) {
+		return messageTooLargeError()
 	}
 	if useE2E {
 		if err := verifyKeystoreUnlocked(keystore); err != nil {
@@ -150,6 +159,9 @@ func sendSnippetOutbound(ws *websocket.Conn, keystore *crypto.KeyStore, username
 	recipient := strings.TrimSpace(dmRecipient)
 	if recipient != "" {
 		return sendDirectMessage(ws, keystore, username, recipient, content, useE2E)
+	}
+	if contentExceedsMessageLimit(content) {
+		return messageTooLargeError()
 	}
 	if useE2E {
 		recipients := channelRecipients
@@ -353,7 +365,7 @@ func (m *model) connectWebSocket(serverURL string) error {
 					return
 				}
 				if websocket.IsCloseError(readErr, websocket.CloseMessageTooBig) {
-					m.deliverWSMsg(wsErr{fmt.Errorf("file exceeds server size limit")})
+					m.deliverWSMsg(wsErr{fmt.Errorf("message exceeds server size limit")})
 					return
 				}
 				re := readErr.Error()

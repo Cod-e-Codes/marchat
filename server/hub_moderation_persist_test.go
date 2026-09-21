@@ -237,7 +237,7 @@ func assertHandshakeRejectedAsBanned(t *testing.T, hub *Hub, db interface {
 	sqlDB := hub.getDB()
 	go hub.Run()
 
-	handler := ServeWs(hub, sqlDB, nil, "admin-key", false, 10<<20, filepath.Join(tdir, "ws.db"))
+	handler := ServeWs(hub, sqlDB, nil, "admin-key", false, 10<<20, 0, filepath.Join(tdir, "ws.db"))
 	srv := httptest.NewServer(handler)
 	defer srv.Close()
 

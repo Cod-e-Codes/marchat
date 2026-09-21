@@ -27,7 +27,7 @@ func setupSpoofTestHub(t *testing.T) (*sql.DB, string, func()) {
 	hub := mustNewHub(t, tdir, tdir, "", db)
 	go hub.Run()
 
-	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, dbPath)
+	handler := ServeWs(hub, db, nil, "admin-key", false, 10<<20, 0, dbPath)
 	srv := httptest.NewServer(handler)
 	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
 

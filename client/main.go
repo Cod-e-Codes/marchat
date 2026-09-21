@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
@@ -964,6 +965,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if err := sendSnippetOutbound(m.conn, m.keystore, m.cfg.Username, recipient, v.content, m.useE2E, m.users); err != nil {
 				log.Printf("Failed to send code snippet: %v", err)
+				if errors.Is(err, errMessageTooLarge) {
+					m.banner = messageTooLargeBanner()
+					m.sending = false
+					return m, m.listenWebSocket()
+				}
 				m.banner = "[ERROR] Failed to send code snippet"
 			}
 		}
@@ -2047,6 +2053,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						m.appendClientSystem("Invalid message ID")
 					} else {
 						newContent := strings.Join(parts[2:], " ")
+						if contentExceedsMessageLimit(newContent) {
+							m.banner = messageTooLargeBanner()
+							return m, nil
+						}
 						editMsg := shared.Message{Type: shared.EditMessageType, MessageID: id, Sender: m.cfg.Username}
 						okToSend := true
 						if m.useE2E && m.keystore != nil && m.keystore.GetSessionKey("global") != nil {
@@ -2056,6 +2066,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							} else if wire, encErr := encryptGlobalTextWireContent(m.keystore, m.cfg.Username, newContent); encErr != nil {
 								m.appendClientSystem("[ERROR] Failed to encrypt edit: " + encErr.Error())
 								okToSend = false
+							} else if contentExceedsMessageLimit(wire) {
+								m.banner = messageTooLargeBanner()
+								return m, nil
 							} else {
 								editMsg.Content = wire
 								editMsg.Encrypted = true
@@ -2175,10 +2188,18 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				} else {
 					target := parts[1]
 					content := strings.Join(parts[2:], " ")
+					if contentExceedsMessageLimit(content) {
+						m.banner = messageTooLargeBanner()
+						return m, nil
+					}
 					if m.conn != nil {
 						dmMsg := shared.Message{Type: shared.DirectMessage, Sender: m.cfg.Username, Recipient: target, Content: content}
 						exthook.FireSend(dmMsg)
 						if err := sendDirectMessage(m.conn, m.keystore, m.cfg.Username, target, content, m.useE2E); err != nil {
+							if errors.Is(err, errMessageTooLarge) {
+								m.banner = messageTooLargeBanner()
+								return m, nil
+							}
 							m.banner = "[ERROR] Failed to send DM: " + err.Error()
 						}
 					}
@@ -2197,6 +2218,10 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			if strings.HasPrefix(text, ":search ") {
 				query := strings.TrimSpace(strings.TrimPrefix(text, ":search "))
+				if contentExceedsMessageLimit(query) {
+					m.banner = messageTooLargeBanner()
+					return m, nil
+				}
 				if query != "" {
 					searchMsg := shared.Message{Type: shared.SearchMessage, Sender: m.cfg.Username, Content: query}
 					if m.conn != nil {
@@ -2321,6 +2346,11 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.refreshTranscript()
 				m.sending = true
 				if m.conn != nil {
+					if contentExceedsMessageLimit(text) {
+						m.banner = messageTooLargeBanner()
+						m.sending = false
+						return m, nil
+					}
 					// Check if this is a server-side command (admin/plugin) that should bypass encryption
 					// Client-side commands are handled above and never reach this point
 					clientOnlyCommands := []string{":theme", ":time", ":msginfo", ":clear", ":bell", ":bell-mention", ":code", ":sendfile", ":savefile", ":q", ":edit", ":delete", ":dm", ":dms", ":dmhide", ":search", ":react", ":unreact", ":thumbsup", ":thumbsdown", ":pin", ":pinned", ":join", ":leave", ":channels", ":export"}
@@ -2366,9 +2396,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 						}
 						exthook.FireSend(dmMsg)
 						if err := sendDirectMessage(m.conn, m.keystore, m.cfg.Username, m.dmRecipient, text, m.useE2E); err != nil {
-							m.banner = "[ERROR] Failed to send DM: " + err.Error()
+							if errors.Is(err, errMessageTooLarge) {
+								m.banner = messageTooLargeBanner()
+							} else {
+								m.banner = "[ERROR] Failed to send DM: " + err.Error()
+								m.textarea.SetValue("")
+							}
 							m.sending = false
-							m.textarea.SetValue("")
 							return m, nil
 						}
 						m.banner = ""
@@ -2396,9 +2430,13 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 							Type:    shared.TextMessage,
 						})
 						if err := debugEncryptAndSend(recipients, text, m.conn, m.keystore, m.cfg.Username); err != nil {
-							m.banner = fmt.Sprintf("[ERROR] Global encryption failed: %v", err)
+							if errors.Is(err, errMessageTooLarge) {
+								m.banner = messageTooLargeBanner()
+							} else {
+								m.banner = fmt.Sprintf("[ERROR] Global encryption failed: %v", err)
+								m.textarea.SetValue("")
+							}
 							m.sending = false
-							m.textarea.SetValue("")
 							return m, nil
 						}
 

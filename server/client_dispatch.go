@@ -14,6 +14,12 @@ func (c *Client) dispatchInbound(msg *shared.Message) {
 		c.handleInboundFile(msg)
 		return
 	}
+	if msg.Type != shared.FileMessageType && shared.ContentExceedsLimit(msg.Content, c.maxMessageBytes) {
+		limit := shared.EffectiveMaxMessageBytes(c.maxMessageBytes)
+		log.Printf("Rejected message from %s: content too large (%d bytes, max %d)", c.username, len(msg.Content), limit)
+		c.send <- messageTooLargeSystemMessage(c.maxMessageBytes)
+		return
+	}
 
 	if msg.Type == shared.EditMessageType && msg.MessageID > 0 {
 		c.handleInboundEdit(msg)
