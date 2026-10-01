@@ -9,8 +9,8 @@ pkgbase = marchat-bin
 	depends = glibc
 	options = !strip
 	source_x86_64 = marchat-v1.3.8-linux-amd64.zip::https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.8/marchat-v1.3.8-linux-amd64.zip
-	sha256sums_x86_64 = 0000000000000000000000000000000000000000000000000000000000000000
+	sha256sums_x86_64 = 47c6f14b650880115ea090a25a36fd1b746ff227b85d1f2f834fc459638f60b1
 	source_aarch64 = marchat-v1.3.8-linux-arm64.zip::https://github.com/Cod-e-Codes/marchat/releases/download/v1.3.8/marchat-v1.3.8-linux-arm64.zip
-	sha256sums_aarch64 = 0000000000000000000000000000000000000000000000000000000000000000
+	sha256sums_aarch64 = 58cceeb97bf609c8a3b08c54032fb9d09baf87e3ad872a99b0e472c0502af7f7
 
 pkgname = marchat-bin

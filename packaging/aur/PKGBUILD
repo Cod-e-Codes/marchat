@@ -11,8 +11,8 @@ options=('!strip')
 depends=('glibc')
 source_x86_64=("marchat-${_pkgtag}-linux-amd64.zip::https://github.com/Cod-e-Codes/marchat/releases/download/${_pkgtag}/marchat-${_pkgtag}-linux-amd64.zip")
 source_aarch64=("marchat-${_pkgtag}-linux-arm64.zip::https://github.com/Cod-e-Codes/marchat/releases/download/${_pkgtag}/marchat-${_pkgtag}-linux-arm64.zip")
-sha256sums_x86_64=('0000000000000000000000000000000000000000000000000000000000000000')
-sha256sums_aarch64=('0000000000000000000000000000000000000000000000000000000000000000')
+sha256sums_x86_64=('47c6f14b650880115ea090a25a36fd1b746ff227b85d1f2f834fc459638f60b1')
+sha256sums_aarch64=('58cceeb97bf609c8a3b08c54032fb9d09baf87e3ad872a99b0e472c0502af7f7')
 
 package() {
   if [[ $CARCH == x86_64 ]]; then
