@@ -6,9 +6,14 @@ Narrative notes by release. Per-file binaries and assets: [GitHub releases](http
 
 On **`main`** only; not part of the latest tagged release until you tag and publish. Compare against the current tag on [GitHub releases](https://github.com/Cod-e-Codes/marchat/releases).
 
+## v1.3.8
+
+**Released 2026-10-01.** Since **[v1.3.7](https://github.com/Cod-e-Codes/marchat/releases/tag/v1.3.7)**; compare [`v1.3.7...v1.3.8`](https://github.com/Cod-e-Codes/marchat/compare/v1.3.7...v1.3.8). Commits: **`git log v1.3.7..v1.3.8 --oneline`**.
+
 - **Server**: Cap chat `content` at 32 KiB by default (`MARCHAT_MAX_MESSAGE_BYTES`, or `MARCHAT_MAX_MESSAGE_MB`). Oversized `text`, `dm`, `edit`, `search`, and command bodies get a System reply and stay connected; nothing is persisted or broadcast. Encrypted ciphertext uses the same byte cap. Plugin chat and command replies over the cap are dropped before broadcast. File uploads keep their own limit. Admin TUI, web admin, and `-doctor` show the message cap.
 - **Client**: Reject oversized composer, DM, code snippet, edit, and search bodies before send, including E2E wire `content` after encryption. WebSocket close **1009** is reported as a message-too-big error.
 - **Dependencies**: **modernc.org/sqlite** v1.59.0 (transitive **modernc.org/libc** v1.75.7; **modernc.org/mathutil** v1.7.1 and **modernc.org/memory** v1.12.1 unchanged); **github.com/mattn/go-runewidth** v0.0.30.
+- **Packaging**: Version strings and URLs for **v1.3.8** in **install.ps1**, **install.sh**, **build-release.ps1**, **scripts/build-*.ps1/sh**, **README**, **SECURITY.md**, **.github/workflows/release.yml**, and **packaging/** (Homebrew, Scoop, winget **1.3.8** manifest set, Chocolatey, AUR). **SHA256** fields are **placeholders** (`000000...`) until replaced from published release zips (**PACKAGING.md**, **packaging/ci/render-release-manifests.sh**).
 
 ## v1.3.7
 
