@@ -4,7 +4,7 @@ go 1.26.8
 
 require (
 	charm.land/bubbles/v2 v2.2.1
-	charm.land/bubbletea/v2 v2.0.9
+	charm.land/bubbletea/v2 v2.0.10
 	charm.land/lipgloss/v2 v2.0.6
 	github.com/Cod-e-Codes/marchat/plugin/sdk v0.0.0
 	github.com/alecthomas/chroma v0.10.0
